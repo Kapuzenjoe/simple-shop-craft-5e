@@ -1,0 +1,99 @@
+<div class="cart-content">
+    {{#if lines.length}}
+    <h3 class="icon"><i class="fas fa-cart-shopping" inert></i><span class="roboto-upper">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopCart.Buying" }}</span></h3>
+    <ol class="cart-lines unlist">
+        {{#each lines}}
+        <li class="cart-line">
+            <img class="item-image gold-icon" src="{{ this.item.img }}" alt="{{ this.item.name }}">
+            <span class="name">{{ this.item.name }}</span>
+            <span class="qty">×{{ this.cartQuantity }}</span>
+            <span class="amount">
+                {{#each this.subtotal}}
+                <span class="denom">
+                    <span class="value">{{ dnd5e-numberFormat this.value }}</span>
+                    <i class="currency {{ this.denomination }}" inert></i>
+                </span>
+                {{/each}}
+            </span>
+        </li>
+        {{/each}}
+    </ol>
+    {{/if}}
+
+    {{#if sellLines.length}}
+    <h3 class="icon"><i class="fas fa-hand-holding-dollar" inert></i><span class="roboto-upper">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopCart.Selling" }}</span></h3>
+    <ol class="cart-lines unlist">
+        {{#each sellLines}}
+        <li class="cart-line">
+            <img class="item-image gold-icon" src="{{ this.item.img }}" alt="{{ this.item.name }}">
+            <span class="name">{{ this.item.name }}</span>
+            <span class="qty">×{{ this.sellQuantity }}</span>
+            <span class="amount">
+                {{#each this.subtotal}}
+                <span class="denom">
+                    <span class="value">{{ dnd5e-numberFormat this.value }}</span>
+                    <i class="currency {{ this.denomination }}" inert></i>
+                </span>
+                {{/each}}
+            </span>
+        </li>
+        {{/each}}
+    </ol>
+    {{/if}}
+
+    {{#unless hasLines}}
+    <p>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopCart.Empty" }}</p>
+    {{/unless}}
+
+    <div class="cart-total">
+        <span class="label roboto-upper">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopCart.Total" }}</span>
+        <span class="amount">
+            {{#each total.parts}}
+            <span class="denom">
+                <span class="value">{{ dnd5e-numberFormat this.value }}</span>
+                <i class="currency {{ this.denomination }}" inert></i>
+            </span>
+            {{/each}}
+        </span>
+    </div>
+
+    {{#if actor}}
+    <div class="cart-balance{{#if balance.insufficient}} insufficient{{/if}}">
+        <span class="label roboto-upper">{{ actor.name }} — {{ localize "SIMPLE_SHOP_CRAFT_5E.ShopCart.Balance" }}</span>
+        <span class="amount">
+            {{#each balance.before}}
+            <span class="denom">
+                <span class="value">{{ dnd5e-numberFormat this.value }}</span>
+                <i class="currency {{ this.denomination }}" inert></i>
+            </span>
+            {{/each}}
+        </span>
+        {{#if hasLines}}
+        <span class="after">
+            (
+            {{#if balance.insufficient}}
+            {{ localize "SIMPLE_SHOP_CRAFT_5E.ShopCart.InsufficientFunds" }}
+            {{else}}
+            {{#each balance.after}}
+            <span class="denom">
+                <span class="value">{{ dnd5e-numberFormat this.value }}</span>
+                <i class="currency {{ this.denomination }}" inert></i>
+            </span>
+            {{/each}}
+            {{/if}}
+            )
+        </span>
+        {{/if}}
+    </div>
+    {{else}}
+    <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopCart.NoActor" }}</p>
+    {{/if}}
+
+    {{#if noActiveGM}}
+    <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopCart.NoActiveGM" }}</p>
+    {{/if}}
+
+    <button type="button" class="confirm-button" data-action="confirm" {{#if confirmDisabled}}disabled{{/if}}>
+        {{ localize "SIMPLE_SHOP_CRAFT_5E.ShopCart.Confirm" }}
+    </button>
+</div>

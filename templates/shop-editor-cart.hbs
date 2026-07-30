@@ -1,0 +1,13 @@
+<div class="cart-footer{{#unless cart.count}} empty{{/unless}}" data-action="openCart" role="button">
+    <i class="fas fa-basket-shopping" inert></i>
+    <span class="label">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopCart.ViewCart" }}</span>
+    <span class="amount">
+        {{#each cart.parts}}
+        <span class="denom">
+            <span class="value">{{ dnd5e-numberFormat this.value }}</span>
+            <i class="currency {{ this.denomination }}" inert></i>
+        </span>
+        {{/each}}
+    </span>
+    <i class="fas fa-chevron-right" inert></i>
+</div>

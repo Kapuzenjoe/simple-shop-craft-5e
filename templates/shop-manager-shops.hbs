@@ -1,0 +1,64 @@
+<section class="tab {{#if tab.active}}active{{/if}} inventory-element" data-group="primary" data-tab="shops">
+    <div class="items-section card">
+        <div class="items-header header">
+            <h3 class="item-name">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Shop" }}</h3>
+            <div class="item-header item-npc">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Owner" }}</div>
+            <div class="item-header item-location">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Location" }}</div>
+            <div class="item-header item-active">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Active" }}</div>
+            <div class="item-header item-count">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Items" }}</div>
+            <div class="item-header item-controls"></div>
+        </div>
+        <ol class="item-list unlist">
+            {{#each shops}}
+            <li class="item">
+                <div class="item-row">
+                    <div class="item-name clickable" data-action="editShop" data-shop-id="{{ this.shop._id }}">
+                        <img class="item-image gold-icon" src="{{ this.shop.img }}" alt="{{ this.shop.name }}">
+                        <div class="name name-stacked">
+                            <span class="title">{{ this.shop.name }}</span>
+                        </div>
+                    </div>
+                    <div class="item-detail item-npc">
+                        {{#if this.npc}}
+                        <img class="item-image gold-icon" src="{{ this.npc.img }}" alt="{{ this.npc.name }}">
+                        <span class="title">{{ this.npc.name }}</span>
+                        {{/if}}
+                    </div>
+                    <div class="item-detail item-location">{{ this.shop.location }}</div>
+                    <div class="item-detail item-active">
+                        {{#if ../isGM}}
+                        <a data-action="toggleActive" data-shop-id="{{ this.shop._id }}"
+                           data-tooltip="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.ToggleActive' }}"
+                           aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.ToggleActive' }}">
+                            <i class="fa-solid fa-toggle-{{ ifThen this.shop.active 'on' 'off' }}"></i>
+                        </a>
+                        {{else}}
+                        <i class="fa-solid fa-toggle-{{ ifThen this.shop.active 'on' 'off' }}"></i>
+                        {{/if}}
+                    </div>
+                    <div class="item-detail item-count">{{ this.shop.items.length }}</div>
+                    <div class="item-detail item-controls">
+                        {{#if ../isGM}}
+                        <button type="button" class="unbutton config-button item-control item-action"
+                                data-action="deleteShop" data-shop-id="{{ this.shop._id }}"
+                                data-tooltip="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Delete' }}"
+                                aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Delete' }}">
+                            <i class="fas fa-trash" inert></i>
+                        </button>
+                        {{/if}}
+                    </div>
+                </div>
+            </li>
+            {{else}}
+            <p>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.None" }}</p>
+            {{/each}}
+        </ol>
+    </div>
+    {{#if isGM}}
+    <button type="button" data-action="createShop" class="gold-button always-interactive create-child"
+            data-tooltip="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Create' }}"
+            aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Create' }}">
+        <i class="fas fa-plus" inert></i>
+    </button>
+    {{/if}}
+</section>

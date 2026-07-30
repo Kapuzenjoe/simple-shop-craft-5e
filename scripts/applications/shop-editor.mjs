@@ -1,0 +1,888 @@
+import { MODULE_ID, SETTING_KEYS, SETTLEMENT_CAPS, GOLD_POOL_DEFAULT } from "../config.mjs";
+import { entryKey, pickItemIdentifiers, resolveShopItems } from "../shops/item-resolver.mjs";
+import { breakdownPrice, effectiveGoldPool } from "../shops/currency.mjs";
+import ShopCart from "./shop-cart.mjs";
+
+const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
+
+/**
+ * GM-facing application for editing a single shop's item list.
+ * @mixes HandlebarsApplicationMixin
+ * @extends {ApplicationV2}
+ */
+export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2) {
+
+  /**
+   * @param {object} [options]
+   * @param {string} [options.shopId]  Id of the ShopData being edited.
+   */
+  constructor(options={}) {
+    super(options);
+    this.shopId = options.shopId;
+  }
+
+  /** @override */
+  static DEFAULT_OPTIONS = {
+    id: "shop-editor-{id}",
+    classes: ["dnd5e2", "simple-shop-craft-5e", "shop-editor"],
+    tag: "form",
+    window: {
+      title: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Title",
+      resizable: true
+    },
+    position: {
+      width: 850,
+      height: 700
+    },
+    form: {
+      handler: ShopEditor.#onSubmit,
+      submitOnChange: true,
+      closeOnSubmit: false
+    },
+    actions: {
+      addItems: ShopEditor.#addItems,
+      removeItem: ShopEditor.#removeItem,
+      editPrice: ShopEditor.#editPrice,
+      adjustCartQty: ShopEditor.#adjustCartQty,
+      adjustSellQty: ShopEditor.#adjustSellQty,
+      openCart: ShopEditor.#openCart,
+      clearNpc: ShopEditor.#clearNpc,
+      openNpcSheet: ShopEditor.#openNpcSheet,
+      changeMode: ShopEditor.#changeMode,
+      editImage: ShopEditor.#editImage,
+      editGoldPool: ShopEditor.#editGoldPool,
+      resetShop: ShopEditor.#resetShop,
+      editMaxStock: ShopEditor.#editMaxStock
+    }
+  };
+
+  /**
+   * Is this editor currently in edit mode? GM-only; players always see view mode.
+   * @type {boolean}
+   */
+  isEditMode = false;
+
+  /**
+   * UUID of the actor (or party) currently selected for buy/sell. Per-user, not persisted across sessions.
+   * @type {string|null}
+   */
+  selectedActorUuid = undefined;
+
+  /**
+   * Selected buy quantities, keyed by {@link entryKey}. Per-user, not persisted across sessions.
+   * @type {Map<string, number>}
+   */
+  cart = new Map();
+
+  /**
+   * Selected sell quantities, keyed by the actor-owned item's id. Per-user, not persisted across sessions.
+   * @type {Map<string, number>}
+   */
+  sellCart = new Map();
+
+  /**
+   * The shopping cart window, opened on demand and reused across renders.
+   * @type {ShopCart|null}
+   */
+  cartApp = null;
+
+  /** @override */
+  static PARTS = {
+    header: {
+      template: "modules/simple-shop-craft-5e/templates/shop-editor-header.hbs",
+      templates: ["modules/simple-shop-craft-5e/templates/partials/mod-item.hbs"]
+    },
+    owner: { template: "modules/simple-shop-craft-5e/templates/shop-editor-owner.hbs" },
+    tabs: {
+      template: "modules/simple-shop-craft-5e/templates/shop-editor-tabs.hbs",
+      templates: ["templates/generic/tab-navigation.hbs"]
+    },
+    buy: {
+      template: "modules/simple-shop-craft-5e/templates/shop-editor-buy.hbs",
+      scrollable: [""]
+    },
+    sell: {
+      template: "modules/simple-shop-craft-5e/templates/shop-editor-sell.hbs",
+      scrollable: [""]
+    },
+    cart: { template: "modules/simple-shop-craft-5e/templates/shop-editor-cart.hbs" }
+  };
+
+  /** @override */
+  static TABS = {
+    primary: {
+      tabs: [
+        { id: "buy", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Buy", icon: "fas fa-cart-shopping" },
+        { id: "sell", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Sell", icon: "fas fa-hand-holding-dollar" }
+      ],
+      initial: "buy"
+    }
+  };
+
+  /* -------------------------------------------- */
+
+  /**
+   * The shop currently being edited.
+   * @type {Shop}
+   */
+  get shop() {
+    return game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS).find(s => s._id === this.shopId);
+  }
+
+  /** @override */
+  get title() {
+    return this.shop?.name ?? super.title;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Persist a partial update to this shop's data and re-render.
+   * @param {object} patch  Fields to merge into the shop's current data.
+   * @returns {Promise<void>}
+   */
+  async #updateShop(patch) {
+    const shops = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS);
+    await game.settings.set(MODULE_ID, SETTING_KEYS.SHOPS, shops.map(s =>
+      s._id === this.shopId ? { ...s.toObject(), ...patch } : s.toObject()
+    ));
+    this.render();
+  }
+
+  /* -------------------------------------------- */
+
+  /** @override */
+  async _prepareContext(options) {
+    const context = await super._prepareContext(options);
+    context.shop = this.shop;
+    context.config = CONFIG.DND5E;
+    context.isGM = game.user.isGM;
+    context.editable = game.user.isGM && this.isEditMode;
+    const { characters, party } = ShopEditor.#getSelectableActors();
+    if ( this.selectedActorUuid === undefined ) {
+      this.selectedActorUuid = game.user.character?.type === "character" ? game.user.character.uuid : "";
+    }
+    context.actorOptions = [
+      { value: "", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoActorSelected") },
+      ...(party ? [{ value: party.uuid, label: party.name }] : []),
+      ...characters.map(a => ({ value: a.uuid, label: a.name }))
+    ].map(o => ({ ...o, selected: o.value === this.selectedActorUuid }));
+    context.npc = context.shop.npc ? fromUuidSync(context.shop.npc) : null;
+    context.npcImg = context.npc?.img;
+    const resolved = await resolveShopItems(context.shop.items);
+    context.groups = ShopEditor.#groupByType(resolved, context.shop.settlementCap, context.shop.buyModifier, this.cart);
+    this.lastGroups = context.groups;
+
+    context.actor = this.selectedActorUuid ? fromUuidSync(this.selectedActorUuid) : null;
+    context.sellGroups = ShopEditor.#groupSellItems(context.actor?.items ?? [], context.shop.sellModifier, this.sellCart);
+    this.lastSellGroups = context.sellGroups;
+
+    context.cart = ShopEditor.#summarizeCart(context.groups, context.sellGroups);
+    context.effectiveGoldCurrent = effectiveGoldPool(context.shop.goldPool);
+    return context;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Rows currently selected in the shopping cart, resolved from the last render.
+   * @type {object[]}
+   */
+  get cartLines() {
+    return (this.lastGroups ?? []).flatMap(group => group.items).filter(row => row.cartQuantity > 0);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Rows currently selected to sell, resolved from the last render.
+   * @type {object[]}
+   */
+  get sellLines() {
+    return (this.lastSellGroups ?? []).flatMap(group => group.items).filter(row => row.sellQuantity > 0);
+  }
+
+  /* -------------------------------------------- */
+
+  /** @override */
+  async _preparePartContext(partId, context, options) {
+    context = await super._preparePartContext(partId, context, options);
+    context.tab = context.tabs?.[partId];
+    return context;
+  }
+
+  /* -------------------------------------------- */
+
+  /** @override */
+  async _onRender(context, options) {
+    await super._onRender(context, options);
+
+    const addButton = this.element.querySelector(".create-child");
+    if ( addButton ) addButton.hidden = !context.editable || !context.tabs?.buy?.active;
+
+    const locationText = this.element.querySelector(".window-subtitle .location-text");
+    if ( locationText ) locationText.textContent = this.shop.location || "";
+
+    const capDisplay = this.element.querySelector(".settlement-cap-display");
+    const capSelect = this.element.querySelector(".settlement-cap-select");
+    const capCustom = this.element.querySelector(".settlement-cap-custom");
+    if ( capDisplay ) {
+      const current = this.shop.settlementCap;
+      capDisplay.hidden = !!context.editable;
+      capDisplay.textContent = current.value != null
+        ? `· ${current.value} ${current.denomination.toUpperCase()}`
+        : "· ∞";
+    }
+    if ( capSelect ) {
+      capSelect.hidden = !context.editable;
+      const current = this.shop.settlementCap;
+      const preset = Object.entries(SETTLEMENT_CAPS).find(([, v]) => v === current.value)?.[0]
+        ?? (current.value != null ? "custom" : "");
+      capSelect.value = preset;
+      capCustom.hidden = !context.editable || (preset !== "custom");
+      capCustom.value = current.value ?? "";
+    }
+    this.window.title.textContent = this.shop.name;
+  }
+
+  /* -------------------------------------------- */
+
+  /** @override */
+  async _onFirstRender(context, options) {
+    await super._onFirstRender(context, options);
+
+    if ( game.user.isGM ) {
+      const toggle = document.createElement("slide-toggle");
+      toggle.checked = this.isEditMode;
+      toggle.classList.add("mode-slider");
+      toggle.dataset.action = "changeMode";
+      toggle.dataset.tooltip = "SIMPLE_SHOP_CRAFT_5E.ShopEditor.EditMode";
+      toggle.setAttribute("aria-label", _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.EditMode"));
+      this.element.querySelector(".window-header").prepend(toggle);
+    }
+
+    const titleEl = this.window.title;
+    const titleWrapper = document.createElement("div");
+    titleWrapper.classList.add("window-titles");
+    titleEl.replaceWith(titleWrapper);
+    titleWrapper.append(titleEl);
+
+    const subtitle = document.createElement("h2");
+    subtitle.classList.add("window-subtitle");
+    titleWrapper.append(subtitle);
+
+    const locationText = document.createElement("span");
+    locationText.classList.add("location-text");
+    subtitle.append(locationText);
+
+    if ( game.user.isGM ) {
+      const capDisplay = document.createElement("span");
+      capDisplay.classList.add("settlement-cap-display");
+      capDisplay.dataset.tooltip = "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SettlementCap";
+      subtitle.append(capDisplay);
+
+      const capSelect = document.createElement("select");
+      capSelect.classList.add("settlement-cap-select", "uninput");
+      capSelect.dataset.tooltip = "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SettlementCap";
+      capSelect.innerHTML = [
+        ["", "NoCap"], ["village", "Village"], ["town", "Town"], ["city", "City"], ["custom", "Custom"]
+      ].map(([value, key]) =>
+        `<option value="${value}">${_loc(`SIMPLE_SHOP_CRAFT_5E.ShopEditor.${key}`)}</option>`
+      ).join("");
+      subtitle.append(capSelect);
+
+      const capCustom = document.createElement("input");
+      capCustom.type = "number";
+      capCustom.min = "0";
+      capCustom.classList.add("settlement-cap-custom", "uninput");
+      subtitle.append(capCustom);
+    }
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.tooltip = "SIMPLE_SHOP_CRAFT_5E.ShopEditor.AddItems";
+    button.ariaLabel = _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.AddItems");
+    button.classList.add("create-child", "gold-button", "always-interactive");
+    button.dataset.action = "addItems";
+    button.innerHTML = '<i class="fas fa-plus" inert></i>';
+    this.element.querySelector(".window-content").append(button);
+
+    const capSelect = this.element.querySelector(".settlement-cap-select");
+    const capCustom = this.element.querySelector(".settlement-cap-custom");
+    if ( capSelect ) {
+      capSelect.addEventListener("change", async () => {
+        capCustom.hidden = capSelect.value !== "custom";
+        if ( capSelect.value === "custom" ) { capCustom.focus(); return; }
+        const value = capSelect.value === "" ? null : SETTLEMENT_CAPS[capSelect.value];
+        await this.#updateShop({ settlementCap: { value, denomination: "gp" } });
+      });
+      capCustom.addEventListener("change", async () => {
+        const value = capCustom.value === "" ? null : Number(capCustom.value);
+        await this.#updateShop({ settlementCap: { value, denomination: "gp" } });
+      });
+    }
+  }
+
+  /* -------------------------------------------- */
+
+  /** @override */
+  _attachPartListeners(partId, htmlElement, options) {
+    super._attachPartListeners(partId, htmlElement, options);
+    const editable = game.user.isGM && this.isEditMode;
+
+    if ( partId === "owner" ) {
+      htmlElement.querySelector('select[name="selectedActor"]')?.addEventListener("change", async event => {
+        event.stopPropagation();
+        this.selectedActorUuid = event.target.value;
+        this.sellCart.clear();
+        await this.render();
+        if ( this.cartApp?.rendered ) this.cartApp.render();
+      });
+
+      const npcDropTarget = htmlElement.querySelector(".npc-drop-target");
+      if ( editable && npcDropTarget ) {
+        npcDropTarget.addEventListener("dragover", event => event.preventDefault());
+        npcDropTarget.addEventListener("drop", event => {
+          const data = foundry.applications.ux.TextEditor.implementation.getDragEventData(event);
+          if ( data.type !== "Actor" ) return;
+          const input = this.element.querySelector('input[name="npc"]');
+          input.value = data.uuid;
+          input.dispatchEvent(new Event("change", { bubbles: true }));
+        });
+      }
+    }
+
+    if ( partId === "buy" ) {
+      const buyTab = htmlElement.matches('.tab[data-tab="buy"]') ? htmlElement : htmlElement.querySelector('.tab[data-tab="buy"]');
+      if ( editable && buyTab ) {
+        buyTab.addEventListener("dragover", event => event.preventDefault());
+        buyTab.addEventListener("drop", async event => {
+          const data = foundry.applications.ux.TextEditor.implementation.getDragEventData(event);
+          if ( data.type !== "Item" ) return;
+          const item = await fromUuid(data.uuid);
+          if ( !item || !CONFIG.Item.dataModels[item.type]?.inventorySection ) return;
+          await this.#mergeItemEntries([
+            { identifier: item.system.identifier ?? "", uuid: data.uuid, stock: { max: null, current: null } }
+          ]);
+        });
+      }
+    }
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Group resolved item rows by their item type.
+   * @param {Array<{entry: ShopItemEntryData, item: object|null}>} rows
+   * @param {{value: number|null, denomination: string}} settlementCap
+   * @param {number} buyModifier  Shop's default buy-side percent discount/markup, used when an item has no override.
+   * @param {Map<string, number>} cart  Selected buy quantities, keyed by {@link entryKey}.
+   * @returns {Array<{type: string, items: Array<{entry: ShopItemEntryData, item: object|null}>}>}
+   */
+  static #groupByType(rows, settlementCap, buyModifier, cart) {
+    const targetUnit = game.settings.get("dnd5e", "metricWeightUnits") ? "kg" : "lb";
+    const capGP = settlementCap?.value != null
+      ? settlementCap.value / (CONFIG.DND5E.currencies[settlementCap.denomination]?.conversion ?? 1)
+      : null;
+    const groups = new Map();
+    for ( const row of rows ) {
+      row.key = entryKey(row.entry);
+      const basePrice = row.entry.price?.value ?? row.item?.system?.price?.value ?? 0;
+      const denomination = (row.entry.price?.value != null)
+        ? row.entry.price.denomination
+        : (row.item?.system?.price?.denomination ?? "gp");
+      const discountPercent = row.entry.discount ?? (ShopEditor.#isFixedValue(row.item) ? 0 : buyModifier);
+      const finalValue = basePrice * (1 + discountPercent / 100);
+      row.priceDisplay = ShopEditor.#buildPriceDisplay(basePrice, finalValue, denomination);
+      row.discountPercent = discountPercent;
+      row.cartQuantity = cart.get(row.key) ?? 0;
+      row.bundleSize = (row.item?.system?.quantity > 1) ? row.item.system.quantity : null;
+      row.weight = ShopEditor.#resolveWeight(row.item?.system, targetUnit);
+      row.stockTracked = row.entry.stock.current !== null;
+
+      const baseGP = basePrice / (CONFIG.DND5E.currencies[denomination]?.conversion ?? 1);
+      const priceGP = finalValue / (CONFIG.DND5E.currencies[denomination]?.conversion ?? 1);
+      row.priceGP = priceGP;
+      const reasons = [];
+      if ( !row.item ) reasons.push(_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SuppressedNotFound"));
+      if ( row.entry.stock.current === 0 ) reasons.push(_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SuppressedStock"));
+      if ( (capGP != null) && (baseGP > capGP) ) reasons.push(_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SuppressedCap"));
+      row.suppressed = reasons.length > 0;
+      row.suppressReason = reasons.join(", ");
+      row.itemImg = row.item?.img ?? "icons/svg/hazard.svg";
+      row.itemName = row.item?.name ?? row.entry.identifier ?? row.entry.uuid ?? "?";
+
+      const type = row.item?.type ?? "unknown";
+      if ( !groups.has(type) ) groups.set(type, []);
+      groups.get(type).push(row);
+    }
+    return ShopEditor.#finalizeGroups(groups);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Gemstones and art objects (DMG "Treasure" loot subtypes) are treated as items with a fixed
+   * market value — never subject to any buy/sell discount or markup.
+   * @param {Item5e|object} [item]
+   * @returns {boolean}
+   */
+  static #isFixedValue(item) {
+    const fixedTypes = ["gem", "art"];
+    return (item?.type === "loot") && fixedTypes.includes(item?.system?.type?.value);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Build the price-display object (current value + original-if-discounted) shown in Buy/Sell tables.
+   * @param {number} basePrice
+   * @param {number} finalValue
+   * @param {string} denomination
+   * @returns {{parts: object[], original: object[]|null}}
+   */
+  static #buildPriceDisplay(basePrice, finalValue, denomination) {
+    return {
+      parts: breakdownPrice(finalValue, denomination),
+      original: (finalValue !== basePrice) ? breakdownPrice(basePrice, denomination) : null
+    };
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Convert an item's weight to the world's configured weight unit, if it has one.
+   * @param {object} [itemSystem]  The item's system data.
+   * @param {string} targetUnit    "kg" or "lb", per the world's `metricWeightUnits` setting.
+   * @returns {{value: number, unit: string}|undefined}
+   */
+  static #resolveWeight(itemSystem, targetUnit) {
+    if ( !itemSystem?.weight ) return undefined;
+    return {
+      value: game.dnd5e.utils.convertWeight(itemSystem.weight.value, itemSystem.weight.units || "lb", targetUnit),
+      unit: targetUnit
+    };
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Turn a Map of type → rows into the sorted, labeled group array used by both Buy and Sell tables.
+   * @param {Map<string, object[]>} groups
+   * @returns {Array<{type: string, label: string, items: object[]}>}
+   */
+  static #finalizeGroups(groups) {
+    return Array.from(groups, ([type, items]) => ({
+      type,
+      label: _loc(`TYPES.Item.${type}Pl`),
+      items
+    })).sort((a, b) =>
+      (CONFIG.Item.dataModels[a.type]?.inventorySection?.order ?? Infinity)
+      - (CONFIG.Item.dataModels[b.type]?.inventorySection?.order ?? Infinity)
+    );
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Group a selected actor's sellable inventory by item type.
+   * @param {Item5e[]|Collection} items      The actor's items.
+   * @param {number} sellModifier            Shop's sell-side percent discount/markup.
+   * @param {Map<string, number>} sellCart   Selected sell quantities, keyed by item id.
+   * @returns {Array<{type: string, label: string, items: object[]}>}
+   */
+  static #groupSellItems(items, sellModifier, sellCart) {
+    const targetUnit = game.settings.get("dnd5e", "metricWeightUnits") ? "kg" : "lb";
+    const groups = new Map();
+    for ( const item of items ) {
+      if ( !CONFIG.Item.dataModels[item.type]?.inventorySection ) continue;
+      const basePrice = item.system.price?.value ?? 0;
+      const denomination = item.system.price?.denomination ?? "gp";
+      const discountPercent = ShopEditor.#isFixedValue(item) ? 0 : sellModifier;
+      const finalValue = basePrice * (1 + discountPercent / 100);
+      const row = {
+        item,
+        priceDisplay: ShopEditor.#buildPriceDisplay(basePrice, finalValue, denomination),
+        discountPercent,
+        sellQuantity: sellCart.get(item.id) ?? 0,
+        owned: item.system.quantity ?? 1,
+        priceGP: finalValue / (CONFIG.DND5E.currencies[denomination]?.conversion ?? 1),
+        weight: ShopEditor.#resolveWeight(item.system, targetUnit)
+      };
+      if ( !groups.has(item.type) ) groups.set(item.type, []);
+      groups.get(item.type).push(row);
+    }
+    return ShopEditor.#finalizeGroups(groups);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle incrementing/decrementing a sell quantity.
+   * @this {ShopEditor}
+   * @param {Event} event         Triggering click event.
+   * @param {HTMLElement} target  Button that was clicked.
+   */
+  static #adjustSellQty(event, target) {
+    const itemId = target.dataset.itemId;
+    const actor = this.selectedActorUuid ? fromUuidSync(this.selectedActorUuid) : null;
+    const max = actor?.items.get(itemId)?.system?.quantity ?? 0;
+    const delta = Number(target.dataset.delta);
+    const next = Math.clamp((this.sellCart.get(itemId) ?? 0) + delta, 0, max);
+    if ( next === 0 ) this.sellCart.delete(itemId);
+    else this.sellCart.set(itemId, next);
+    this.render();
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Summarize the current buy and sell carts across all groups into a single net total.
+   * Buying costs money (negative), selling earns money (positive).
+   * @param {Array<{items: object[]}>} buyGroups   Rows returned by {@link ShopEditor.#groupByType}.
+   * @param {Array<{items: object[]}>} sellGroups  Rows returned by {@link ShopEditor.#groupSellItems}.
+   * @returns {{count: number, parts: Array<{denomination: string, value: number}>}}
+   */
+  static #summarizeCart(buyGroups, sellGroups) {
+    let count = 0;
+    let buyTotalGP = 0;
+    for ( const group of buyGroups ) {
+      for ( const row of group.items ) {
+        if ( !row.cartQuantity ) continue;
+        count += row.cartQuantity;
+        buyTotalGP += row.priceGP * row.cartQuantity;
+      }
+    }
+    let sellTotalGP = 0;
+    for ( const group of sellGroups ) {
+      for ( const row of group.items ) {
+        if ( !row.sellQuantity ) continue;
+        count += row.sellQuantity;
+        sellTotalGP += row.priceGP * row.sellQuantity;
+      }
+    }
+    const netGP = sellTotalGP - buyTotalGP;
+    return { count, parts: count > 0 ? breakdownPrice(Math.abs(netGP), "gp", netGP < 0) : [] };
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Determine which actors/party the current user may act as for buy/sell — player characters and the party actor only.
+   * @returns {{characters: Actor5e[], party: Actor5e|null}}
+   */
+  static #getSelectableActors() {
+    const isGM = game.user.isGM;
+    const characters = game.actors.filter(a => (a.type === "character") && (isGM || a.isOwner));
+    const party = game.actors.party;
+    const partySelectable = party && (isGM
+      || (game.user.character && party.system.playerCharacters.includes(game.user.character) && party.isOwner));
+    return { characters, party: partySelectable ? party : null };
+  }
+
+  /* -------------------------------------------- */
+  /*  Actions                                      */
+  /* -------------------------------------------- */
+
+  /**
+   * Handle changes to per-item stock/price overrides.
+   * @this {ShopEditor}
+   * @param {Event} event
+   * @param {HTMLElement} form
+   * @param {FormDataExtended} formData
+   */
+  static async #onSubmit(event, form, formData) {
+    const data = foundry.utils.expandObject(formData.object);
+    const overrides = data.items ?? {};
+    const items = this.shop.items.map(entry => {
+      const override = overrides[entryKey(entry)];
+      if ( !override ) return entry.toObject();
+      const result = entry.toObject();
+      if ( override.discount !== undefined ) {
+        result.discount = override.discount === null ? null : Math.clamp(Math.round(override.discount), -100, 1000);
+      }
+      return result;
+    });
+
+    await this.#updateShop({
+      npc: data.npc || null,
+      name: data.name || this.shop.name,
+      location: data.location ?? this.shop.location,
+      buyModifier: Math.clamp(Math.round(data.buyModifier ?? this.shop.buyModifier), -100, 1000),
+      sellModifier: Math.clamp(Math.round(data.sellModifier ?? this.shop.sellModifier), -100, 1000),
+      description: data.description ?? this.shop.description, items
+    });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle clearing the assigned NPC.
+   * @this {ShopEditor}
+   */
+  static #clearNpc() {
+    const input = this.element.querySelector('input[name="npc"]');
+    input.value = "";
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle toggling between edit and view mode. GM-only.
+   * @this {ShopEditor}
+   */
+  static #changeMode() {
+    if ( !game.user.isGM ) return;
+    this.isEditMode = !this.isEditMode;
+    this.render();
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle changing the shop's image via the file picker.
+   * @this {ShopEditor}
+   */
+  static #editImage() {
+    const fp = new foundry.applications.apps.FilePicker.implementation({
+      type: "image",
+      current: this.shop.img,
+      callback: path => this.#updateShop({ img: path })
+    });
+    fp.browse();
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle opening a small dialog to edit the shop's gold pool (how much liquidity it has to buy items back).
+   * @this {ShopEditor}
+   */
+  static async #editGoldPool() {
+    const { createFormGroup, createNumberInput, createCheckboxInput } = foundry.applications.fields;
+    const pool = this.shop.goldPool;
+    const effectiveCurrent = pool.current ?? pool.max ?? GOLD_POOL_DEFAULT;
+    const content = `<fieldset>
+      ${createFormGroup({
+        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GoldPoolUnlimited"),
+        hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GoldPoolUnlimitedHint"),
+        input: createCheckboxInput({ name: "unlimited", value: pool.unlimited })
+      }).outerHTML}
+      ${createFormGroup({
+        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GoldPoolMax"),
+        hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GoldPoolMaxHint"),
+        input: createNumberInput({ name: "max", value: pool.max, placeholder: GOLD_POOL_DEFAULT, min: 0 })
+      }).outerHTML}
+      ${createFormGroup({
+        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GoldPoolCurrent"),
+        input: createNumberInput({ name: "current", value: pool.current, placeholder: effectiveCurrent, min: 0 })
+      }).outerHTML}
+    </fieldset>`;
+
+    const data = await foundry.applications.api.DialogV2.input({
+      window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GoldPool" },
+      content
+    });
+    if ( !data ) return;
+
+    await this.#updateShop({
+      goldPool: { max: data.max ?? null, current: data.current ?? null, unlimited: !!data.unlimited }
+    });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle resetting this shop's stock (to each item's configured max, skipping items excluded via
+   * `noRestock`) and gold pool (to its max, falling back to the default gold pool unless unlimited).
+   * @this {ShopEditor}
+   */
+  static async #resetShop() {
+    const items = this.shop.items.map(entry => {
+      const obj = entry.toObject();
+      if ( !obj.noRestock ) obj.stock = { ...obj.stock, current: obj.stock.max };
+      return obj;
+    });
+    const goldPool = { ...this.shop.goldPool };
+    if ( !goldPool.unlimited ) goldPool.current = goldPool.max ?? GOLD_POOL_DEFAULT;
+
+    await this.#updateShop({ items, goldPool, lastRestock: Date.now() });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle opening a small dialog to edit an item's stock max (restock target) and current stock together.
+   * @this {ShopEditor}
+   * @param {Event} event         Triggering click event.
+   * @param {HTMLElement} target  Element that was clicked.
+   */
+  static async #editMaxStock(event, target) {
+    const key = target.dataset.key;
+    const entry = this.shop.items.find(i => entryKey(i) === key);
+
+    const { createFormGroup, createNumberInput, createCheckboxInput } = foundry.applications.fields;
+    const content = `<fieldset>
+      ${createFormGroup({
+        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StockMax"),
+        hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StockMaxHint"),
+        input: createNumberInput({ name: "max", value: entry.stock.max, placeholder: "∞", min: 0 })
+      }).outerHTML}
+      ${createFormGroup({
+        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StockCurrent"),
+        input: createNumberInput({ name: "current", value: entry.stock.current, placeholder: "∞", min: 0 })
+      }).outerHTML}
+      ${createFormGroup({
+        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoRestock"),
+        hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoRestockHint"),
+        input: createCheckboxInput({ name: "noRestock", value: entry.noRestock })
+      }).outerHTML}
+    </fieldset>`;
+
+    const data = await foundry.applications.api.DialogV2.input({
+      window: { title: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StockMax") },
+      position: { width: 480 },
+      content,
+      render: (event, dialog) => {
+        const maxInput = dialog.element.querySelector('input[name="max"]');
+        const noRestockInput = dialog.element.querySelector('input[name="noRestock"]');
+        const sync = () => maxInput.readOnly = noRestockInput.checked;
+        noRestockInput.addEventListener("change", sync);
+        sync();
+      }
+    });
+    if ( !data ) return;
+
+    const items = this.shop.items.map(i => entryKey(i) !== key ? i.toObject() : {
+      ...i.toObject(),
+      stock: { max: data.noRestock ? null : (data.max ?? null), current: data.current ?? null },
+      noRestock: !!data.noRestock
+    });
+    await this.#updateShop({ items });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle opening the assigned NPC's actor sheet.
+   * @this {ShopEditor}
+   */
+  static #openNpcSheet() {
+    if ( !game.user.isGM ) return;
+    const npc = this.shop.npc ? fromUuidSync(this.shop.npc) : null;
+    npc?.sheet.render({ force: true });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Merge new item entries into the shop's item list, replacing any existing entry with the same
+   * {@link entryKey}.
+   * @param {ShopItemEntryData[]} newEntries
+   */
+  async #mergeItemEntries(newEntries) {
+    const entries = new Map(this.shop.items.map(i => [entryKey(i), i.toObject()]));
+    for ( const entry of newEntries ) entries.set(entryKey(entry), entry);
+    await this.#updateShop({ items: Array.from(entries.values()) });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle adding items to this shop via the compendium browser.
+   * @this {ShopEditor}
+   */
+  static async #addItems() {
+    const picked = await pickItemIdentifiers();
+    if ( !picked.length ) return;
+
+    await this.#mergeItemEntries(picked.map(({ identifier }) => ({ identifier, stock: { max: null, current: null } })));
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle removing an item from this shop.
+   * @this {ShopEditor}
+   * @param {Event} event         Triggering click event.
+   * @param {HTMLElement} target  Button that was clicked.
+   */
+  static async #removeItem(event, target) {
+    const key = target.dataset.key;
+    const items = this.shop.items.filter(i => entryKey(i) !== key).map(i => i.toObject());
+    await this.#updateShop({ items });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle opening a small dialog to edit an item's price.
+   * @this {ShopEditor}
+   * @param {Event} event         Triggering click event.
+   * @param {HTMLElement} target  Element that was clicked.
+   */
+  static async #editPrice(event, target) {
+    const key = target.dataset.key;
+    const entry = this.shop.items.find(i => entryKey(i) === key);
+    const item = (await resolveShopItems([entry]))[0]?.item;
+
+    const { createFormGroup, createNumberInput, createSelectInput } = foundry.applications.fields;
+    const content = `<fieldset>
+      ${createFormGroup({
+        label: _loc("DND5E.Price"),
+        input: createNumberInput({ name: "value", value: entry.price?.value, placeholder: item?.system?.price?.value })
+      }).outerHTML}
+      ${createFormGroup({
+        label: _loc("DND5E.Currency"),
+        input: createSelectInput({
+          name: "denomination",
+          value: entry.price?.denomination ?? item?.system?.price?.denomination ?? "gp",
+          options: Object.entries(CONFIG.DND5E.currencies).map(([value, cfg]) => ({ value, label: cfg.label }))
+        })
+      }).outerHTML}
+    </fieldset>`;
+
+    const data = await foundry.applications.api.DialogV2.input({
+      window: { title: "DND5E.Price" },
+      content
+    });
+    if ( !data ) return;
+
+    const items = this.shop.items.map(i => entryKey(i) !== key ? i.toObject() : {
+      ...i.toObject(),
+      price: { value: data.value ?? null, denomination: data.denomination }
+    });
+    await this.#updateShop({ items });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle incrementing/decrementing an item's quantity in the (session-only) shopping cart.
+   * @this {ShopEditor}
+   * @param {Event} event         Triggering click event.
+   * @param {HTMLElement} target  Button that was clicked.
+   */
+  static async #adjustCartQty(event, target) {
+    const key = target.dataset.key;
+    const max = this.shop.items.find(i => entryKey(i) === key)?.stock.current ?? Infinity;
+    const delta = Number(target.dataset.delta);
+    const next = Math.clamp((this.cart.get(key) ?? 0) + delta, 0, max);
+    if ( next === 0 ) this.cart.delete(key);
+    else this.cart.set(key, next);
+    await this.render();
+    if ( this.cartApp?.rendered ) this.cartApp.render();
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle opening the shopping cart window.
+   * @this {ShopEditor}
+   */
+  static #openCart() {
+    this.cartApp ??= new ShopCart({ shopEditor: this });
+    this.cartApp.render({ force: true });
+  }
+}

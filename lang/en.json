@@ -1,0 +1,124 @@
+{
+  "SIMPLE_SHOP_CRAFT_5E": {
+    "StarterPack": {
+      "Blacksmith": "Blacksmith",
+      "Alchemist": "Alchemist",
+      "Tavern": "Tavern",
+      "GeneralStore": "General Store",
+      "MagicShop": "Magic Shop",
+      "Blackmarket": "Blackmarket"
+    },
+    "ShopManager": {
+      "Title": "Shop & Craft",
+      "Action": {
+        "Open": "Shop & Craft"
+      },
+      "Tabs": {
+        "Shops": "Shops",
+        "Crafting": "Crafting"
+      },
+      "Shops": {
+        "Shop": "Shop",
+        "Owner": "Owner",
+        "Location": "Location",
+        "Active": "Active",
+        "ToggleActive": "Toggle Active",
+        "Items": "Items",
+        "StarterPack": "Starter Pack",
+        "Empty": "Empty",
+        "None": "No shops yet.",
+        "Create": "New Shop",
+        "Delete": "Delete Shop",
+        "DeleteConfirm": "Delete this shop? This cannot be undone."
+      },
+      "Crafting": {
+        "None": "Crafting is not implemented yet."
+      }
+    },
+    "ShopEditor": {
+      "Title": "Edit Shop",
+      "AddItems": "Add Items",
+      "EditMode": "Edit Mode",
+      "Tabs": {
+        "Buy": "Buy",
+        "Sell": "Sell"
+      },
+      "ActingAs": "Acting As",
+      "NoActorSelected": "— None —",
+      "ShopName": "Shop Name",
+      "LocationPlaceholder": "e.g. Baldur's Gate",
+      "BuyModifierHint": "Default buy-side price modifier in percent (negative = discount, positive = markup).",
+      "SellModifierHint": "Default sell-back price modifier in percent (negative = discount, positive = markup).",
+      "SettlementCap": "Settlement Cap",
+      "NoCap": "No Cap",
+      "Village": "Village (20 GP)",
+      "Town": "Town (2,000 GP)",
+      "City": "City (200,000 GP)",
+      "Custom": "Custom",
+      "Value": "Value",
+      "GoldPool": "Gold Pool",
+      "GoldPoolMax": "Max. Gold Pool",
+      "GoldPoolMaxHint": "Leave empty to use the default gold pool (100 GP).",
+      "GoldPoolCurrent": "Current Gold",
+      "GoldPoolUnlimited": "Unlimited",
+      "GoldPoolUnlimitedHint": "This shop can always buy items back, regardless of its gold pool.",
+      "ResetRestock": "Reset Stock & Gold Pool",
+      "NoRestock": "Exclude from Restock",
+      "NoRestockHint": "This item stays depleted after being bought out — Reset won't restock it.",
+      "Owner": "Owner",
+      "OwnerDescription": "Owner Description",
+      "DropNpc": "Drag an NPC here to assign",
+      "OpenNpcSheet": "Open NPC Sheet",
+      "ClearNpc": "Remove NPC",
+      "PriceTooltip": "Edit Price",
+      "PriceModifier": "Price Modifier",
+      "Stock": "Stock",
+      "StockTooltip": "Edit Stock",
+      "StockMax": "Max Stock (Restock Target)",
+      "StockMaxHint": "Empty means unlimited stock.",
+      "StockCurrent": "Current Stock",
+      "CartQuantity": "Buy",
+      "SellQuantity": "Sell",
+      "IncreaseQuantity": "Increase Quantity",
+      "DecreaseQuantity": "Decrease Quantity",
+      "NoSellableItems": "Nothing to sell.",
+      "NoActorForSell": "No character selected — pick one under \"Acting As\" first.",
+      "SuppressedStock": "Out of Stock",
+      "SuppressedCap": "Exceeds Settlement Cap",
+      "SuppressedNotFound": "Item not found in active compendiums — check the identifier or enabled rulebooks",
+      "None": "No items yet."
+    },
+    "ShopCart": {
+      "Title": "Shopping Cart",
+      "ViewCart": "View Cart",
+      "Buying": "Buying",
+      "Selling": "Selling",
+      "Empty": "No items selected yet.",
+      "Total": "Total",
+      "Balance": "Balance",
+      "InsufficientFunds": "Insufficient funds",
+      "NoActor": "No character selected — pick one under \"Acting As\" first.",
+      "NoActiveGM": "No GM is currently online — purchases can only be completed while a GM is connected.",
+      "Confirm": "Confirm",
+      "PurchaseRequested": "Purchase request sent — waiting for GM confirmation."
+    },
+    "PurchaseCard": {
+      "Buyer": "Buyer",
+      "Buying": "Buying",
+      "Selling": "Selling",
+      "Accept": "Accept",
+      "Reject": "Reject",
+      "InsufficientStock": "Not enough stock left for one or more items — purchase not completed.",
+      "InsufficientSellQuantity": "The seller no longer has enough of one or more items — sale not completed.",
+      "InsufficientShopGold": "The shop doesn't have enough gold to buy these items — sale not completed.",
+      "MissingActor": "The buying character could no longer be found.",
+      "MissingShop": "The shop this purchase belongs to could no longer be found.",
+      "MissingItem": "One of the purchased items could no longer be resolved.",
+      "Status": {
+        "Pending": "Pending GM confirmation…",
+        "Accepted": "Accepted",
+        "Rejected": "Rejected"
+      }
+    }
+  }
+}

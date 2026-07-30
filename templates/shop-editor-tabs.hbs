@@ -1,0 +1,25 @@
+<div class="tab-bar">
+    <div class="tab-row">
+        {{> "templates/generic/tab-navigation.hbs" }}
+        <div class="mod-row">
+            {{> "modules/simple-shop-craft-5e/templates/partials/mod-item.hbs"
+                icon="fas fa-tag" hint="SIMPLE_SHOP_CRAFT_5E.ShopEditor.BuyModifierHint"
+                name="buyModifier" value=shop.buyModifier editable=editable}}
+            {{> "modules/simple-shop-craft-5e/templates/partials/mod-item.hbs"
+                icon="fas fa-coins" hint="SIMPLE_SHOP_CRAFT_5E.ShopEditor.SellModifierHint"
+                name="sellModifier" value=shop.sellModifier editable=editable}}
+            <div class="mod-item cap-display{{#if editable}} clickable{{/if}}"
+                 {{#if editable}}data-action="editGoldPool" role="button"{{/if}}
+                 data-tooltip="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.GoldPool' }}">
+                <i class="fas fa-sack-dollar" inert></i>
+                {{#if effectiveGoldCurrent}}
+                <span class="value">{{ effectiveGoldCurrent }}</span>
+                <i class="currency gp" inert></i>
+                {{else}}
+                <i class="fas fa-infinity" inert></i>
+                {{/if}}
+            </div>
+        </div>
+    </div>
+    <hr class="ampersand">
+</div>

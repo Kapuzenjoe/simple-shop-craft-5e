@@ -1,0 +1,74 @@
+<div class="tab{{#if tab.active}} active{{/if}} inventory-element" data-group="primary" data-tab="sell">
+    {{#if actor}}
+    {{#each sellGroups}}
+    <div class="items-section card">
+        <div class="items-header header">
+            <h3 class="item-name">{{ this.label }}</h3>
+            <div class="item-header item-cart">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SellQuantity" }}</div>
+            <div class="item-header item-discount">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.PriceModifier" }}</div>
+            <div class="item-header item-price">{{ localize "DND5E.Price" }}</div>
+            <div class="item-header item-weight">{{ localize "DND5E.Weight" }}</div>
+            <div class="item-header item-stock">{{ localize "DND5E.Quantity" }}</div>
+            <div class="item-header item-controls"></div>
+        </div>
+        <ol class="item-list unlist">
+            {{#each this.items}}
+            <li class="item">
+                <div class="item-row">
+                    <div class="item-name item-tooltip" data-uuid="{{ this.item.uuid }}">
+                        <img class="item-image gold-icon" src="{{ this.item.img }}" alt="{{ this.item.name }}">
+                        <div class="name name-stacked">
+                            <span class="title">{{ this.item.name }}</span>
+                        </div>
+                    </div>
+                    <div class="item-detail item-cart">
+                        <a class="adjustment-button" data-action="adjustSellQty" data-item-id="{{ this.item.id }}" data-delta="-1"
+                           aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.DecreaseQuantity' }}">
+                            <i class="fa-solid fa-minus" inert></i>
+                        </a>
+                        <span>{{ this.sellQuantity }}</span>
+                        <a class="adjustment-button" data-action="adjustSellQty" data-item-id="{{ this.item.id }}" data-delta="+1"
+                           aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.IncreaseQuantity' }}">
+                            <i class="fa-solid fa-plus" inert></i>
+                        </a>
+                    </div>
+                    <div class="item-detail item-discount">
+                        <span class="value">{{ this.discountPercent }}</span>
+                        <span class="unit">%</span>
+                    </div>
+                    <div class="item-detail item-price">
+                        <div class="price-display">
+                            {{#each this.priceDisplay.parts}}
+                            <span class="value">{{ dnd5e-numberFormat this.value }}</span>
+                            <i class="currency {{ this.denomination }}"
+                               aria-label="{{ lookup (lookup @root.config.currencies this.denomination) 'label' }}"></i>
+                            {{/each}}
+                            {{#if this.priceDisplay.original}}
+                            <span class="original">
+                                ({{#each this.priceDisplay.original}}{{ dnd5e-numberFormat this.value }}<i class="currency {{ this.denomination }}" inert></i>{{/each}})
+                            </span>
+                            {{/if}}
+                        </div>
+                    </div>
+                    <div class="item-detail item-weight">
+                        {{#if this.weight}}
+                        <i class="fa-solid fa-weight-hanging" inert></i> {{ dnd5e-formatWeight this.weight.value unit=this.weight.unit }}
+                        {{/if}}
+                    </div>
+                    <div class="item-detail item-stock">
+                        <span>{{ this.owned }}</span>
+                    </div>
+                    <div class="item-detail item-controls"></div>
+                </div>
+            </li>
+            {{/each}}
+        </ol>
+    </div>
+    {{/each}}
+    {{#unless sellGroups.length}}
+    <p>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoSellableItems" }}</p>
+    {{/unless}}
+    {{else}}
+    <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoActorForSell" }}</p>
+    {{/if}}
+</div>

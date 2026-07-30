@@ -1,0 +1,58 @@
+{
+  "id": "simple-shop-craft-5e",
+  "title": "Simple Shop & Craft 5e",
+  "version": "0.0.1",
+  "authors": [
+    {
+      "name": "Peterlankton",
+      "url": "https://github.com/Kapuzenjoe",
+      "discord": "peter_lankton",
+      "ko-fi": "https://ko-fi.com/peterlankton86911",
+      "flags": {}
+    }
+  ],
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json",
+      "flags": {}
+    }
+  ],
+  "compatibility": {
+    "minimum": "14",
+    "maximum": "14",
+    "verified": "14"
+  },
+  "esmodules": [
+    "scripts/module.mjs"
+  ],
+  "styles": [
+    "css/style.css"
+  ],
+  "flags": {
+    "hotReload": {
+      "extensions": [
+        "css",
+        "hbs"
+      ],
+      "paths": [
+        "css",
+        "templates"
+      ]
+    }
+  },
+  "relationships": {
+    "systems": [
+      {
+        "id": "dnd5e",
+        "type": "system",
+        "compatibility": {}
+      }
+    ]
+  },
+  "url": "https://github.com/Kapuzenjoe/simpleshopcraft5e",
+  "manifest": "https://github.com/Kapuzenjoe/simpleshopcraft5e/releases/latest/download/module.json",
+  "download": "https://github.com/Kapuzenjoe/simpleshopcraft5e/releases/download/0.0.1/module.zip",
+  "description": "Simple Shop & Craft 5e."
+}

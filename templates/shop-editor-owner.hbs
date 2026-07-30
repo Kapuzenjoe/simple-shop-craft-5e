@@ -1,0 +1,45 @@
+<div class="owner-sidebar">
+    <div class="actor-select mod-item" data-tooltip="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.ActingAs' }}">
+        <i class="fas fa-user" inert></i>
+        <select name="selectedActor" class="uninput">
+            {{#each actorOptions}}
+            <option value="{{ this.value }}" {{#if this.selected}}selected{{/if}}>{{ this.label }}</option>
+            {{/each}}
+        </select>
+    </div>
+    <div class="owner-card card">
+        <div class="header">
+            <h3>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Owner" }}</h3>
+        </div>
+        <div class="owner-content">
+            <div class="owner-row">
+                {{#if npc}}
+                <div class="npc-portrait npc-drop-target" data-action="openNpcSheet"
+                     data-tooltip="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.OpenNpcSheet' }}">
+                    <img class="item-image gold-icon" style="--gold-icon-size: 120px;" src="{{ npcImg }}" alt="{{ npc.name }}">
+                    {{#if editable}}
+                    <button type="button" class="unbutton clear-npc" data-action="clearNpc"
+                            aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.ClearNpc' }}">
+                        <i class="fas fa-times" inert></i>
+                    </button>
+                    {{/if}}
+                </div>
+                <div class="npc-name" data-action="openNpcSheet">
+                    <span class="value">{{ npc.name }}</span>
+                </div>
+                {{else if editable}}
+                <div class="drop-area npc-drop-target">
+                    {{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.DropNpc" }}
+                </div>
+                {{/if}}
+                <input type="hidden" name="npc" value="{{ shop.npc }}">
+            </div>
+            {{#if npc}}
+            <div class="description-block">
+                <h3 class="icon"><i class="fas fa-book-open" inert></i><span class="roboto-upper">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.OwnerDescription" }}</span></h3>
+                <p class="npc-bio">{{{ npc.system.details.biography.public }}}</p>
+            </div>
+            {{/if}}
+        </div>
+    </div>
+</div>

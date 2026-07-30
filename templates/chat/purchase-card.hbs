@@ -1,0 +1,98 @@
+<div class="simple-shop-craft-5e chat-card purchase-card">
+    <header class="card-header description">
+        <div class="summary">
+            <img class="gold-icon" src="{{ shopImg }}" alt="{{ shopName }}">
+            <div class="name-stacked">
+                <span class="title">{{ shopName }}</span>
+                <span class="subtitle">{{ localize "SIMPLE_SHOP_CRAFT_5E.PurchaseCard.Buyer" }}: {{ actorName }}</span>
+            </div>
+        </div>
+    </header>
+
+    {{#if buyLines.length}}
+    <div class="card-tray collapsible{{#unless pending}} collapsed{{/unless}}">
+        <label class="roboto-upper">
+            <i class="fa-solid fa-basket-shopping"></i>
+            <span>{{ localize "SIMPLE_SHOP_CRAFT_5E.PurchaseCard.Buying" }} ({{ buyLines.length }})</span>
+            <i class="fa-solid fa-caret-down"></i>
+        </label>
+        <div class="collapsible-content">
+            <div class="wrapper">
+                <ol class="cart-lines unlist">
+                    {{#each buyLines}}
+                    <li class="cart-line">
+                        <img class="item-image gold-icon" src="{{ this.img }}" alt="{{ this.name }}">
+                        <span class="name">{{ this.name }}</span>
+                        <span class="qty">×{{ this.quantity }}</span>
+                        <span class="amount">
+                            {{#each this.subtotal}}
+                            <span class="denom">
+                                <span class="value">{{ dnd5e-numberFormat this.value }}</span>
+                                <i class="currency {{ this.denomination }}" inert></i>
+                            </span>
+                            {{/each}}
+                        </span>
+                    </li>
+                    {{/each}}
+                </ol>
+            </div>
+        </div>
+    </div>
+    {{/if}}
+
+    {{#if sellLines.length}}
+    <div class="card-tray collapsible{{#unless pending}} collapsed{{/unless}}">
+        <label class="roboto-upper">
+            <i class="fa-solid fa-hand-holding-dollar"></i>
+            <span>{{ localize "SIMPLE_SHOP_CRAFT_5E.PurchaseCard.Selling" }} ({{ sellLines.length }})</span>
+            <i class="fa-solid fa-caret-down"></i>
+        </label>
+        <div class="collapsible-content">
+            <div class="wrapper">
+                <ol class="cart-lines unlist">
+                    {{#each sellLines}}
+                    <li class="cart-line">
+                        <img class="item-image gold-icon" src="{{ this.img }}" alt="{{ this.name }}">
+                        <span class="name">{{ this.name }}</span>
+                        <span class="qty">×{{ this.quantity }}</span>
+                        <span class="amount">
+                            {{#each this.subtotal}}
+                            <span class="denom">
+                                <span class="value">{{ dnd5e-numberFormat this.value }}</span>
+                                <i class="currency {{ this.denomination }}" inert></i>
+                            </span>
+                            {{/each}}
+                        </span>
+                    </li>
+                    {{/each}}
+                </ol>
+            </div>
+        </div>
+    </div>
+    {{/if}}
+
+    <div class="cart-total">
+        <span class="label roboto-upper">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopCart.Total" }}</span>
+        <span class="amount">
+            {{#each total}}
+            <span class="denom">
+                <span class="value">{{ dnd5e-numberFormat this.value }}</span>
+                <i class="currency {{ this.denomination }}" inert></i>
+            </span>
+            {{/each}}
+        </span>
+    </div>
+
+    <p class="status-line">{{ statusLabel }}</p>
+
+    {{#if pending}}
+    <div class="card-buttons">
+        <button type="button" data-action="acceptPurchase" data-visibility="gm">
+            <i class="fas fa-check" inert></i> <span>{{ localize "SIMPLE_SHOP_CRAFT_5E.PurchaseCard.Accept" }}</span>
+        </button>
+        <button type="button" data-action="rejectPurchase" data-visibility="gm">
+            <i class="fas fa-xmark" inert></i> <span>{{ localize "SIMPLE_SHOP_CRAFT_5E.PurchaseCard.Reject" }}</span>
+        </button>
+    </div>
+    {{/if}}
+</div>
