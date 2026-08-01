@@ -3,24 +3,18 @@
     {{#each sellGroups}}
     <div class="items-section card">
         <div class="items-header header">
-            <h3 class="item-name">{{ this.label }}</h3>
             <div class="item-header item-cart">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SellQuantity" }}</div>
+            <h3 class="item-name">{{ this.label }}</h3>
             <div class="item-header item-discount">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.PriceModifier" }}</div>
             <div class="item-header item-price">{{ localize "DND5E.Price" }}</div>
             <div class="item-header item-weight">{{ localize "DND5E.Weight" }}</div>
-            <div class="item-header item-stock">{{ localize "DND5E.Quantity" }}</div>
+            <div class="item-header item-quantity">{{ localize "DND5E.Quantity" }}</div>
             <div class="item-header item-controls"></div>
         </div>
         <ol class="item-list unlist">
             {{#each this.items}}
             <li class="item">
                 <div class="item-row">
-                    <div class="item-name item-tooltip" data-uuid="{{ this.item.uuid }}">
-                        <img class="item-image gold-icon" src="{{ this.item.img }}" alt="{{ this.item.name }}">
-                        <div class="name name-stacked">
-                            <span class="title">{{ this.item.name }}</span>
-                        </div>
-                    </div>
                     <div class="item-detail item-cart">
                         <a class="adjustment-button" data-action="adjustSellQty" data-item-id="{{ this.item.id }}" data-delta="-1"
                            aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.DecreaseQuantity' }}">
@@ -31,6 +25,11 @@
                            aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.IncreaseQuantity' }}">
                             <i class="fa-solid fa-plus" inert></i>
                         </a>
+                    </div>
+                    <div class="item-name item-tooltip clickable" data-uuid="{{ this.item.uuid }}"
+                         data-action="openItemSheet" role="button" aria-label="{{ this.item.name }}">
+                        {{> "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs"
+                            img=this.item.img name=this.item.name }}
                     </div>
                     <div class="item-detail item-discount">
                         <span class="value">{{ this.discountPercent }}</span>
@@ -45,17 +44,13 @@
                             {{/each}}
                             {{#if this.priceDisplay.original}}
                             <span class="original">
-                                ({{#each this.priceDisplay.original}}{{ dnd5e-numberFormat this.value }}<i class="currency {{ this.denomination }}" inert></i>{{/each}})
+                                ({{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=this.priceDisplay.original }})
                             </span>
                             {{/if}}
                         </div>
                     </div>
-                    <div class="item-detail item-weight">
-                        {{#if this.weight}}
-                        <i class="fa-solid fa-weight-hanging" inert></i> {{ dnd5e-formatWeight this.weight.value unit=this.weight.unit }}
-                        {{/if}}
-                    </div>
-                    <div class="item-detail item-stock">
+                    {{> "modules/simple-shop-craft-5e/templates/partials/item-weight-cell.hbs" weight=this.weight }}
+                    <div class="item-detail item-quantity">
                         <span>{{ this.owned }}</span>
                     </div>
                     <div class="item-detail item-controls"></div>

@@ -1,38 +1,45 @@
 <div class="owner-sidebar">
-    <div class="actor-select mod-item" data-tooltip="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.ActingAs' }}">
-        <i class="fas fa-user" inert></i>
-        <select name="selectedActor" class="uninput">
-            {{#each actorOptions}}
-            <option value="{{ this.value }}" {{#if this.selected}}selected{{/if}}>{{ this.label }}</option>
-            {{/each}}
-        </select>
-    </div>
     <div class="owner-card card">
         <div class="header">
             <h3>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Owner" }}</h3>
         </div>
         <div class="owner-content">
-            <div class="owner-row">
-                {{#if npc}}
-                <div class="npc-portrait npc-drop-target" data-action="openNpcSheet"
-                     data-tooltip="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.OpenNpcSheet' }}">
-                    <img class="item-image gold-icon" style="--gold-icon-size: 120px;" src="{{ npcImg }}" alt="{{ npc.name }}">
-                    {{#if editable}}
-                    <button type="button" class="unbutton clear-npc" data-action="clearNpc"
-                            aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.ClearNpc' }}">
-                        <i class="fas fa-times" inert></i>
-                    </button>
+            <div class="mod-row owner-mods">
+                <div class="tab{{#if tabs.buy.active}} active{{/if}}" data-group="primary" data-tab="buy">
+                    {{> "modules/simple-shop-craft-5e/templates/partials/mod-item.hbs"
+                        icon="fas fa-tag" hint="SIMPLE_SHOP_CRAFT_5E.ShopEditor.BuyModifierHint"
+                        name="buyModifier" value=shop.buyModifier editable=false}}
+                </div>
+                <div class="tab{{#if tabs.sell.active}} active{{/if}}" data-group="primary" data-tab="sell">
+                    {{> "modules/simple-shop-craft-5e/templates/partials/mod-item.hbs"
+                        icon="fas fa-coins" hint="SIMPLE_SHOP_CRAFT_5E.ShopEditor.SellModifierHint"
+                        name="sellModifier" value=shop.sellModifier editable=false}}
+                </div>
+                <div class="mod-item cap-display" data-tooltip="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.GoldPool' }}">
+                    <i class="fas fa-sack-dollar" inert></i>
+                    {{#if goldPoolDisplay}}
+                    {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=goldPoolDisplay }}
+                    {{else}}
+                    <i class="fas fa-infinity" inert></i>
                     {{/if}}
                 </div>
-                <div class="npc-name" data-action="openNpcSheet">
-                    <span class="value">{{ npc.name }}</span>
-                </div>
-                {{else if editable}}
-                <div class="drop-area npc-drop-target">
-                    {{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.DropNpc" }}
+                {{#if editable}}
+                <div class="mod-item clickable" data-action="resetShop" role="button"
+                     data-tooltip="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.ResetRestock' }}">
+                    <i class="fa-solid fa-rotate-left" inert></i>
                 </div>
                 {{/if}}
-                <input type="hidden" name="npc" value="{{ shop.npc }}">
+            </div>
+            <div class="owner-row">
+                {{#if npc}}
+                <div class="npc-portrait clickable" data-action="openNpcSheet"
+                     data-tooltip="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.OpenNpcSheet' }}">
+                    <img class="item-image gold-icon" style="--gold-icon-size: 120px;" src="{{ npcImg }}" alt="{{ npc.name }}">
+                </div>
+                <div class="npc-name clickable" data-action="openNpcSheet">
+                    <span class="value">{{ npc.name }}</span>
+                </div>
+                {{/if}}
             </div>
             {{#if npc}}
             <div class="description-block">

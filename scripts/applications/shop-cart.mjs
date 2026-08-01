@@ -38,7 +38,10 @@ export default class ShopCart extends HandlebarsApplicationMixin(ApplicationV2) 
 
   /** @override */
   static PARTS = {
-    content: { template: "modules/simple-shop-craft-5e/templates/shop-cart.hbs" }
+    content: {
+      template: "modules/simple-shop-craft-5e/templates/shop-cart.hbs",
+      templates: ["modules/simple-shop-craft-5e/templates/partials/currency-amount.hbs"]
+    }
   };
 
   /* -------------------------------------------- */

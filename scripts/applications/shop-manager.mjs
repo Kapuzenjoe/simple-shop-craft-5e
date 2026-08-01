@@ -1,5 +1,5 @@
-import { MODULE_ID, SETTING_KEYS } from "../config.mjs";
-import { getStarterItems, getStarterPackOptions } from "../data/starter-packs.mjs";
+import { MODULE_ID, SETTING_KEYS, SETTLEMENT_CAPS } from "../config.mjs";
+import ShopConfig from "./shop-config.mjs";
 import ShopEditor from "./shop-editor.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
@@ -14,7 +14,7 @@ export default class ShopManager extends HandlebarsApplicationMixin(ApplicationV
   /** @override */
   static DEFAULT_OPTIONS = {
     id: "shop-manager",
-    classes: ["dnd5e2", "simple-shop-craft-5e", "shop-manager"],
+    classes: ["dnd5e2", "simple-shop-craft-5e", "shop-manager", "standard-form"],
     window: {
       title: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Title",
       resizable: true
@@ -25,8 +25,8 @@ export default class ShopManager extends HandlebarsApplicationMixin(ApplicationV
     },
     actions: {
       createShop: ShopManager.#createShop,
+      editShopConfig: ShopManager.#editShopConfig,
       editShop: ShopManager.#editShop,
-      deleteShop: ShopManager.#deleteShop,
       toggleActive: ShopManager.#toggleActive
     }
   };
@@ -45,7 +45,10 @@ export default class ShopManager extends HandlebarsApplicationMixin(ApplicationV
   /** @override */
   static PARTS = {
     tabs: { template: "templates/generic/tab-navigation.hbs" },
-    shops: { template: "modules/simple-shop-craft-5e/templates/shop-manager-shops.hbs" },
+    shops: {
+      template: "modules/simple-shop-craft-5e/templates/shop-manager-shops.hbs",
+      templates: ["modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs"]
+    },
     crafting: { template: "modules/simple-shop-craft-5e/templates/shop-manager-crafting.hbs" }
   };
 
@@ -54,8 +57,10 @@ export default class ShopManager extends HandlebarsApplicationMixin(ApplicationV
     const context = await super._prepareContext(options);
     context.isGM = game.user.isGM;
     const shops = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS).filter(s => context.isGM || s.active);
-    context.shops = shops.map(shop => ({
-      shop, npc: shop.npc ? fromUuidSync(shop.npc) : null
+    context.shops = shops.toSorted((a, b) => b.active - a.active).map(shop => ({
+      shop,
+      npc: shop.npc ? fromUuidSync(shop.npc) : null,
+      subtitle: [shop.location || null, ShopManager.#settlementCapLabel(shop) || null].filter(Boolean).join(" · ")
     }));
     return context;
   }
@@ -67,6 +72,112 @@ export default class ShopManager extends HandlebarsApplicationMixin(ApplicationV
     context = await super._preparePartContext(partId, context, options);
     context.tab = context.tabs?.[partId];
     return context;
+  }
+
+  /* -------------------------------------------- */
+
+  /** @override */
+  async _onFirstRender(context, options) {
+    await super._onFirstRender(context, options);
+    new game.dnd5e.applications.ContextMenu5e(this.element, "[data-shop-id]", [], {
+      onOpen: element => {
+        const shop = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS).find(s => s._id === element.dataset.shopId);
+        ui.context.menuItems = this.#getShopContextOptions(shop);
+      },
+      jQuery: false
+    });
+  }
+
+  /* -------------------------------------------- */
+
+  /** @override */
+  _attachPartListeners(partId, htmlElement, options) {
+    super._attachPartListeners(partId, htmlElement, options);
+    if ( partId === "shops" ) {
+      htmlElement.querySelectorAll("[data-context-menu]").forEach(control =>
+        control.addEventListener("click", ShopManager.#triggerContextMenu));
+    }
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Trigger the row's context menu from a click on the "..." button. {@link ContextMenu5e.triggerEvent} does the
+   * same thing, but its target selector is hardcoded to dnd5e's own id attributes and doesn't know `data-shop-id`.
+   * @param {PointerEvent} event
+   */
+  static #triggerContextMenu(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const { clientX, clientY } = event;
+    const target = event.target.closest("[data-shop-id]");
+    target?.dispatchEvent(new PointerEvent("contextmenu", { view: window, bubbles: true, cancelable: true, clientX, clientY }));
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Determine the display label for a shop's settlement cap: the matching preset name, "Custom" for a
+   * non-preset value, or an empty string when uncapped.
+   * @param {Shop} shop
+   * @returns {string}
+   */
+  static #settlementCapLabel(shop) {
+    const preset = Object.entries(SETTLEMENT_CAPS).find(([, v]) => v === shop.settlementCap.value)?.[0];
+    if ( preset ) {
+      const label = _loc(`SIMPLE_SHOP_CRAFT_5E.ShopEditor.${preset[0].toUpperCase()}${preset.slice(1)}`);
+      return label.replace(/\s*\(.*\)$/, "");
+    }
+    return shop.settlementCap.value != null ? _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.Custom") : "";
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Build the "..." context menu entries for a shop row.
+   * @param {Shop} shop
+   * @returns {object[]}
+   */
+  #getShopContextOptions(shop) {
+    return [
+      {
+        label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.EditConfig",
+        icon: '<i class="fas fa-gear fa-fw"></i>',
+        onClick: () => new ShopConfig({ shopId: shop._id }).render({ force: true })
+      },
+      {
+        label: shop.active
+          ? "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Deactivate"
+          : "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Activate",
+        icon: `<i class="fa-solid fa-toggle-${shop.active ? "off" : "on"} fa-fw"></i>`,
+        onClick: () => this.#setShopActive(shop, !shop.active)
+      },
+      {
+        label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Duplicate",
+        icon: '<i class="fa-solid fa-copy fa-fw"></i>',
+        onClick: () => this.#duplicateShop(shop)
+      },
+      {
+        label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Delete",
+        icon: '<i class="fa-solid fa-trash fa-fw"></i>',
+        onClick: () => this.#confirmDeleteShop(shop)
+      }
+    ];
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle duplicating an existing shop.
+   * @param {Shop} shop
+   */
+  async #duplicateShop(shop) {
+    const clone = shop.toObject();
+    delete clone._id;
+    clone.name = game.i18n.format("DOCUMENT.CopyOf", { name: shop.name });
+    const shops = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS);
+    await game.settings.set(MODULE_ID, SETTING_KEYS.SHOPS, [...shops.map(s => s.toObject()), clone]);
+    this.render();
   }
 
   /* -------------------------------------------- */
@@ -92,45 +203,20 @@ export default class ShopManager extends HandlebarsApplicationMixin(ApplicationV
    * Handle creating a new shop.
    * @this {ShopManager}
    */
-  static async #createShop() {
-    const { createFormGroup, createSelectInput, createTextInput } = foundry.applications.fields;
-    const packs = getStarterPackOptions();
-    const content = `<fieldset>
-      ${createFormGroup({
-        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.ShopName"),
-        input: createTextInput({ name: "name" })
-      }).outerHTML}
-      ${createFormGroup({
-        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.StarterPack"),
-        input: createSelectInput({
-          name: "starterPack",
-          blank: _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Empty"),
-          options: packs
-        })
-      }).outerHTML}
-    </fieldset>`;
+  static #createShop() {
+    new ShopConfig().render({ force: true });
+  }
 
-    const data = await foundry.applications.api.DialogV2.input({
-      window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Create" },
-      content,
-      render: (event, dialog) => {
-        const select = dialog.element.querySelector('select[name="starterPack"]');
-        const name = dialog.element.querySelector('input[name="name"]');
-        select.addEventListener("change", () => name.placeholder = select.selectedOptions[0]?.text ?? "");
-      }
-    });
-    if ( !data ) return;
+  /* -------------------------------------------- */
 
-    const shops = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS);
-    await game.settings.set(MODULE_ID, SETTING_KEYS.SHOPS, [
-      ...shops.map(s => s.toObject()),
-      {
-        name: data.name || packs.find(p => p.value === data.starterPack)?.label
-          || _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Create"),
-        items: getStarterItems(data.starterPack).map(identifier => ({ identifier, stock: { max: null, current: null } }))
-      }
-    ]);
-    this.render();
+  /**
+   * Handle opening the settings dialog for an existing shop.
+   * @this {ShopManager}
+   * @param {Event} event         Triggering click event.
+   * @param {HTMLElement} target  Button that was clicked.
+   */
+  static #editShopConfig(event, target) {
+    new ShopConfig({ shopId: target.dataset.shopId }).render({ force: true });
   }
 
   /* -------------------------------------------- */
@@ -148,22 +234,19 @@ export default class ShopManager extends HandlebarsApplicationMixin(ApplicationV
   /* -------------------------------------------- */
 
   /**
-   * Handle deleting an existing shop.
-   * @this {ShopManager}
-   * @param {Event} event         Triggering click event.
-   * @param {HTMLElement} target  Button that was clicked.
+   * Handle deleting an existing shop, after confirmation.
+   * @param {Shop} shop
    */
-  static async #deleteShop(event, target) {
+  async #confirmDeleteShop(shop) {
     const confirmed = await foundry.applications.api.DialogV2.confirm({
       window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Delete" },
       content: `<p>${_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.DeleteConfirm")}</p>`
     });
     if ( !confirmed ) return;
 
-    const shopId = target.dataset.shopId;
     const shops = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS);
     await game.settings.set(MODULE_ID, SETTING_KEYS.SHOPS,
-      shops.filter(s => s._id !== shopId).map(s => s.toObject()));
+      shops.filter(s => s._id !== shop._id).map(s => s.toObject()));
     this.render();
   }
 
@@ -176,10 +259,21 @@ export default class ShopManager extends HandlebarsApplicationMixin(ApplicationV
    * @param {HTMLElement} target  Element that was clicked.
    */
   static async #toggleActive(event, target) {
-    const shopId = target.dataset.shopId;
+    const shop = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS).find(s => s._id === target.dataset.shopId);
+    await this.#setShopActive(shop, !shop.active);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Set a shop's active/visible state.
+   * @param {Shop} shop
+   * @param {boolean} active
+   */
+  async #setShopActive(shop, active) {
     const shops = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS);
     await game.settings.set(MODULE_ID, SETTING_KEYS.SHOPS, shops.map(s =>
-      s._id === shopId ? { ...s.toObject(), active: !s.active } : s.toObject()
+      s._id === shop._id ? { ...s.toObject(), active } : s.toObject()
     ));
     this.render();
   }

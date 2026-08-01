@@ -1,6 +1,6 @@
-import { MODULE_ID, SETTING_KEYS, SETTLEMENT_CAPS, GOLD_POOL_DEFAULT } from "../config.mjs";
+import { MODULE_ID, SETTING_KEYS } from "../config.mjs";
 import { entryKey, pickItemIdentifiers, resolveShopItems } from "../shops/item-resolver.mjs";
-import { breakdownPrice, effectiveGoldPool } from "../shops/currency.mjs";
+import { breakdownPrice, displayGoldPool, getCurrencyOptions } from "../shops/currency.mjs";
 import ShopCart from "./shop-cart.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
@@ -46,21 +46,12 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
       adjustCartQty: ShopEditor.#adjustCartQty,
       adjustSellQty: ShopEditor.#adjustSellQty,
       openCart: ShopEditor.#openCart,
-      clearNpc: ShopEditor.#clearNpc,
       openNpcSheet: ShopEditor.#openNpcSheet,
-      changeMode: ShopEditor.#changeMode,
-      editImage: ShopEditor.#editImage,
-      editGoldPool: ShopEditor.#editGoldPool,
       resetShop: ShopEditor.#resetShop,
-      editMaxStock: ShopEditor.#editMaxStock
+      editMaxStock: ShopEditor.#editMaxStock,
+      openItemSheet: ShopEditor.#openItemSheet
     }
   };
-
-  /**
-   * Is this editor currently in edit mode? GM-only; players always see view mode.
-   * @type {boolean}
-   */
-  isEditMode = false;
 
   /**
    * UUID of the actor (or party) currently selected for buy/sell. Per-user, not persisted across sessions.
@@ -88,24 +79,40 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
 
   /** @override */
   static PARTS = {
-    header: {
-      template: "modules/simple-shop-craft-5e/templates/shop-editor-header.hbs",
-      templates: ["modules/simple-shop-craft-5e/templates/partials/mod-item.hbs"]
+    header: { template: "modules/simple-shop-craft-5e/templates/shop-editor-header.hbs" },
+    owner: {
+      template: "modules/simple-shop-craft-5e/templates/shop-editor-owner.hbs",
+      templates: [
+        "modules/simple-shop-craft-5e/templates/partials/mod-item.hbs",
+        "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs"
+      ]
     },
-    owner: { template: "modules/simple-shop-craft-5e/templates/shop-editor-owner.hbs" },
     tabs: {
       template: "modules/simple-shop-craft-5e/templates/shop-editor-tabs.hbs",
       templates: ["templates/generic/tab-navigation.hbs"]
     },
     buy: {
       template: "modules/simple-shop-craft-5e/templates/shop-editor-buy.hbs",
+      templates: [
+        "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs",
+        "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs",
+        "modules/simple-shop-craft-5e/templates/partials/item-weight-cell.hbs"
+      ],
       scrollable: [""]
     },
     sell: {
       template: "modules/simple-shop-craft-5e/templates/shop-editor-sell.hbs",
+      templates: [
+        "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs",
+        "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs",
+        "modules/simple-shop-craft-5e/templates/partials/item-weight-cell.hbs"
+      ],
       scrollable: [""]
     },
-    cart: { template: "modules/simple-shop-craft-5e/templates/shop-editor-cart.hbs" }
+    cart: {
+      template: "modules/simple-shop-craft-5e/templates/shop-editor-cart.hbs",
+      templates: ["modules/simple-shop-craft-5e/templates/partials/currency-amount.hbs"]
+    }
   };
 
   /** @override */
@@ -147,6 +154,7 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
       s._id === this.shopId ? { ...s.toObject(), ...patch } : s.toObject()
     ));
     this.render();
+    if ( this.cartApp?.rendered ) this.cartApp.render();
   }
 
   /* -------------------------------------------- */
@@ -157,7 +165,7 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
     context.shop = this.shop;
     context.config = CONFIG.DND5E;
     context.isGM = game.user.isGM;
-    context.editable = game.user.isGM && this.isEditMode;
+    context.editable = game.user.isGM;
     const { characters, party } = ShopEditor.#getSelectableActors();
     if ( this.selectedActorUuid === undefined ) {
       this.selectedActorUuid = game.user.character?.type === "character" ? game.user.character.uuid : "";
@@ -178,7 +186,7 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
     this.lastSellGroups = context.sellGroups;
 
     context.cart = ShopEditor.#summarizeCart(context.groups, context.sellGroups);
-    context.effectiveGoldCurrent = effectiveGoldPool(context.shop.goldPool);
+    context.goldPoolDisplay = displayGoldPool(context.shop.goldPool);
     return context;
   }
 
@@ -224,23 +232,11 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
     if ( locationText ) locationText.textContent = this.shop.location || "";
 
     const capDisplay = this.element.querySelector(".settlement-cap-display");
-    const capSelect = this.element.querySelector(".settlement-cap-select");
-    const capCustom = this.element.querySelector(".settlement-cap-custom");
     if ( capDisplay ) {
       const current = this.shop.settlementCap;
-      capDisplay.hidden = !!context.editable;
       capDisplay.textContent = current.value != null
-        ? `· ${current.value} ${current.denomination.toUpperCase()}`
-        : "· ∞";
-    }
-    if ( capSelect ) {
-      capSelect.hidden = !context.editable;
-      const current = this.shop.settlementCap;
-      const preset = Object.entries(SETTLEMENT_CAPS).find(([, v]) => v === current.value)?.[0]
-        ?? (current.value != null ? "custom" : "");
-      capSelect.value = preset;
-      capCustom.hidden = !context.editable || (preset !== "custom");
-      capCustom.value = current.value ?? "";
+        ? `${current.value} ${current.denomination.toUpperCase()}`
+        : "∞";
     }
     this.window.title.textContent = this.shop.name;
   }
@@ -250,16 +246,6 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
   /** @override */
   async _onFirstRender(context, options) {
     await super._onFirstRender(context, options);
-
-    if ( game.user.isGM ) {
-      const toggle = document.createElement("slide-toggle");
-      toggle.checked = this.isEditMode;
-      toggle.classList.add("mode-slider");
-      toggle.dataset.action = "changeMode";
-      toggle.dataset.tooltip = "SIMPLE_SHOP_CRAFT_5E.ShopEditor.EditMode";
-      toggle.setAttribute("aria-label", _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.EditMode"));
-      this.element.querySelector(".window-header").prepend(toggle);
-    }
 
     const titleEl = this.window.title;
     const titleWrapper = document.createElement("div");
@@ -273,29 +259,18 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
 
     const locationText = document.createElement("span");
     locationText.classList.add("location-text");
-    subtitle.append(locationText);
+    const locationIcon = document.createElement("i");
+    locationIcon.classList.add("fas", "fa-map-marker-alt");
+    subtitle.append(locationIcon, locationText);
 
     if ( game.user.isGM ) {
+      const capIcon = document.createElement("i");
+      capIcon.classList.add("fas", "fa-city");
+      subtitle.append(capIcon);
       const capDisplay = document.createElement("span");
       capDisplay.classList.add("settlement-cap-display");
       capDisplay.dataset.tooltip = "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SettlementCap";
       subtitle.append(capDisplay);
-
-      const capSelect = document.createElement("select");
-      capSelect.classList.add("settlement-cap-select", "uninput");
-      capSelect.dataset.tooltip = "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SettlementCap";
-      capSelect.innerHTML = [
-        ["", "NoCap"], ["village", "Village"], ["town", "Town"], ["city", "City"], ["custom", "Custom"]
-      ].map(([value, key]) =>
-        `<option value="${value}">${_loc(`SIMPLE_SHOP_CRAFT_5E.ShopEditor.${key}`)}</option>`
-      ).join("");
-      subtitle.append(capSelect);
-
-      const capCustom = document.createElement("input");
-      capCustom.type = "number";
-      capCustom.min = "0";
-      capCustom.classList.add("settlement-cap-custom", "uninput");
-      subtitle.append(capCustom);
     }
 
     const button = document.createElement("button");
@@ -306,21 +281,6 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
     button.dataset.action = "addItems";
     button.innerHTML = '<i class="fas fa-plus" inert></i>';
     this.element.querySelector(".window-content").append(button);
-
-    const capSelect = this.element.querySelector(".settlement-cap-select");
-    const capCustom = this.element.querySelector(".settlement-cap-custom");
-    if ( capSelect ) {
-      capSelect.addEventListener("change", async () => {
-        capCustom.hidden = capSelect.value !== "custom";
-        if ( capSelect.value === "custom" ) { capCustom.focus(); return; }
-        const value = capSelect.value === "" ? null : SETTLEMENT_CAPS[capSelect.value];
-        await this.#updateShop({ settlementCap: { value, denomination: "gp" } });
-      });
-      capCustom.addEventListener("change", async () => {
-        const value = capCustom.value === "" ? null : Number(capCustom.value);
-        await this.#updateShop({ settlementCap: { value, denomination: "gp" } });
-      });
-    }
   }
 
   /* -------------------------------------------- */
@@ -328,9 +288,9 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
   /** @override */
   _attachPartListeners(partId, htmlElement, options) {
     super._attachPartListeners(partId, htmlElement, options);
-    const editable = game.user.isGM && this.isEditMode;
+    const editable = game.user.isGM;
 
-    if ( partId === "owner" ) {
+    if ( partId === "tabs" ) {
       htmlElement.querySelector('select[name="selectedActor"]')?.addEventListener("change", async event => {
         event.stopPropagation();
         this.selectedActorUuid = event.target.value;
@@ -338,18 +298,16 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
         await this.render();
         if ( this.cartApp?.rendered ) this.cartApp.render();
       });
+    }
 
-      const npcDropTarget = htmlElement.querySelector(".npc-drop-target");
-      if ( editable && npcDropTarget ) {
-        npcDropTarget.addEventListener("dragover", event => event.preventDefault());
-        npcDropTarget.addEventListener("drop", event => {
-          const data = foundry.applications.ux.TextEditor.implementation.getDragEventData(event);
-          if ( data.type !== "Actor" ) return;
-          const input = this.element.querySelector('input[name="npc"]');
-          input.value = data.uuid;
-          input.dispatchEvent(new Event("change", { bubbles: true }));
-        });
-      }
+    if ( (partId === "buy") || (partId === "sell") ) {
+      htmlElement.querySelectorAll(".item-tooltip[data-uuid]").forEach(el => {
+        const uuid = el.dataset.uuid;
+        if ( !uuid ) return;
+        el.dataset.tooltip = `<section class="loading" data-uuid="${uuid}"><i class="fas fa-spinner fa-spin-pulse"></i></section>`;
+        el.dataset.tooltipClass = "dnd5e2 dnd5e-tooltip item-tooltip themed theme-light";
+        el.dataset.tooltipDirection ??= "LEFT";
+      });
     }
 
     if ( partId === "buy" ) {
@@ -604,91 +562,7 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
       return result;
     });
 
-    await this.#updateShop({
-      npc: data.npc || null,
-      name: data.name || this.shop.name,
-      location: data.location ?? this.shop.location,
-      buyModifier: Math.clamp(Math.round(data.buyModifier ?? this.shop.buyModifier), -100, 1000),
-      sellModifier: Math.clamp(Math.round(data.sellModifier ?? this.shop.sellModifier), -100, 1000),
-      description: data.description ?? this.shop.description, items
-    });
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Handle clearing the assigned NPC.
-   * @this {ShopEditor}
-   */
-  static #clearNpc() {
-    const input = this.element.querySelector('input[name="npc"]');
-    input.value = "";
-    input.dispatchEvent(new Event("change", { bubbles: true }));
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Handle toggling between edit and view mode. GM-only.
-   * @this {ShopEditor}
-   */
-  static #changeMode() {
-    if ( !game.user.isGM ) return;
-    this.isEditMode = !this.isEditMode;
-    this.render();
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Handle changing the shop's image via the file picker.
-   * @this {ShopEditor}
-   */
-  static #editImage() {
-    const fp = new foundry.applications.apps.FilePicker.implementation({
-      type: "image",
-      current: this.shop.img,
-      callback: path => this.#updateShop({ img: path })
-    });
-    fp.browse();
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Handle opening a small dialog to edit the shop's gold pool (how much liquidity it has to buy items back).
-   * @this {ShopEditor}
-   */
-  static async #editGoldPool() {
-    const { createFormGroup, createNumberInput, createCheckboxInput } = foundry.applications.fields;
-    const pool = this.shop.goldPool;
-    const effectiveCurrent = pool.current ?? pool.max ?? GOLD_POOL_DEFAULT;
-    const content = `<fieldset>
-      ${createFormGroup({
-        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GoldPoolUnlimited"),
-        hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GoldPoolUnlimitedHint"),
-        input: createCheckboxInput({ name: "unlimited", value: pool.unlimited })
-      }).outerHTML}
-      ${createFormGroup({
-        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GoldPoolMax"),
-        hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GoldPoolMaxHint"),
-        input: createNumberInput({ name: "max", value: pool.max, placeholder: GOLD_POOL_DEFAULT, min: 0 })
-      }).outerHTML}
-      ${createFormGroup({
-        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GoldPoolCurrent"),
-        input: createNumberInput({ name: "current", value: pool.current, placeholder: effectiveCurrent, min: 0 })
-      }).outerHTML}
-    </fieldset>`;
-
-    const data = await foundry.applications.api.DialogV2.input({
-      window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GoldPool" },
-      content
-    });
-    if ( !data ) return;
-
-    await this.#updateShop({
-      goldPool: { max: data.max ?? null, current: data.current ?? null, unlimited: !!data.unlimited }
-    });
+    await this.#updateShop({ items });
   }
 
   /* -------------------------------------------- */
@@ -705,7 +579,7 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
       return obj;
     });
     const goldPool = { ...this.shop.goldPool };
-    if ( !goldPool.unlimited ) goldPool.current = goldPool.max ?? GOLD_POOL_DEFAULT;
+    if ( !goldPool.unlimited ) goldPool.current = { ...goldPool.max };
 
     await this.#updateShop({ items, goldPool, lastRestock: Date.now() });
   }
@@ -760,6 +634,22 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
       noRestock: !!data.noRestock
     });
     await this.#updateShop({ items });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle opening an item's sheet from the Buy/Sell table. Always re-resolves via UUID rather than
+   * trusting the row's last-rendered data, matching dnd5e's own Compendium Browser click-to-open pattern.
+   * @this {ShopEditor}
+   * @param {Event} event         Triggering click event.
+   * @param {HTMLElement} target  Element that was clicked.
+   */
+  static async #openItemSheet(event, target) {
+    const uuid = target.dataset.uuid;
+    if ( !uuid ) return;
+    const item = await fromUuid(uuid);
+    item?.sheet?.render(true);
   }
 
   /* -------------------------------------------- */
@@ -838,7 +728,7 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
         input: createSelectInput({
           name: "denomination",
           value: entry.price?.denomination ?? item?.system?.price?.denomination ?? "gp",
-          options: Object.entries(CONFIG.DND5E.currencies).map(([value, cfg]) => ({ value, label: cfg.label }))
+          options: getCurrencyOptions()
         })
       }).outerHTML}
     </fieldset>`;

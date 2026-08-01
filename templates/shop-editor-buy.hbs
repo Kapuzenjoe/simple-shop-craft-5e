@@ -2,12 +2,12 @@
     {{#each groups}}
     <div class="items-section card">
         <div class="items-header header">
-            <h3 class="item-name">{{ this.label }}</h3>
             <div class="item-header item-cart">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.CartQuantity" }}</div>
+            <h3 class="item-name">{{ this.label }}</h3>
             <div class="item-header item-discount">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.PriceModifier" }}</div>
             <div class="item-header item-price">{{ localize "DND5E.Price" }}</div>
             <div class="item-header item-weight">{{ localize "DND5E.Weight" }}</div>
-            <div class="item-header item-stock">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Stock" }}</div>
+            <div class="item-header item-quantity">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Stock" }}</div>
             <div class="item-header item-controls"></div>
         </div>
         <ol class="item-list unlist">
@@ -15,20 +15,6 @@
             <li class="item{{#if this.suppressed}} suppressed{{/if}}"
                 {{#if this.suppressed}}{{#unless @root.editable}}hidden{{/unless}}{{/if}}>
                 <div class="item-row">
-                    <div class="item-name item-tooltip" data-uuid="{{ this.item.uuid }}">
-                        <img class="item-image gold-icon" src="{{ this.itemImg }}" alt="{{ this.itemName }}">
-                        <div class="name name-stacked">
-                            <span class="title">
-                                {{ this.itemName }}
-                                {{#if this.bundleSize}}<span class="bundle-size">×{{ this.bundleSize }}</span>{{/if}}
-                            </span>
-                        </div>
-                        {{#if this.suppressed}}
-                        {{#if @root.editable}}
-                        <i class="fa-solid fa-triangle-exclamation suppress-warning" data-tooltip="{{ this.suppressReason }}"></i>
-                        {{/if}}
-                        {{/if}}
-                    </div>
                     <div class="item-detail item-cart">
                         <a class="adjustment-button" data-action="adjustCartQty" data-key="{{ this.key }}" data-delta="-1"
                            aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.DecreaseQuantity' }}">
@@ -40,11 +26,22 @@
                             <i class="fa-solid fa-plus" inert></i>
                         </a>
                     </div>
+                    <div class="item-name item-tooltip clickable" data-uuid="{{ this.item.uuid }}"
+                         data-action="openItemSheet" role="button" aria-label="{{ this.itemName }}">
+                        {{> "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs"
+                            img=this.itemImg name=this.itemName bundleSize=this.bundleSize }}
+                        {{#if this.suppressed}}
+                        {{#if @root.editable}}
+                        <i class="fa-solid fa-triangle-exclamation suppress-warning" data-tooltip="{{ this.suppressReason }}"></i>
+                        {{/if}}
+                        {{/if}}
+                    </div>
                     <div class="item-detail item-discount">
                         {{#if @root.editable}}
                         <input type="number" name="items.{{ this.key }}.discount"
                                value="{{ this.entry.discount }}" placeholder="{{ ../../shop.buyModifier }}"
-                               min="-100" max="1000" step="1">
+                               min="-100" max="1000" step="1"
+                               aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.PriceModifier' }}">
                         {{else}}
                         <span class="value">{{ this.discountPercent }}</span>
                         {{/if}}
@@ -52,8 +49,8 @@
                     </div>
                     <div class="item-detail item-price">
                         <div class="price-display{{#if @root.editable}} clickable{{/if}}"
-                             {{#if @root.editable}}data-action="editPrice" role="button"
-                             data-tooltip="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.PriceTooltip' }}"{{/if}}
+                             {{#if @root.editable}}data-action="editPrice" role="button" data-tooltip
+                             aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.PriceTooltip' }}"{{/if}}
                              data-key="{{ this.key }}">
                             {{#each this.priceDisplay.parts}}
                             <span class="value">{{ dnd5e-numberFormat this.value }}</span>
@@ -62,20 +59,16 @@
                             {{/each}}
                             {{#if this.priceDisplay.original}}
                             <span class="original">
-                                ({{#each this.priceDisplay.original}}{{ dnd5e-numberFormat this.value }}<i class="currency {{ this.denomination }}" inert></i>{{/each}})
+                                ({{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=this.priceDisplay.original }})
                             </span>
                             {{/if}}
                         </div>
                     </div>
-                    <div class="item-detail item-weight">
-                        {{#if this.weight}}
-                        <i class="fa-solid fa-weight-hanging" inert></i> {{ dnd5e-formatWeight this.weight.value unit=this.weight.unit }}
-                        {{/if}}
-                    </div>
-                    <div class="item-detail item-stock">
+                    {{> "modules/simple-shop-craft-5e/templates/partials/item-weight-cell.hbs" weight=this.weight }}
+                    <div class="item-detail item-quantity">
                         <div class="stock-display{{#if @root.editable}} clickable{{/if}}"
                              {{#if @root.editable}}data-action="editMaxStock" data-key="{{ this.key }}" role="button"
-                             data-tooltip="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.StockTooltip' }}"{{/if}}>
+                             data-tooltip aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.StockTooltip' }}"{{/if}}>
                             {{#if this.stockTracked}}
                             <span class="value">
                                 {{ this.entry.stock.current }}{{#unless this.entry.noRestock}} / {{ this.entry.stock.max }}{{/unless}}
@@ -88,7 +81,8 @@
                     <div class="item-detail item-controls">
                         {{#if @root.editable}}
                         <button type="button" class="unbutton config-button item-control item-action"
-                                data-action="removeItem" data-key="{{ this.key }}">
+                                data-action="removeItem" data-key="{{ this.key }}"
+                                data-tooltip aria-label="{{ localize 'DND5E.ItemDelete' }}">
                             <i class="fas fa-trash" inert></i>
                         </button>
                         {{/if}}

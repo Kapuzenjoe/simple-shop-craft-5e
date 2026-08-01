@@ -1,0 +1,43 @@
+<section class="tab {{#if tab.active}}active{{/if}}" data-group="primary" data-tab="economy">
+    <fieldset>
+        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopConfig.Discount" }}</legend>
+        {{ formField fields.buyModifier value=buyModifier rootId="economy" }}
+        {{ formField fields.sellModifier value=sellModifier rootId="economy" }}
+    </fieldset>
+
+    <fieldset>
+        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SettlementCap" }}</legend>
+        {{ formField settlementCapPresetField value=settlementCapPreset name="settlementCapPreset"
+            localize=true rootId="economy" }}
+        <div class="form-group" {{#unless settlementCapCustom}}hidden{{/unless}}>
+            <label>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SettlementCapValue" }}</label>
+            <div class="form-fields">
+                {{ formInput fields.settlementCap.fields.value value=settlementCapValue name="settlementCapValue" min=0 }}
+                <select name="settlementCapDenomination">
+                    {{#each currencyOptions}}
+                    <option value="{{ this.value }}" {{#if this.selected}}selected{{/if}}>{{ this.label }}</option>
+                    {{/each}}
+                </select>
+            </div>
+        </div>
+    </fieldset>
+
+    <fieldset>
+        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GoldPool" }}</legend>
+        {{ formField fields.goldPool.fields.unlimited value=goldPoolUnlimited rootId="economy" }}
+        <div class="form-group" data-goldpool-amounts {{#if goldPoolUnlimited}}hidden{{/if}}>
+            <label>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GoldPoolMax" }}</label>
+            <div class="form-fields">
+                <div class="mod-row">
+                    {{#each goldCurrencies}}
+                    <label class="mod-item">
+                        <i class="currency {{ @key }}" data-tooltip aria-label="{{ label }}"></i>
+                        {{ numberInput value name=(concat "goldPool." @key) class="uninput" min=0 step=1
+                            disabled=../goldPoolUnlimited }}
+                    </label>
+                    {{/each}}
+                </div>
+            </div>
+        </div>
+    </fieldset>
+</section>

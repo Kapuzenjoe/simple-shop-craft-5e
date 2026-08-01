@@ -230,7 +230,10 @@ async function applyPurchase(purchase) {
   }
 
   const goldPool = { ...shop.goldPool };
-  if ( effectiveGoldCurrent !== null ) goldPool.current = effectiveGoldCurrent - sellTotalGP;
+  if ( effectiveGoldCurrent !== null ) {
+    const parts = breakdownPrice(effectiveGoldCurrent - sellTotalGP, "gp", false, ["ep", "pp"]);
+    goldPool.current = Object.fromEntries(parts.map(p => [p.denomination, p.value]));
+  }
 
   await game.settings.set(MODULE_ID, SETTING_KEYS.SHOPS,
     shops.map(s => s._id === shop._id ? { ...s.toObject(), items, goldPool } : s.toObject()));

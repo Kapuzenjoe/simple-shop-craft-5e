@@ -1,6 +1,6 @@
 const {
   ArrayField, BooleanField, DocumentIdField, DocumentUUIDField, EmbeddedDataField, FilePathField, HTMLField,
-  NumberField, SchemaField, StringField
+  NumberField, ObjectField, SchemaField, StringField
 } = foundry.data.fields;
 
 /**
@@ -49,6 +49,12 @@ export class Shop extends foundry.abstract.DataModel {
    */
   static DEFAULT_ICON = "icons/svg/chest.svg";
 
+  /**
+   * Localization prefixes used to auto-localize this schema's field labels/hints.
+   * @type {string[]}
+   */
+  static LOCALIZATION_PREFIXES = ["SIMPLE_SHOP_CRAFT_5E.SHOP"];
+
   /** @override */
   static defineSchema() {
     return {
@@ -65,8 +71,8 @@ export class Shop extends foundry.abstract.DataModel {
         denomination: new StringField({ initial: "gp" })
       }),
       goldPool: new SchemaField({
-        max: new NumberField({ initial: null, nullable: true, min: 0 }),
-        current: new NumberField({ initial: null, nullable: true, min: 0 }),
+        max: new ObjectField({ initial: {} }),
+        current: new ObjectField({ initial: {} }),
         unlimited: new BooleanField({ initial: false })
       }),
       lastRestock: new NumberField({ initial: null, nullable: true, integer: true }),

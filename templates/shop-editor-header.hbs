@@ -1,32 +1,12 @@
 <div class="shop-header">
-{{#if editable}}
-<div class="name-row">
-    <div class="field">
-        <i class="fas fa-shop" inert></i>
-        <input type="text" name="name" value="{{ shop.name }}" placeholder="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.ShopName' }}">
-    </div>
-    <div class="field">
-        <i class="fas fa-map-marker-alt" inert></i>
-        <input type="text" name="location" value="{{ shop.location }}" placeholder="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.LocationPlaceholder' }}">
-    </div>
-    <div class="mod-item clickable" data-action="resetShop" role="button"
-         data-tooltip="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.ResetRestock' }}">
-        <i class="fa-solid fa-rotate-left" inert></i>
-    </div>
-</div>
-{{/if}}
 <header class="sheet-header">
     <div class="left">
-        <div class="shop-portrait" {{#if editable}}data-action="editImage"{{/if}}>
+        <div class="shop-portrait">
             <img class="document-image" src="{{ shop.img }}" alt="{{ shop.name }}">
         </div>
     </div>
     <div class="shop-description-block">
-        {{#if editable}}
-        {{ formInput shop.schema.fields.description value=shop.description name="description" }}
-        {{else}}
         <div class="npc-bio">{{{ shop.description }}}</div>
-        {{/if}}
     </div>
 </header>
 </div>

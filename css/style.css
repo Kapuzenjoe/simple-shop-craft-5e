@@ -8,8 +8,8 @@
     inset: auto 16px 16px auto;
   }
 
-  .item-controls {
-    padding: 0 4px;
+  &:has(.cart-footer:not(.empty)) .create-child {
+    bottom: 60px;
   }
 
   .tab:not(.active) {
@@ -22,54 +22,14 @@
     gap: 6px;
   }
 
-  .denom {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-  }
-
   .sign {
     margin-right: -2px;
   }
 
-  h3.icon {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--dnd5e-color-gold);
-    font-size: var(--font-size-11);
-    margin: 8px 0 2px;
-    border-bottom: 1px solid var(--dnd5e-color-gold);
-    padding-bottom: 2px;
+  .clickable {
+    cursor: pointer;
 
-    &:first-child { margin-top: 0; }
-  }
-
-  .cart-lines {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .cart-line {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: nowrap;
-
-    .gold-icon {
-      --gold-icon-size: 32px;
-      border-radius: 50%;
-      border: 2px solid var(--dnd5e-color-gold);
-    }
-
-    .name {
-      flex: 1;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
+    &:hover { text-shadow: 0 0 8px var(--color-shadow-primary); }
   }
 
   .cart-total {
@@ -84,43 +44,126 @@
   }
 }
 
-.simple-shop-craft-5e.shop-manager {
-  .item-row {
-    min-height: 56px;
+.simple-shop-craft-5e.shop-editor,
+.simple-shop-craft-5e.shop-config {
+  .sheet-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--dnd5e-color-gold);
   }
 
-  .item-npc {
-    flex: 1;
-    gap: .5rem;
+  .left {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    flex: 0 0 auto;
+    --dnd5e-document-image-size: 96px;
+    padding-right: 12px;
+    border-right: 1px solid var(--dnd5e-color-gold);
   }
 
-  .item-name .gold-icon,
-  .item-npc .gold-icon {
-    --gold-icon-size: 48px;
+  .shop-portrait {
+    &[data-action="editImage"] .document-image { cursor: pointer; }
+    &[data-action="editImage"]:hover .document-image { box-shadow: 0 0 8px var(--color-shadow-primary); }
+
+    .document-image {
+      width: var(--dnd5e-document-image-size);
+      height: var(--dnd5e-document-image-size);
+      border-radius: 50%;
+      border: 2px solid var(--dnd5e-color-gold);
+      box-shadow: 0 0 4px var(--dnd5e-shadow-45);
+      object-fit: cover;
+      background: var(--dnd5e-background-alt-1);
+    }
+  }
+
+  .owner-row {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .drop-area.npc-drop-target {
+    width: 100%;
+    min-height: 200px;
+  }
+
+  .npc-portrait {
+    position: relative;
+
+    &:hover .gold-icon { box-shadow: 0 0 8px var(--color-shadow-primary); }
+  }
+
+  .npc-name {
+    display: flex;
+    flex-direction: column;
+
+    .value {
+      font-size: var(--font-size-13);
+    }
+  }
+
+  .clear-npc {
+    position: absolute;
+    inset: -4px -4px auto auto;
+    background: var(--dnd5e-color-black);
+    color: var(--dnd5e-color-gold);
     border-radius: 50%;
-    border: 2px solid var(--dnd5e-color-gold);
-    box-shadow: 0 0 4px var(--dnd5e-shadow-45);
+    width: 14px;
+    height: 14px;
+    display: grid;
+    place-content: center;
+    font-size: var(--font-size-9);
   }
 
-  .item-location {
-    width: 100px;
+  .mod-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
   }
 
-  .item-active {
-    width: 50px;
+  .mod-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--dnd5e-color-gold);
 
-    a { color: var(--color-text-tertiary); }
-    .fa-toggle-on { color: var(--dnd5e-color-gold); }
+    input {
+      background: none;
+      border: none;
+      text-align: center;
+      width: 36px;
+    }
+
+    select { max-width: 120px; }
+  }
+}
+
+.simple-shop-craft-5e.shop-config {
+  .drop-area.npc-drop-target {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100px;
   }
 
-  .item-count {
-    width: 60px;
+  [data-application-part="identity"],
+  [data-application-part="economy"] {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
   }
 
-  .item-name.clickable {
-    cursor: pointer;
-
-    &:hover .title { text-shadow: 0 0 8px var(--color-shadow-primary); }
+  [data-application-part="footer"] {
+    flex: 0 0 auto;
   }
 }
 
@@ -143,7 +186,7 @@
     padding: 8px 8px 8px 0;
   }
 
-  .tab.active {
+  [data-application-part].tab.active {
     grid-area: content;
     min-height: 0;
     overflow: hidden auto;
@@ -177,6 +220,7 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
+    align-items: center;
     flex: 1;
     min-width: 0;
   }
@@ -192,52 +236,11 @@
   .window-subtitle {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
     font-size: var(--font-size-11);
     opacity: .7;
     margin: 0;
-  }
-
-  .settlement-cap-select, .settlement-cap-custom {
-    background: none;
-    border: none;
-    color: inherit;
-    font-size: inherit;
-    width: auto;
-  }
-
-  .settlement-cap-custom {
-    width: 50px;
-  }
-
-  .name-row {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 8px;
-
-    .field {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      flex: 1;
-      color: var(--dnd5e-color-gold);
-
-      input {
-        flex: 1;
-        background: none;
-        border: none;
-        border-bottom: 1px solid var(--dnd5e-color-gold);
-      }
-    }
-  }
-
-  .sheet-header {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    padding-bottom: 8px;
-    margin-bottom: 8px;
-    border-bottom: 1px solid var(--dnd5e-color-gold);
   }
 
   .shop-description-block {
@@ -254,65 +257,29 @@
 
     nav.tabs {
       flex: 0 0 auto;
-
-      a { white-space: nowrap; }
-    }
-  }
-
-  .mod-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-  }
-
-  .mod-item {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    color: var(--dnd5e-color-gold);
-
-    input {
-      background: none;
       border: none;
-      text-align: center;
-      width: 36px;
+      gap: 16px;
+
+      a {
+        white-space: nowrap;
+        color: var(--color-text-secondary);
+        text-transform: uppercase;
+        font-family: var(--dnd5e-font-roboto);
+        font-weight: bold;
+        font-size: var(--font-size-13);
+
+        span { padding-bottom: 1px; }
+
+        &.active {
+          color: var(--color-text-primary);
+
+          span { border-bottom: 3px solid var(--dnd5e-color-gold); }
+        }
+      }
     }
-
-    select { max-width: 120px; }
-
-    &.clickable { cursor: pointer; }
-    &.clickable:hover { text-shadow: 0 0 8px var(--color-shadow-primary); }
   }
 
-  input[readonly] { opacity: .6; cursor: default; }
   a.adjustment-button:not([data-action]) { opacity: .2; pointer-events: none; }
-
-  .left {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    flex: 0 0 auto;
-    --dnd5e-document-image-size: 96px;
-    padding-right: 12px;
-    border-right: 1px solid var(--dnd5e-color-gold);
-  }
-
-  .shop-portrait {
-    &[data-action="editImage"] .document-image { cursor: pointer; }
-    &[data-action="editImage"]:hover .document-image { box-shadow: 0 0 8px var(--color-shadow-primary); }
-
-    .document-image {
-      width: var(--dnd5e-document-image-size);
-      height: var(--dnd5e-document-image-size);
-      border-radius: 50%;
-      border: 2px solid var(--dnd5e-color-gold);
-      box-shadow: 0 0 4px var(--dnd5e-shadow-45);
-      object-fit: cover;
-      background: var(--dnd5e-background-alt-1);
-    }
-  }
 
   .owner-sidebar {
     display: flex;
@@ -328,50 +295,10 @@
     padding: 8px;
   }
 
-  .owner-row {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    gap: 6px;
+  .owner-mods {
     margin-bottom: 8px;
-  }
-
-  .drop-area.npc-drop-target {
-    width: 100%;
-    min-height: 200px;
-  }
-
-  .npc-portrait {
-    position: relative;
-    cursor: pointer;
-
-    &:hover .gold-icon { box-shadow: 0 0 8px var(--color-shadow-primary); }
-  }
-
-  .npc-name {
-    display: flex;
-    flex-direction: column;
-    cursor: pointer;
-
-    .value {
-      font-size: var(--font-size-13);
-    }
-
-    &:hover .value { text-shadow: 0 0 8px var(--color-shadow-primary); }
-  }
-
-  .clear-npc {
-    position: absolute;
-    inset: -4px -4px auto auto;
-    background: var(--dnd5e-color-black);
-    color: var(--dnd5e-color-gold);
-    border-radius: 50%;
-    width: 14px;
-    height: 14px;
-    display: grid;
-    place-content: center;
-    font-size: var(--font-size-9);
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--dnd5e-color-gold);
   }
 
   .npc-bio {
@@ -380,29 +307,20 @@
     margin: 0;
   }
 
-  .item-discount, .item-cart {
+  .item-cart {
     width: 70px;
     justify-content: space-evenly;
+    gap: 4px;
+    border-right: 1px solid var(--dnd5e-color-gold);
+    padding-right: 4px;
   }
 
-  .item-stock {
+  .item-discount {
     width: 70px;
-    justify-content: space-evenly;
-  }
-
-  .stock-display.clickable {
-    cursor: pointer;
-
-    &:hover { text-shadow: 0 0 8px var(--color-shadow-primary); }
   }
 
   .item-controls {
-    width: 32px;
-  }
-
-  .item-cart {
-    border-right: 1px solid var(--dnd5e-color-gold);
-    padding-right: 4px;
+    padding: 0 4px;
   }
 
   .item-price input,
@@ -422,19 +340,7 @@
     font-size: var(--font-size-11);
   }
 
-  .item-weight {
-    color: var(--color-text-tertiary);
-    opacity: .7;
-  }
-
-  .price-display.clickable {
-    cursor: pointer;
-
-    &:hover .value { text-shadow: 0 0 8px var(--color-shadow-primary); }
-  }
-
   .item-price {
-    width: auto;
     min-width: 150px;
 
     .price-display, .original {
@@ -498,22 +404,6 @@
 
   .confirm-button {
     margin-top: 4px;
-    padding: 6px;
-    background: var(--dnd5e-color-black);
-    color: var(--dnd5e-color-gold);
-    border: 1px solid var(--dnd5e-color-gold);
-    border-radius: 4px;
-    font-family: var(--dnd5e-font-modesto);
-    font-size: var(--font-size-16);
-
-    &:not(:disabled):hover {
-      box-shadow: 0 0 6px var(--dnd5e-color-gold);
-    }
-
-    &:disabled {
-      opacity: .5;
-      cursor: not-allowed;
-    }
   }
 }
 
@@ -521,4 +411,18 @@
   font-style: italic;
   color: var(--color-text-tertiary);
   margin: 2px 0 0;
+}
+
+.dnd5e2 .goldpool-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.dnd5e2 .goldpool-grid label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.dnd5e2 .goldpool-grid input:disabled {
+  opacity: .4;
 }

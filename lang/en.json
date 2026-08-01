@@ -1,5 +1,23 @@
 {
   "SIMPLE_SHOP_CRAFT_5E": {
+    "SHOP": {
+      "FIELDS": {
+        "name": { "label": "Shop Name" },
+        "location": { "label": "Location" },
+        "img": { "label": "Image" },
+        "buyModifier": {
+          "label": "Buy Modifier",
+          "hint": "Percentage adjustment applied to item prices in this shop's Buy tab. Negative values lower the price, positive values raise it. Individual items can override this."
+        },
+        "sellModifier": {
+          "label": "Sell Modifier",
+          "hint": "Percentage adjustment applied to item prices in this shop's Sell tab. Negative values lower what the shop pays out, positive values raise it."
+        },
+        "goldPool": {
+          "unlimited": { "label": "Unlimited" }
+        }
+      }
+    },
     "StarterPack": {
       "Blacksmith": "Blacksmith",
       "Alchemist": "Alchemist",
@@ -21,14 +39,15 @@
         "Shop": "Shop",
         "Owner": "Owner",
         "Location": "Location",
-        "Active": "Active",
-        "ToggleActive": "Toggle Active",
-        "Items": "Items",
+        "Activate": "Activate Shop",
+        "Deactivate": "Deactivate Shop",
         "StarterPack": "Starter Pack",
         "Empty": "Empty",
         "None": "No shops yet.",
         "Create": "New Shop",
         "Delete": "Delete Shop",
+        "Duplicate": "Duplicate Shop",
+        "EditConfig": "Edit Shop Settings",
         "DeleteConfirm": "Delete this shop? This cannot be undone."
       },
       "Crafting": {
@@ -38,7 +57,6 @@
     "ShopEditor": {
       "Title": "Edit Shop",
       "AddItems": "Add Items",
-      "EditMode": "Edit Mode",
       "Tabs": {
         "Buy": "Buy",
         "Sell": "Sell"
@@ -55,21 +73,16 @@
       "Town": "Town (2,000 GP)",
       "City": "City (200,000 GP)",
       "Custom": "Custom",
-      "Value": "Value",
-      "GoldPool": "Gold Pool",
-      "GoldPoolMax": "Max. Gold Pool",
-      "GoldPoolMaxHint": "Leave empty to use the default gold pool (100 GP).",
-      "GoldPoolCurrent": "Current Gold",
+      "SettlementCapValue": "Custom Cap Value",
+      "GoldPool": "Shop Money",
+      "GoldPoolMax": "Max. Shop Money",
       "GoldPoolUnlimited": "Unlimited",
-      "GoldPoolUnlimitedHint": "This shop can always buy items back, regardless of its gold pool.",
-      "ResetRestock": "Reset Stock & Gold Pool",
+      "ResetRestock": "Reset Stock & Shop Money",
       "NoRestock": "Exclude from Restock",
       "NoRestockHint": "This item stays depleted after being bought out — Reset won't restock it.",
       "Owner": "Owner",
       "OwnerDescription": "Owner Description",
-      "DropNpc": "Drag an NPC here to assign",
       "OpenNpcSheet": "Open NPC Sheet",
-      "ClearNpc": "Remove NPC",
       "PriceTooltip": "Edit Price",
       "PriceModifier": "Price Modifier",
       "Stock": "Stock",
@@ -87,6 +100,13 @@
       "SuppressedCap": "Exceeds Settlement Cap",
       "SuppressedNotFound": "Item not found in active compendiums — check the identifier or enabled rulebooks",
       "None": "No items yet."
+    },
+    "ShopConfig": {
+      "Tabs": {
+        "Economy": "Economy"
+      },
+      "Discount": "Discount",
+      "ShopImage": "Image"
     },
     "ShopCart": {
       "Title": "Shopping Cart",
