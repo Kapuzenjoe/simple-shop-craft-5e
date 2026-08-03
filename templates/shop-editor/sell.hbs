@@ -43,8 +43,9 @@
                                aria-label="{{ lookup (lookup @root.config.currencies this.denomination) 'label' }}"></i>
                             {{/each}}
                             {{#if this.priceDisplay.original}}
+                            <span class="separator">/</span>
                             <span class="original">
-                                ({{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=this.priceDisplay.original }})
+                                {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=this.priceDisplay.original }}
                             </span>
                             {{/if}}
                         </div>

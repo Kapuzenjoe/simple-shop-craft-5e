@@ -1,5 +1,4 @@
-import { MODULE_ID, SETTING_KEYS, SETTLEMENT_CAPS, GOLD_POOL_DEFAULT } from "../config.mjs";
-import { getStarterItems, getStarterPackOptions } from "../data/starter-packs.mjs";
+import { MODULE_ID, SETTING_KEYS, SETTLEMENT_CAPS } from "../config.mjs";
 import { getCurrencyOptions, goldPoolCurrencies } from "../shops/currency.mjs";
 import { Shop } from "../data/shop-data.mjs";
 
@@ -27,26 +26,24 @@ export default class ShopConfig extends HandlebarsApplicationMixin(ApplicationV2
     classes: ["dnd5e2", "simple-shop-craft-5e", "shop-config", "standard-form"],
     tag: "form",
     window: {
-      title: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Create",
+      title: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.EditConfig",
       resizable: true
     },
     position: {
-      width: 560,
-      height: 620
+      width: 560
     },
     form: {
       handler: ShopConfig.#onSubmit,
-      submitOnChange: false,
-      closeOnSubmit: true
+      submitOnChange: true,
+      closeOnSubmit: false
     }
   };
 
   /** @override */
   static PARTS = {
     tabs: { template: "templates/generic/tab-navigation.hbs" },
-    identity: { template: "modules/simple-shop-craft-5e/templates/shop-config-identity.hbs" },
-    economy: { template: "modules/simple-shop-craft-5e/templates/shop-config-economy.hbs" },
-    footer: { template: "templates/generic/form-footer.hbs" }
+    identity: { template: "modules/simple-shop-craft-5e/templates/shop-config/identity.hbs" },
+    economy: { template: "modules/simple-shop-craft-5e/templates/shop-config/economy.hbs" }
   };
 
   /** @override */
@@ -81,13 +78,11 @@ export default class ShopConfig extends HandlebarsApplicationMixin(ApplicationV2
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
     const shop = this.shop;
-    context.isCreate = !this.shopId;
     context.fields = Shop.schema.fields;
     context.name = shop?.name ?? "";
     context.img = shop?.img ?? Shop.DEFAULT_ICON;
     context.location = shop?.location ?? "";
     context.description = shop?.description ?? "";
-    context.starterPacks = context.isCreate ? getStarterPackOptions() : null;
     context.npcUuid = shop?.npc ?? "";
 
     context.buyModifier = shop?.buyModifier ?? 0;
@@ -117,7 +112,7 @@ export default class ShopConfig extends HandlebarsApplicationMixin(ApplicationV2
     context.goldCurrencies = goldPoolCurrencies().reduce((obj, denom) => {
       obj[denom] = {
         label: CONFIG.DND5E.currencies[denom].label,
-        value: goldPool.max?.[denom] ?? (context.isCreate && (denom === "gp") ? GOLD_POOL_DEFAULT : null)
+        value: goldPool.max?.[denom] ?? null
       };
       return obj;
     }, {});
@@ -130,9 +125,6 @@ export default class ShopConfig extends HandlebarsApplicationMixin(ApplicationV2
   async _preparePartContext(partId, context, options) {
     context = await super._preparePartContext(partId, context, options);
     context.tab = context.tabs?.[partId];
-    if ( partId === "footer" ) {
-      context.buttons = [{ type: "submit", icon: "fas fa-save", label: "Save" }];
-    }
     return context;
   }
 
@@ -141,14 +133,6 @@ export default class ShopConfig extends HandlebarsApplicationMixin(ApplicationV2
   /** @override */
   _attachPartListeners(partId, htmlElement, options) {
     super._attachPartListeners(partId, htmlElement, options);
-
-    if ( partId === "identity" ) {
-      if ( !this.shopId ) {
-        const select = htmlElement.querySelector('select[name="starterPack"]');
-        const name = htmlElement.querySelector('input[name="name"]');
-        select?.addEventListener("change", () => name.placeholder = select.selectedOptions[0]?.text ?? "");
-      }
-    }
 
     if ( partId === "economy" ) {
       const capSelect = htmlElement.querySelector('select[name="settlementCapPreset"]');
@@ -167,7 +151,7 @@ export default class ShopConfig extends HandlebarsApplicationMixin(ApplicationV2
   /* -------------------------------------------- */
 
   /**
-   * Handle submitting the create/edit form.
+   * Handle submitting the edit form.
    * @this {ShopConfig}
    * @param {Event} event
    * @param {HTMLElement} form
@@ -185,36 +169,16 @@ export default class ShopConfig extends HandlebarsApplicationMixin(ApplicationV2
     const buyModifier = Math.clamp(Math.round(data.buyModifier ?? 0), -100, 1000);
     const sellModifier = Math.clamp(Math.round(data.sellModifier ?? -50), -100, 1000);
 
-    if ( this.shopId ) {
-      await game.settings.set(MODULE_ID, SETTING_KEYS.SHOPS, shops.map(s => s._id !== this.shopId ? s.toObject() : {
-        ...s.toObject(),
-        name: data.name || s.name,
-        img: data.img || s.img,
-        location: data.location ?? "",
-        description: data.description ?? "",
-        npc: data.npc || null,
-        buyModifier, sellModifier,
-        settlementCap: { value: settlementCapValue, denomination: settlementCapDenomination },
-        goldPool: { ...s.goldPool, max: goldPoolMax, unlimited: !!data.goldPoolUnlimited }
-      }));
-      return;
-    }
-
-    const packs = getStarterPackOptions();
-    await game.settings.set(MODULE_ID, SETTING_KEYS.SHOPS, [
-      ...shops.map(s => s.toObject()),
-      {
-        name: data.name || packs.find(p => p.value === data.starterPack)?.label
-          || _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Create"),
-        img: data.img || undefined,
-        location: data.location ?? "",
-        description: data.description ?? "",
-        npc: data.npc || null,
-        buyModifier, sellModifier,
-        settlementCap: { value: settlementCapValue, denomination: settlementCapDenomination },
-        goldPool: { max: goldPoolMax, current: goldPoolMax, unlimited: !!data.goldPoolUnlimited },
-        items: getStarterItems(data.starterPack).map(identifier => ({ identifier, stock: { max: null, current: null } }))
-      }
-    ]);
+    await game.settings.set(MODULE_ID, SETTING_KEYS.SHOPS, shops.map(s => s._id !== this.shopId ? s.toObject() : {
+      ...s.toObject(),
+      name: data.name || s.name,
+      img: data.img || s.img,
+      location: data.location ?? "",
+      description: data.description ?? "",
+      npc: data.npc || null,
+      buyModifier, sellModifier,
+      settlementCap: { value: settlementCapValue, denomination: settlementCapDenomination },
+      goldPool: { ...s.goldPool, max: goldPoolMax, unlimited: !!data.goldPoolUnlimited }
+    }));
   }
 }

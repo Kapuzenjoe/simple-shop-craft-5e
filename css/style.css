@@ -12,16 +12,6 @@
     bottom: 60px;
   }
 
-  .tab:not(.active) {
-    display: none;
-  }
-
-  .amount {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
   .sign {
     margin-right: -2px;
   }
@@ -36,16 +26,13 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    padding-top: 8px;
-    border-top: 1px solid var(--dnd5e-color-gold);
     font-weight: bold;
 
     .label { flex: 1; color: var(--color-text-tertiary); font-weight: normal; }
   }
 }
 
-.simple-shop-craft-5e.shop-editor,
-.simple-shop-craft-5e.shop-config {
+.simple-shop-craft-5e.shop-editor {
   .sheet-header {
     display: flex;
     align-items: flex-start;
@@ -90,11 +77,6 @@
     margin-bottom: 8px;
   }
 
-  .drop-area.npc-drop-target {
-    width: 100%;
-    min-height: 200px;
-  }
-
   .npc-portrait {
     position: relative;
 
@@ -108,19 +90,6 @@
     .value {
       font-size: var(--font-size-13);
     }
-  }
-
-  .clear-npc {
-    position: absolute;
-    inset: -4px -4px auto auto;
-    background: var(--dnd5e-color-black);
-    color: var(--dnd5e-color-gold);
-    border-radius: 50%;
-    width: 14px;
-    height: 14px;
-    display: grid;
-    place-content: center;
-    font-size: var(--font-size-9);
   }
 
   .mod-row {
@@ -145,29 +114,7 @@
 
     select { max-width: 120px; }
   }
-}
 
-.simple-shop-craft-5e.shop-config {
-  .drop-area.npc-drop-target {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 100px;
-  }
-
-  [data-application-part="identity"],
-  [data-application-part="economy"] {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-  }
-
-  [data-application-part="footer"] {
-    flex: 0 0 auto;
-  }
-}
-
-.simple-shop-craft-5e.shop-editor {
   .window-content {
     display: grid;
     grid-template-areas: "header header" "owner tabnav" "owner content" "owner cart";
@@ -319,110 +266,27 @@
     width: 70px;
   }
 
-  .item-controls {
-    padding: 0 4px;
-  }
-
-  .item-price input,
-  .item-discount input {
-    background: none;
-    border: none;
-    text-align: center;
-    width: 30px;
-  }
-
   .item-discount .unit, .mod-item .unit {
     color: var(--color-text-tertiary);
+    font-size: var(--font-size-12);
   }
 
-  .bundle-size {
+  .title .sign {
     color: var(--color-text-tertiary);
-    font-size: var(--font-size-11);
   }
 
   .item-price {
-    min-width: 150px;
-
-    .price-display, .original {
-      flex-wrap: nowrap;
-      white-space: nowrap;
-    }
+    .separator { color: var(--dnd5e-color-gold); }
+    .original { color: var(--color-text-secondary); }
   }
 
-  .price-display .original {
-    color: var(--color-text-tertiary);
-    font-size: var(--font-size-11);
-    margin-left: 2px;
-  }
-
-  .item.suppressed .item-row {
+  .item.suppressed {
     opacity: .5;
   }
 
-  .suppress-warning {
-    color: var(--dnd5e-color-note-warn);
+  .warning {
+    color: var(--dnd5e-color-failure);
     margin-left: 4px;
     cursor: help;
   }
-}
-
-.simple-shop-craft-5e.shop-cart {
-  .cart-content {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .cart-balance {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding-top: 8px;
-    border-top: 1px solid var(--dnd5e-color-gold);
-    font-weight: bold;
-
-    .label { flex: 1; color: var(--color-text-tertiary); font-weight: normal; }
-
-    .after {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      color: var(--color-text-tertiary);
-      font-weight: normal;
-    }
-  }
-
-  .cart-balance.insufficient .warning {
-    color: var(--dnd5e-color-note-warn);
-    font-weight: bold;
-  }
-
-  .hint {
-    color: var(--dnd5e-color-note-warn);
-    font-size: var(--font-size-13);
-  }
-
-  .confirm-button {
-    margin-top: 4px;
-  }
-}
-
-.simple-shop-craft-5e.purchase-card .status-line {
-  font-style: italic;
-  color: var(--color-text-tertiary);
-  margin: 2px 0 0;
-}
-
-.dnd5e2 .goldpool-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-}
-.dnd5e2 .goldpool-grid label {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.dnd5e2 .goldpool-grid input:disabled {
-  opacity: .4;
 }

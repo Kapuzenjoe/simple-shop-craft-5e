@@ -1,4 +1,5 @@
-import { MODULE_ID, SETTING_KEYS, SETTLEMENT_CAPS } from "../config.mjs";
+import { MODULE_ID, SETTING_KEYS, SETTLEMENT_CAPS, GOLD_POOL_DEFAULT } from "../config.mjs";
+import { getStarterItems, getStarterPackOptions } from "../data/starter-packs.mjs";
 import ShopConfig from "./shop-config.mjs";
 import ShopEditor from "./shop-editor.mjs";
 
@@ -46,10 +47,10 @@ export default class ShopManager extends HandlebarsApplicationMixin(ApplicationV
   static PARTS = {
     tabs: { template: "templates/generic/tab-navigation.hbs" },
     shops: {
-      template: "modules/simple-shop-craft-5e/templates/shop-manager-shops.hbs",
+      template: "modules/simple-shop-craft-5e/templates/shop-manager/shops.hbs",
       templates: ["modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs"]
     },
-    crafting: { template: "modules/simple-shop-craft-5e/templates/shop-manager-crafting.hbs" }
+    crafting: { template: "modules/simple-shop-craft-5e/templates/shop-manager/crafting.hbs" }
   };
 
   /** @override */
@@ -95,23 +96,8 @@ export default class ShopManager extends HandlebarsApplicationMixin(ApplicationV
     super._attachPartListeners(partId, htmlElement, options);
     if ( partId === "shops" ) {
       htmlElement.querySelectorAll("[data-context-menu]").forEach(control =>
-        control.addEventListener("click", ShopManager.#triggerContextMenu));
+        control.addEventListener("click", game.dnd5e.applications.ContextMenu5e.triggerEvent));
     }
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Trigger the row's context menu from a click on the "..." button. {@link ContextMenu5e.triggerEvent} does the
-   * same thing, but its target selector is hardcoded to dnd5e's own id attributes and doesn't know `data-shop-id`.
-   * @param {PointerEvent} event
-   */
-  static #triggerContextMenu(event) {
-    event.preventDefault();
-    event.stopPropagation();
-    const { clientX, clientY } = event;
-    const target = event.target.closest("[data-shop-id]");
-    target?.dispatchEvent(new PointerEvent("contextmenu", { view: window, bubbles: true, cancelable: true, clientX, clientY }));
   }
 
   /* -------------------------------------------- */
@@ -200,11 +186,64 @@ export default class ShopManager extends HandlebarsApplicationMixin(ApplicationV
   /* -------------------------------------------- */
 
   /**
-   * Handle creating a new shop.
+   * Handle creating a new shop: small name/starter-pack prompt, then opens the full edit view.
    * @this {ShopManager}
    */
-  static #createShop() {
-    new ShopConfig().render({ force: true });
+  static async #createShop() {
+    const { createFormGroup, createTextInput, createSelectInput } = foundry.applications.fields;
+    const content = `
+      ${createFormGroup({
+        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.StarterPack"),
+        input: createSelectInput({
+          name: "starterPack",
+          options: [
+            { value: "", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Empty") },
+            ...getStarterPackOptions()
+          ]
+        })
+      }).outerHTML}
+      ${createFormGroup({
+        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Shop"),
+        input: createTextInput({ name: "name" })
+      }).outerHTML}
+    `;
+    const data = await foundry.applications.api.DialogV2.wait({
+      window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Create" },
+      position: { width: 480 },
+      content,
+      buttons: [
+        {
+          action: "create",
+          label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Create",
+          icon: "fas fa-plus",
+          default: true,
+          callback: (event, target) => new foundry.applications.ux.FormDataExtended(target.form).object
+        },
+        { action: "cancel", label: game.i18n.localize("Cancel"), icon: "fas fa-xmark" }
+      ],
+      render: (event, dialog) => {
+        const select = dialog.element.querySelector('select[name="starterPack"]');
+        const name = dialog.element.querySelector('input[name="name"]');
+        select?.addEventListener("change", () => {
+          name.placeholder = select.value ? (select.selectedOptions[0]?.text ?? "") : "";
+        });
+      }
+    });
+    if ( !data || (data === "cancel") ) return;
+
+    const packs = getStarterPackOptions();
+    const shops = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS);
+    const newShop = {
+      name: data.name || packs.find(p => p.value === data.starterPack)?.label
+        || _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Create"),
+      goldPool: { max: { gp: GOLD_POOL_DEFAULT }, current: { gp: GOLD_POOL_DEFAULT }, unlimited: false },
+      items: getStarterItems(data.starterPack).map(identifier => ({ identifier, stock: { max: null, current: null } }))
+    };
+    await game.settings.set(MODULE_ID, SETTING_KEYS.SHOPS, [...shops.map(s => s.toObject()), newShop]);
+    this.render();
+
+    const created = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS).at(-1);
+    new ShopConfig({ shopId: created._id }).render({ force: true });
   }
 
   /* -------------------------------------------- */

@@ -1,6 +1,6 @@
 <div class="cart-footer{{#unless cart.count}} empty{{/unless}}" data-action="openCart" role="button">
     <i class="fas fa-basket-shopping" inert></i>
     <span class="label">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopCart.ViewCart" }}</span>
-    {{> "modules/simple-shop-craft-5e/templates/partials/currency-amount.hbs" parts=cart.parts }}
+    {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=cart.parts }}
     <i class="fas fa-chevron-right" inert></i>
 </div>

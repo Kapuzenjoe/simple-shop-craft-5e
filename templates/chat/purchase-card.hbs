@@ -25,7 +25,7 @@
                         <div class="name-stacked">
                             <span class="title">{{ this.name }} <span class="bundle-size">×{{ this.quantity }}</span></span>
                         </div>
-                        {{> "modules/simple-shop-craft-5e/templates/partials/currency-amount.hbs" parts=this.subtotal }}
+                        {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=this.subtotal }}
                     </li>
                     {{/each}}
                 </ol>
@@ -50,7 +50,7 @@
                         <div class="name-stacked">
                             <span class="title">{{ this.name }} <span class="bundle-size">×{{ this.quantity }}</span></span>
                         </div>
-                        {{> "modules/simple-shop-craft-5e/templates/partials/currency-amount.hbs" parts=this.subtotal }}
+                        {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=this.subtotal }}
                     </li>
                     {{/each}}
                 </ol>
@@ -61,7 +61,7 @@
 
     <div class="cart-total">
         <span class="label roboto-upper">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopCart.Total" }}</span>
-        {{> "modules/simple-shop-craft-5e/templates/partials/currency-amount.hbs" parts=total }}
+        {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=total }}
     </div>
 
     <p class="status-line">{{ statusLabel }}</p>

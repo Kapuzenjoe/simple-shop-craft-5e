@@ -43,6 +43,7 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
       addItems: ShopEditor.#addItems,
       removeItem: ShopEditor.#removeItem,
       editPrice: ShopEditor.#editPrice,
+      editDiscount: ShopEditor.#editDiscount,
       adjustCartQty: ShopEditor.#adjustCartQty,
       adjustSellQty: ShopEditor.#adjustSellQty,
       openCart: ShopEditor.#openCart,
@@ -79,20 +80,20 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
 
   /** @override */
   static PARTS = {
-    header: { template: "modules/simple-shop-craft-5e/templates/shop-editor-header.hbs" },
+    header: { template: "modules/simple-shop-craft-5e/templates/shop-editor/header.hbs" },
     owner: {
-      template: "modules/simple-shop-craft-5e/templates/shop-editor-owner.hbs",
+      template: "modules/simple-shop-craft-5e/templates/shop-editor/owner.hbs",
       templates: [
         "modules/simple-shop-craft-5e/templates/partials/mod-item.hbs",
         "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs"
       ]
     },
     tabs: {
-      template: "modules/simple-shop-craft-5e/templates/shop-editor-tabs.hbs",
+      template: "modules/simple-shop-craft-5e/templates/shop-editor/tabs.hbs",
       templates: ["templates/generic/tab-navigation.hbs"]
     },
     buy: {
-      template: "modules/simple-shop-craft-5e/templates/shop-editor-buy.hbs",
+      template: "modules/simple-shop-craft-5e/templates/shop-editor/buy.hbs",
       templates: [
         "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs",
         "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs",
@@ -101,7 +102,7 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
       scrollable: [""]
     },
     sell: {
-      template: "modules/simple-shop-craft-5e/templates/shop-editor-sell.hbs",
+      template: "modules/simple-shop-craft-5e/templates/shop-editor/sell.hbs",
       templates: [
         "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs",
         "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs",
@@ -110,8 +111,8 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
       scrollable: [""]
     },
     cart: {
-      template: "modules/simple-shop-craft-5e/templates/shop-editor-cart.hbs",
-      templates: ["modules/simple-shop-craft-5e/templates/partials/currency-amount.hbs"]
+      template: "modules/simple-shop-craft-5e/templates/shop-editor/cart.hbs",
+      templates: ["modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs"]
     }
   };
 
@@ -481,7 +482,7 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
    * @param {Event} event         Triggering click event.
    * @param {HTMLElement} target  Button that was clicked.
    */
-  static #adjustSellQty(event, target) {
+  static async #adjustSellQty(event, target) {
     const itemId = target.dataset.itemId;
     const actor = this.selectedActorUuid ? fromUuidSync(this.selectedActorUuid) : null;
     const max = actor?.items.get(itemId)?.system?.quantity ?? 0;
@@ -489,7 +490,8 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
     const next = Math.clamp((this.sellCart.get(itemId) ?? 0) + delta, 0, max);
     if ( next === 0 ) this.sellCart.delete(itemId);
     else this.sellCart.set(itemId, next);
-    this.render();
+    await this.render();
+    if ( this.cartApp?.rendered ) this.cartApp.render();
   }
 
   /* -------------------------------------------- */
@@ -742,6 +744,41 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
     const items = this.shop.items.map(i => entryKey(i) !== key ? i.toObject() : {
       ...i.toObject(),
       price: { value: data.value ?? null, denomination: data.denomination }
+    });
+    await this.#updateShop({ items });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle opening a small dialog to edit an item's price-modifier override.
+   * @this {ShopEditor}
+   * @param {Event} event         Triggering click event.
+   * @param {HTMLElement} target  Element that was clicked.
+   */
+  static async #editDiscount(event, target) {
+    const key = target.dataset.key;
+    const entry = this.shop.items.find(i => entryKey(i) === key);
+
+    const { createFormGroup, createNumberInput } = foundry.applications.fields;
+    const content = `<fieldset>
+      ${createFormGroup({
+        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.PriceModifier"),
+        input: createNumberInput({
+          name: "discount", value: entry.discount, placeholder: String(this.shop.buyModifier), min: -100, max: 1000
+        })
+      }).outerHTML}
+    </fieldset>`;
+
+    const data = await foundry.applications.api.DialogV2.input({
+      window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.PriceModifier" },
+      content
+    });
+    if ( !data ) return;
+
+    const items = this.shop.items.map(i => entryKey(i) !== key ? i.toObject() : {
+      ...i.toObject(),
+      discount: data.discount ?? null
     });
     await this.#updateShop({ items });
   }

@@ -7,7 +7,7 @@
         </div>
         <ol class="item-list unlist">
             {{#each shops}}
-            <li class="item" data-shop-id="{{ this.shop._id }}">
+            <li class="item" data-id="{{ this.shop._id }}" data-shop-id="{{ this.shop._id }}">
                 <div class="item-row">
                     <div class="item-name rollable" data-action="editShop" role="button" data-shop-id="{{ this.shop._id }}">
                         {{> "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs"

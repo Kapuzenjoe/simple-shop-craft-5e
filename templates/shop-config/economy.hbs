@@ -27,17 +27,15 @@
         {{ formField fields.goldPool.fields.unlimited value=goldPoolUnlimited rootId="economy" }}
         <div class="form-group" data-goldpool-amounts {{#if goldPoolUnlimited}}hidden{{/if}}>
             <label>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GoldPoolMax" }}</label>
-            <div class="form-fields">
-                <div class="mod-row">
-                    {{#each goldCurrencies}}
-                    <label class="mod-item">
-                        <i class="currency {{ @key }}" data-tooltip aria-label="{{ label }}"></i>
-                        {{ numberInput value name=(concat "goldPool." @key) class="uninput" min=0 step=1
-                            disabled=../goldPoolUnlimited }}
-                    </label>
-                    {{/each}}
-                </div>
-            </div>
+            <section class="currency">
+                {{#each goldCurrencies}}
+                <label>
+                    <i class="currency {{ @key }}" data-tooltip aria-label="{{ label }}"></i>
+                    {{ numberInput value name=(concat "goldPool." @key) class="uninput" min=0 step=1
+                        disabled=../goldPoolUnlimited }}
+                </label>
+                {{/each}}
+            </section>
         </div>
     </fieldset>
 </section>

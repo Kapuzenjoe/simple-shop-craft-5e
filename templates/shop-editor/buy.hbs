@@ -32,19 +32,15 @@
                             img=this.itemImg name=this.itemName bundleSize=this.bundleSize }}
                         {{#if this.suppressed}}
                         {{#if @root.editable}}
-                        <i class="fa-solid fa-triangle-exclamation suppress-warning" data-tooltip="{{ this.suppressReason }}"></i>
+                        <i class="fa-solid fa-triangle-exclamation warning" data-tooltip="{{ this.suppressReason }}"></i>
                         {{/if}}
                         {{/if}}
                     </div>
-                    <div class="item-detail item-discount">
-                        {{#if @root.editable}}
-                        <input type="number" name="items.{{ this.key }}.discount"
-                               value="{{ this.entry.discount }}" placeholder="{{ ../../shop.buyModifier }}"
-                               min="-100" max="1000" step="1"
-                               aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.PriceModifier' }}">
-                        {{else}}
+                    <div class="item-detail item-discount{{#if @root.editable}} clickable{{/if}}"
+                         {{#if @root.editable}}data-action="editDiscount" role="button" data-tooltip
+                         aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.DiscountTooltip' }}"{{/if}}
+                         data-key="{{ this.key }}">
                         <span class="value">{{ this.discountPercent }}</span>
-                        {{/if}}
                         <span class="unit">%</span>
                     </div>
                     <div class="item-detail item-price">
@@ -58,8 +54,9 @@
                                aria-label="{{ lookup (lookup @root.config.currencies this.denomination) 'label' }}"></i>
                             {{/each}}
                             {{#if this.priceDisplay.original}}
+                            <span class="separator">/</span>
                             <span class="original">
-                                ({{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=this.priceDisplay.original }})
+                                {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=this.priceDisplay.original }}
                             </span>
                             {{/if}}
                         </div>

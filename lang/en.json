@@ -85,6 +85,7 @@
       "OpenNpcSheet": "Open NPC Sheet",
       "PriceTooltip": "Edit Price",
       "PriceModifier": "Price Modifier",
+      "DiscountTooltip": "Edit Price Modifier",
       "Stock": "Stock",
       "StockTooltip": "Edit Stock",
       "StockMax": "Max Stock (Restock Target)",

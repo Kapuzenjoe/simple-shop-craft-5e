@@ -7,7 +7,7 @@ Hooks.once("init", () => {
   initSettings();
   registerPurchaseCard();
   foundry.applications.handlebars.loadTemplates([
-    "modules/simple-shop-craft-5e/templates/partials/currency-amount.hbs"
+    "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs"
   ]);
 });
 

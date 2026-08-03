@@ -1,18 +1,4 @@
 <section class="tab {{#if tab.active}}active{{/if}}" data-group="primary" data-tab="identity">
-    {{#if isCreate}}
-    <div class="form-group">
-        <label>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.StarterPack" }}</label>
-        <div class="form-fields">
-            <select name="starterPack">
-                <option value="">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Empty" }}</option>
-                {{#each starterPacks}}
-                <option value="{{ this.value }}">{{ this.label }}</option>
-                {{/each}}
-            </select>
-        </div>
-    </div>
-    {{/if}}
-
     <fieldset>
         <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Shop" }}</legend>
         {{ formField fields.name value=name rootId="identity" }}
@@ -25,6 +11,10 @@
 
     <fieldset>
         <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Owner" }}</legend>
-        <document-tags name="npc" type="Actor" single class="drop-area npc-drop-target" value="{{ npcUuid }}"></document-tags>
+        <ul class="separated-list single-item">
+            <li>
+                <document-tags name="npc" type="Actor" single value="{{ npcUuid }}"></document-tags>
+            </li>
+        </ul>
     </fieldset>
 </section>

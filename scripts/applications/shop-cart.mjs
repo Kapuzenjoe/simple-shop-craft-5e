@@ -25,6 +25,7 @@ export default class ShopCart extends HandlebarsApplicationMixin(ApplicationV2) 
     classes: ["dnd5e2", "simple-shop-craft-5e", "shop-cart"],
     window: {
       title: "SIMPLE_SHOP_CRAFT_5E.ShopCart.Title",
+      contentClasses: ["standard-form"],
       resizable: true
     },
     position: {
@@ -38,11 +39,42 @@ export default class ShopCart extends HandlebarsApplicationMixin(ApplicationV2) 
 
   /** @override */
   static PARTS = {
-    content: {
-      template: "modules/simple-shop-craft-5e/templates/shop-cart.hbs",
-      templates: ["modules/simple-shop-craft-5e/templates/partials/currency-amount.hbs"]
-    }
+    buy: {
+      template: "modules/simple-shop-craft-5e/templates/shop-cart/lines.hbs",
+      templates: ["modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs"]
+    },
+    sell: {
+      template: "modules/simple-shop-craft-5e/templates/shop-cart/lines.hbs",
+      templates: ["modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs"]
+    },
+    balance: {
+      template: "modules/simple-shop-craft-5e/templates/shop-cart/balance.hbs",
+      templates: ["modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs"]
+    },
+    footer: { template: "templates/generic/form-footer.hbs" }
   };
+
+  /* -------------------------------------------- */
+
+  /** @override */
+  async _preparePartContext(partId, context, options) {
+    context = await super._preparePartContext(partId, context, options);
+    if ( partId === "buy" ) {
+      context.icon = "fas fa-cart-shopping";
+      context.label = "SIMPLE_SHOP_CRAFT_5E.ShopCart.Buying";
+      context.rows = context.lines.map(row => ({
+        img: row.item.img, name: row.item.name, quantity: row.cartQuantity, subtotal: row.subtotal
+      }));
+    }
+    if ( partId === "sell" ) {
+      context.icon = "fas fa-hand-holding-dollar";
+      context.label = "SIMPLE_SHOP_CRAFT_5E.ShopCart.Selling";
+      context.rows = context.sellLines.map(row => ({
+        img: row.item.img, name: row.item.name, quantity: row.sellQuantity, subtotal: row.subtotal
+      }));
+    }
+    return context;
+  }
 
   /* -------------------------------------------- */
 
@@ -72,19 +104,22 @@ export default class ShopCart extends HandlebarsApplicationMixin(ApplicationV2) 
     const actor = this.shopEditor.selectedActorUuid ? fromUuidSync(this.shopEditor.selectedActorUuid) : null;
     context.actor = actor;
     if ( actor ) {
-      const currencies = CONFIG.DND5E.currencies;
-      const currentGP = Object.entries(actor.system.currency ?? {})
-        .reduce((sum, [denom, value]) => sum + value / (currencies[denom]?.conversion ?? 1), 0);
-      const afterGP = currentGP + netGP;
-      context.balance = {
-        before: breakdownPrice(currentGP, "gp"),
-        insufficient: afterGP < 0,
-        after: afterGP >= 0 ? breakdownPrice(afterGP, "gp") : []
-      };
+      context.balance = { insufficient: false };
+      if ( netGP < 0 ) {
+        const updates = game.dnd5e.applications.CurrencyManager.getActorCurrencyUpdates(actor, -netGP, "gp", {});
+        context.balance.insufficient = !updates.remainder.almostEqual(0);
+      }
     }
 
     context.noActiveGM = !game.users.activeGM;
     context.confirmDisabled = context.noActiveGM || !hasLines || !actor || !!context.balance?.insufficient;
+    context.buttons = [{
+      type: "button",
+      action: "confirm",
+      cssClass: "",
+      label: "SIMPLE_SHOP_CRAFT_5E.ShopCart.Confirm",
+      disabled: context.confirmDisabled
+    }];
     this.lastContext = context;
     return context;
   }
