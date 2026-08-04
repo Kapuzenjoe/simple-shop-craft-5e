@@ -2,6 +2,7 @@ import { MODULE_ID, SETTING_KEYS } from "../config.mjs";
 import { entryKey, pickItemIdentifiers, resolveShopItems } from "../shops/item-resolver.mjs";
 import { breakdownPrice, displayGoldPool, getCurrencyOptions } from "../shops/currency.mjs";
 import ShopCart from "./shop-cart.mjs";
+import ShopConfig from "./shop-config.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -24,7 +25,7 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
   /** @override */
   static DEFAULT_OPTIONS = {
     id: "shop-editor-{id}",
-    classes: ["dnd5e2", "simple-shop-craft-5e", "shop-editor"],
+    classes: ["dnd5e2", "sheet", "simple-shop-craft-5e", "shop-editor"],
     tag: "form",
     window: {
       title: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Title",
@@ -47,10 +48,11 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
       adjustCartQty: ShopEditor.#adjustCartQty,
       adjustSellQty: ShopEditor.#adjustSellQty,
       openCart: ShopEditor.#openCart,
-      openNpcSheet: ShopEditor.#openNpcSheet,
       resetShop: ShopEditor.#resetShop,
       editMaxStock: ShopEditor.#editMaxStock,
-      openItemSheet: ShopEditor.#openItemSheet
+      openItemSheet: ShopEditor.#openItemSheet,
+      haggle: ShopEditor.#haggle,
+      editPlayers: ShopEditor.#editPlayers
     }
   };
 
@@ -80,13 +82,9 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
 
   /** @override */
   static PARTS = {
-    header: { template: "modules/simple-shop-craft-5e/templates/shop-editor/header.hbs" },
-    owner: {
-      template: "modules/simple-shop-craft-5e/templates/shop-editor/owner.hbs",
-      templates: [
-        "modules/simple-shop-craft-5e/templates/partials/mod-item.hbs",
-        "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs"
-      ]
+    header: {
+      template: "modules/simple-shop-craft-5e/templates/shop-editor/header.hbs",
+      templates: ["modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs"]
     },
     tabs: {
       template: "modules/simple-shop-craft-5e/templates/shop-editor/tabs.hbs",
@@ -110,6 +108,10 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
       ],
       scrollable: [""]
     },
+    description: {
+      template: "modules/simple-shop-craft-5e/templates/shop-editor/description.hbs",
+      scrollable: [""]
+    },
     cart: {
       template: "modules/simple-shop-craft-5e/templates/shop-editor/cart.hbs",
       templates: ["modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs"]
@@ -121,7 +123,8 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
     primary: {
       tabs: [
         { id: "buy", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Buy", icon: "fas fa-cart-shopping" },
-        { id: "sell", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Sell", icon: "fas fa-hand-holding-dollar" }
+        { id: "sell", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Sell", icon: "fas fa-hand-holding-dollar" },
+        { id: "description", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Description", icon: "fas fa-book-open" }
       ],
       initial: "buy"
     }
@@ -176,18 +179,27 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
       ...(party ? [{ value: party.uuid, label: party.name }] : []),
       ...characters.map(a => ({ value: a.uuid, label: a.name }))
     ].map(o => ({ ...o, selected: o.value === this.selectedActorUuid }));
-    context.npc = context.shop.npc ? fromUuidSync(context.shop.npc) : null;
-    context.npcImg = context.npc?.img;
+    context.actor = this.selectedActorUuid ? fromUuidSync(this.selectedActorUuid) : null;
+    const playerOverride = ShopEditor.#getPlayerOverride(context.shop.playerDiscounts, this.selectedActorUuid);
+
     const resolved = await resolveShopItems(context.shop.items);
-    context.groups = ShopEditor.#groupByType(resolved, context.shop.settlementCap, context.shop.buyModifier, this.cart);
+    context.groups = await ShopEditor.#groupByType(
+      resolved, context.shop.settlementCap, context.shop.buyModifier, this.cart, context.shop.fixedValueLootTypes,
+      playerOverride.buy, context.actor?.name
+    );
     this.lastGroups = context.groups;
 
-    context.actor = this.selectedActorUuid ? fromUuidSync(this.selectedActorUuid) : null;
-    context.sellGroups = ShopEditor.#groupSellItems(context.actor?.items ?? [], context.shop.sellModifier, this.sellCart);
+    context.sellGroups = await ShopEditor.#groupSellItems(
+      context.actor?.items ?? [], context.shop.sellModifier, this.sellCart, context.shop.fixedValueLootTypes,
+      playerOverride.sell, context.actor?.name
+    );
     this.lastSellGroups = context.sellGroups;
 
     context.cart = ShopEditor.#summarizeCart(context.groups, context.sellGroups);
     context.goldPoolDisplay = displayGoldPool(context.shop.goldPool);
+    context.settlementCapDisplay = context.shop.settlementCap.value != null
+      ? `${context.shop.settlementCap.value} ${context.shop.settlementCap.denomination.toUpperCase()}`
+      : "∞";
     return context;
   }
 
@@ -229,16 +241,6 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
     const addButton = this.element.querySelector(".create-child");
     if ( addButton ) addButton.hidden = !context.editable || !context.tabs?.buy?.active;
 
-    const locationText = this.element.querySelector(".window-subtitle .location-text");
-    if ( locationText ) locationText.textContent = this.shop.location || "";
-
-    const capDisplay = this.element.querySelector(".settlement-cap-display");
-    if ( capDisplay ) {
-      const current = this.shop.settlementCap;
-      capDisplay.textContent = current.value != null
-        ? `${current.value} ${current.denomination.toUpperCase()}`
-        : "∞";
-    }
     this.window.title.textContent = this.shop.name;
   }
 
@@ -247,32 +249,6 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
   /** @override */
   async _onFirstRender(context, options) {
     await super._onFirstRender(context, options);
-
-    const titleEl = this.window.title;
-    const titleWrapper = document.createElement("div");
-    titleWrapper.classList.add("window-titles");
-    titleEl.replaceWith(titleWrapper);
-    titleWrapper.append(titleEl);
-
-    const subtitle = document.createElement("h2");
-    subtitle.classList.add("window-subtitle");
-    titleWrapper.append(subtitle);
-
-    const locationText = document.createElement("span");
-    locationText.classList.add("location-text");
-    const locationIcon = document.createElement("i");
-    locationIcon.classList.add("fas", "fa-map-marker-alt");
-    subtitle.append(locationIcon, locationText);
-
-    if ( game.user.isGM ) {
-      const capIcon = document.createElement("i");
-      capIcon.classList.add("fas", "fa-city");
-      subtitle.append(capIcon);
-      const capDisplay = document.createElement("span");
-      capDisplay.classList.add("settlement-cap-display");
-      capDisplay.dataset.tooltip = "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SettlementCap";
-      subtitle.append(capDisplay);
-    }
 
     const button = document.createElement("button");
     button.type = "button";
@@ -291,7 +267,7 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
     super._attachPartListeners(partId, htmlElement, options);
     const editable = game.user.isGM;
 
-    if ( partId === "tabs" ) {
+    if ( partId === "header" ) {
       htmlElement.querySelector('select[name="selectedActor"]')?.addEventListener("change", async event => {
         event.stopPropagation();
         this.selectedActorUuid = event.target.value;
@@ -336,9 +312,11 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
    * @param {{value: number|null, denomination: string}} settlementCap
    * @param {number} buyModifier  Shop's default buy-side percent discount/markup, used when an item has no override.
    * @param {Map<string, number>} cart  Selected buy quantities, keyed by {@link entryKey}.
+   * @param {Set<string>} fixedValueLootTypes
+   * @param {number|null} [playerBuyModifier]  Acting actor's buy-side override, used when an item has no override.
    * @returns {Array<{type: string, items: Array<{entry: ShopItemEntryData, item: object|null}>}>}
    */
-  static #groupByType(rows, settlementCap, buyModifier, cart) {
+  static async #groupByType(rows, settlementCap, buyModifier, cart, fixedValueLootTypes, playerBuyModifier, actorName) {
     const targetUnit = game.settings.get("dnd5e", "metricWeightUnits") ? "kg" : "lb";
     const capGP = settlementCap?.value != null
       ? settlementCap.value / (CONFIG.DND5E.currencies[settlementCap.denomination]?.conversion ?? 1)
@@ -350,10 +328,14 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
       const denomination = (row.entry.price?.value != null)
         ? row.entry.price.denomination
         : (row.item?.system?.price?.denomination ?? "gp");
-      const discountPercent = row.entry.discount ?? (ShopEditor.#isFixedValue(row.item) ? 0 : buyModifier);
+      const isFixedValue = ShopEditor.#isFixedValue(row.item, fixedValueLootTypes);
+      const { percent: discountPercent, tooltip: discountTooltip } = await ShopEditor.#resolveDiscount(
+        row.entry.discount, isFixedValue, buyModifier, playerBuyModifier, actorName
+      );
       const finalValue = basePrice * (1 + discountPercent / 100);
-      row.priceDisplay = ShopEditor.#buildPriceDisplay(basePrice, finalValue, denomination);
+      row.priceDisplay = breakdownPrice(finalValue, denomination);
       row.discountPercent = discountPercent;
+      row.discountTooltip = discountTooltip;
       row.cartQuantity = cart.get(row.key) ?? 0;
       row.bundleSize = (row.item?.system?.quantity > 1) ? row.item.system.quantity : null;
       row.weight = ShopEditor.#resolveWeight(row.item?.system, targetUnit);
@@ -381,30 +363,85 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
   /* -------------------------------------------- */
 
   /**
-   * Gemstones and art objects (DMG "Treasure" loot subtypes) are treated as items with a fixed
-   * market value — never subject to any buy/sell discount or markup.
+   * Items of the shop's configured fixed-value loot subtypes (default: Gemstones and Art Objects) have a
+   * fixed market value — never subject to any buy/sell discount or markup.
    * @param {Item5e|object} [item]
+   * @param {Set<string>} fixedValueLootTypes
    * @returns {boolean}
    */
-  static #isFixedValue(item) {
-    const fixedTypes = ["gem", "art"];
-    return (item?.type === "loot") && fixedTypes.includes(item?.system?.type?.value);
+  static #isFixedValue(item, fixedValueLootTypes) {
+    return (item?.type === "loot") && fixedValueLootTypes.has(item?.system?.type?.value);
   }
 
   /* -------------------------------------------- */
 
   /**
-   * Build the price-display object (current value + original-if-discounted) shown in Buy/Sell tables.
-   * @param {number} basePrice
-   * @param {number} finalValue
-   * @param {string} denomination
-   * @returns {{parts: object[], original: object[]|null}}
+   * Resolve the acting actor's discount override for this shop, if one is configured.
+   * @param {ShopPlayerDiscount[]} playerDiscounts
+   * @param {string} [actorUuid]
+   * @returns {{buy: number|null, sell: number|null}}
    */
-  static #buildPriceDisplay(basePrice, finalValue, denomination) {
-    return {
-      parts: breakdownPrice(finalValue, denomination),
-      original: (finalValue !== basePrice) ? breakdownPrice(basePrice, denomination) : null
-    };
+  static #getPlayerOverride(playerDiscounts, actorUuid) {
+    const override = actorUuid ? playerDiscounts.find(pd => pd.actor === actorUuid) : null;
+    return { buy: override?.buyModifier ?? null, sell: override?.sellModifier ?? null };
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Resolve a row's effective discount percent and a rendered attribution tooltip breaking down the
+   * result: item override, else fixed-value (0%), else shop default + player modifier.
+   * @param {number|null} itemOverride    The item entry's own discount override, if any (buy-side only).
+   * @param {boolean} isFixedValue        Whether the item is a fixed-value loot subtype (always 0%).
+   * @param {number} shopModifier         Shop's default percent for this side (buy or sell).
+   * @param {number|null} playerModifier  Acting actor's additive modifier for this side, if configured.
+   * @param {string} [actorName]          Acting actor's name, used to label the player row.
+   * @returns {Promise<{percent: number, tooltip: string}>}
+   */
+  static async #resolveDiscount(itemOverride, isFixedValue, shopModifier, playerModifier, actorName) {
+    if ( itemOverride != null ) {
+      const sources = [{ label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.ItemOverride"), value: `${itemOverride}%`, type: "override" }];
+      return { percent: itemOverride, tooltip: await ShopEditor.#renderAttribution(sources, `${itemOverride}%`) };
+    }
+    if ( isFixedValue ) {
+      const sources = [{ label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.FixedValueItem"), value: "0%", type: "override" }];
+      return { percent: 0, tooltip: await ShopEditor.#renderAttribution(sources, "0%") };
+    }
+    const sources = [ShopEditor.#additiveSource(_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.ShopDefault"), shopModifier)];
+    let percent = shopModifier;
+    if ( playerModifier ) {
+      sources.push(ShopEditor.#additiveSource(actorName, playerModifier));
+      percent += playerModifier;
+    }
+    const tooltip = await ShopEditor.#renderAttribution(sources, `${percent}%`);
+    return { percent, tooltip };
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Build a property-attribution source entry for an additive percent term, matching dnd5e's own
+   * convention of flipping negative "add" values to type "subtract" with an absolute display value.
+   * @param {string} label
+   * @param {number} value
+   * @returns {{label: string, value: string, type: string}}
+   */
+  static #additiveSource(label, value) {
+    return { label, value: `${Math.abs(value)}%`, type: (value < 0) ? "subtract" : "add" };
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Render dnd5e's property-attribution table markup for use as a hover tooltip.
+   * @param {object[]} sources
+   * @param {string} total
+   * @returns {Promise<string>}
+   */
+  static async #renderAttribution(sources, total) {
+    return foundry.applications.handlebars.renderTemplate("systems/dnd5e/templates/apps/property-attribution.hbs", {
+      caption: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.PriceModifier"), sources, total
+    });
   }
 
   /* -------------------------------------------- */
@@ -448,21 +485,27 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
    * @param {Item5e[]|Collection} items      The actor's items.
    * @param {number} sellModifier            Shop's sell-side percent discount/markup.
    * @param {Map<string, number>} sellCart   Selected sell quantities, keyed by item id.
+   * @param {Set<string>} fixedValueLootTypes
+   * @param {number|null} [playerSellModifier]  Acting actor's sell-side override, if configured.
    * @returns {Array<{type: string, label: string, items: object[]}>}
    */
-  static #groupSellItems(items, sellModifier, sellCart) {
+  static async #groupSellItems(items, sellModifier, sellCart, fixedValueLootTypes, playerSellModifier, actorName) {
     const targetUnit = game.settings.get("dnd5e", "metricWeightUnits") ? "kg" : "lb";
     const groups = new Map();
     for ( const item of items ) {
       if ( !CONFIG.Item.dataModels[item.type]?.inventorySection ) continue;
       const basePrice = item.system.price?.value ?? 0;
       const denomination = item.system.price?.denomination ?? "gp";
-      const discountPercent = ShopEditor.#isFixedValue(item) ? 0 : sellModifier;
+      const isFixedValue = ShopEditor.#isFixedValue(item, fixedValueLootTypes);
+      const { percent: discountPercent, tooltip: discountTooltip } = await ShopEditor.#resolveDiscount(
+        null, isFixedValue, sellModifier, playerSellModifier, actorName
+      );
       const finalValue = basePrice * (1 + discountPercent / 100);
       const row = {
         item,
-        priceDisplay: ShopEditor.#buildPriceDisplay(basePrice, finalValue, denomination),
+        priceDisplay: breakdownPrice(finalValue, denomination),
         discountPercent,
+        discountTooltip,
         sellQuantity: sellCart.get(item.id) ?? 0,
         owned: item.system.quantity ?? 1,
         priceGP: finalValue / (CONFIG.DND5E.currencies[denomination]?.conversion ?? 1),
@@ -657,18 +700,6 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
   /* -------------------------------------------- */
 
   /**
-   * Handle opening the assigned NPC's actor sheet.
-   * @this {ShopEditor}
-   */
-  static #openNpcSheet() {
-    if ( !game.user.isGM ) return;
-    const npc = this.shop.npc ? fromUuidSync(this.shop.npc) : null;
-    npc?.sheet.render({ force: true });
-  }
-
-  /* -------------------------------------------- */
-
-  /**
    * Merge new item entries into the shop's item list, replacing any existing entry with the same
    * {@link entryKey}.
    * @param {ShopItemEntryData[]} newEntries
@@ -759,13 +790,15 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
   static async #editDiscount(event, target) {
     const key = target.dataset.key;
     const entry = this.shop.items.find(i => entryKey(i) === key);
+    const playerOverride = ShopEditor.#getPlayerOverride(this.shop.playerDiscounts, this.selectedActorUuid);
+    const effectiveDefault = this.shop.buyModifier + (playerOverride.buy ?? 0);
 
     const { createFormGroup, createNumberInput } = foundry.applications.fields;
     const content = `<fieldset>
       ${createFormGroup({
         label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.PriceModifier"),
         input: createNumberInput({
-          name: "discount", value: entry.discount, placeholder: String(this.shop.buyModifier), min: -100, max: 1000
+          name: "discount", value: entry.discount, placeholder: String(effectiveDefault), min: -100, max: 1000
         })
       }).outerHTML}
     </fieldset>`;
@@ -781,6 +814,54 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
       discount: data.discount ?? null
     });
     await this.#updateShop({ items });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle opening a dialog to pick a Charisma skill and roll it for the acting actor.
+   * @this {ShopEditor}
+   */
+  static async #haggle() {
+    const actor = this.selectedActorUuid ? fromUuidSync(this.selectedActorUuid) : null;
+    if ( !actor ) return;
+
+    const playerOverride = ShopEditor.#getPlayerOverride(this.shop.playerDiscounts, this.selectedActorUuid);
+    const effectiveBuy = this.shop.buyModifier + (playerOverride.buy ?? 0);
+    const effectiveSell = this.shop.sellModifier + (playerOverride.sell ?? 0);
+
+    const chaSkills = Object.entries(CONFIG.DND5E.skills).filter(([, s]) => s.ability === "cha");
+    const { createFormGroup, createSelectInput } = foundry.applications.fields;
+    const content = `<fieldset>
+      <p>${_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.HagglingCurrent")}:
+        ${_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Buy")} ${effectiveBuy}% /
+        ${_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Sell")} ${effectiveSell}%</p>
+      ${createFormGroup({
+        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.HagglingSkill"),
+        input: createSelectInput({ name: "skill", options: chaSkills.map(([value, s]) => ({ value, label: s.label })) })
+      }).outerHTML}
+    </fieldset>`;
+
+    const data = await foundry.applications.api.DialogV2.input({
+      window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Haggling" },
+      content,
+      ok: { label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.HagglingRoll" }
+    });
+    if ( !data ) return;
+
+    await actor.rollSkill({ skill: data.skill });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle opening this shop's config directly on the Players tab.
+   * @this {ShopEditor}
+   */
+  static async #editPlayers() {
+    const app = new ShopConfig({ shopId: this.shopId });
+    await app.render({ force: true });
+    app.changeTab("players", "primary");
   }
 
   /* -------------------------------------------- */

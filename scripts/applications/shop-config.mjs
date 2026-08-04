@@ -36,6 +36,9 @@ export default class ShopConfig extends HandlebarsApplicationMixin(ApplicationV2
       handler: ShopConfig.#onSubmit,
       submitOnChange: true,
       closeOnSubmit: false
+    },
+    actions: {
+      removePlayerDiscount: ShopConfig.#removePlayerDiscount
     }
   };
 
@@ -43,7 +46,8 @@ export default class ShopConfig extends HandlebarsApplicationMixin(ApplicationV2
   static PARTS = {
     tabs: { template: "templates/generic/tab-navigation.hbs" },
     identity: { template: "modules/simple-shop-craft-5e/templates/shop-config/identity.hbs" },
-    economy: { template: "modules/simple-shop-craft-5e/templates/shop-config/economy.hbs" }
+    economy: { template: "modules/simple-shop-craft-5e/templates/shop-config/economy.hbs" },
+    players: { template: "modules/simple-shop-craft-5e/templates/shop-config/players.hbs" }
   };
 
   /** @override */
@@ -51,7 +55,8 @@ export default class ShopConfig extends HandlebarsApplicationMixin(ApplicationV2
     primary: {
       tabs: [
         { id: "identity", label: "DND5E.ACTIVITY.SECTIONS.Identity", icon: "fas fa-tag" },
-        { id: "economy", label: "SIMPLE_SHOP_CRAFT_5E.ShopConfig.Tabs.Economy", icon: "fas fa-coins" }
+        { id: "economy", label: "SIMPLE_SHOP_CRAFT_5E.ShopConfig.Tabs.Economy", icon: "fas fa-coins" },
+        { id: "players", label: "SIMPLE_SHOP_CRAFT_5E.ShopConfig.Tabs.Players", icon: "fas fa-users" }
       ],
       initial: "identity"
     }
@@ -87,6 +92,16 @@ export default class ShopConfig extends HandlebarsApplicationMixin(ApplicationV2
 
     context.buyModifier = shop?.buyModifier ?? 0;
     context.sellModifier = shop?.sellModifier ?? -50;
+    context.fixedValueLootTypes = shop?.fixedValueLootTypes ?? ["gem", "art"];
+    context.lootTypeOptions = Object.entries(CONFIG.DND5E.lootTypes).map(([value, cfg]) => ({ value, label: cfg.label }));
+    context.playerDiscounts = (shop?.playerDiscounts ?? []).map((pd, index) => ({
+      index,
+      actorUuid: pd.actor,
+      actorImg: fromUuidSync(pd.actor)?.img,
+      actorName: fromUuidSync(pd.actor)?.name,
+      buyModifier: pd.buyModifier,
+      sellModifier: pd.sellModifier
+    }));
 
     const settlementCap = shop?.settlementCap ?? { value: null, denomination: "gp" };
     const preset = Object.entries(SETTLEMENT_CAPS).find(([, v]) => v === settlementCap.value)?.[0]
@@ -139,7 +154,7 @@ export default class ShopConfig extends HandlebarsApplicationMixin(ApplicationV2
       const capValueGroup = htmlElement.querySelector('input[name="settlementCapValue"]')?.closest(".form-group");
       capSelect?.addEventListener("change", () => capValueGroup.hidden = capSelect.value !== "custom");
 
-      const goldUnlimited = htmlElement.querySelector('input[name="goldPoolUnlimited"]');
+      const goldUnlimited = htmlElement.querySelector('input[name="goldPool.unlimited"]');
       const goldGroup = htmlElement.querySelector('[data-goldpool-amounts]');
       goldUnlimited?.addEventListener("change", () => {
         goldGroup.hidden = goldUnlimited.checked;
@@ -159,26 +174,80 @@ export default class ShopConfig extends HandlebarsApplicationMixin(ApplicationV2
    */
   static async #onSubmit(event, form, formData) {
     const data = foundry.utils.expandObject(formData.object);
-    const shops = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS);
 
     const settlementCapValue = data.settlementCapPreset === "custom"
       ? (data.settlementCapValue ?? null)
       : (data.settlementCapPreset === "" ? null : SETTLEMENT_CAPS[data.settlementCapPreset]);
     const settlementCapDenomination = (data.settlementCapPreset === "custom") ? (data.settlementCapDenomination || "gp") : "gp";
-    const goldPoolMax = data.goldPool ?? {};
+    const { unlimited: goldPoolUnlimited, ...goldPoolMax } = data.goldPool ?? {};
     const buyModifier = Math.clamp(Math.round(data.buyModifier ?? 0), -100, 1000);
     const sellModifier = Math.clamp(Math.round(data.sellModifier ?? -50), -100, 1000);
+    const fixedValueLootTypes = data.fixedValueLootTypes ?? [];
+    const playerDiscounts = ShopConfig.#mergePlayerDiscounts(data.playerDiscounts, data.newPlayerActors);
 
-    await game.settings.set(MODULE_ID, SETTING_KEYS.SHOPS, shops.map(s => s._id !== this.shopId ? s.toObject() : {
-      ...s.toObject(),
-      name: data.name || s.name,
-      img: data.img || s.img,
+    await this.#persistShopPatch({
+      name: data.name || this.shop?.name,
+      img: data.img || this.shop?.img,
       location: data.location ?? "",
       description: data.description ?? "",
       npc: data.npc || null,
       buyModifier, sellModifier,
+      fixedValueLootTypes,
+      playerDiscounts,
       settlementCap: { value: settlementCapValue, denomination: settlementCapDenomination },
-      goldPool: { ...s.goldPool, max: goldPoolMax, unlimited: !!data.goldPoolUnlimited }
+      goldPool: { ...this.shop?.goldPool, max: goldPoolMax, unlimited: !!goldPoolUnlimited }
+    });
+    if ( data.newPlayerActors?.length ) this.render();
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Normalize the submitted player-discount rows and merge in newly tagged actors.
+   * @param {Record<string, {actor: string, buy: string, sell: string}>} [edits]
+   * @param {string[]} [newActors]
+   * @returns {object[]}
+   */
+  static #mergePlayerDiscounts(edits, newActors) {
+    const toModifier = value => (value === "" || value == null) ? null : Number(value);
+    const rows = Object.values(edits ?? {}).map(row => ({
+      actor: row.actor,
+      buyModifier: toModifier(row.buy),
+      sellModifier: toModifier(row.sell)
     }));
+    for ( const uuid of newActors ?? [] ) {
+      if ( rows.some(r => r.actor === uuid) ) continue;
+      rows.push({ actor: uuid, buyModifier: null, sellModifier: null });
+    }
+    return rows;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Persist a partial update to the shop currently being edited.
+   * @param {object} patch
+   * @returns {Promise<void>}
+   */
+  async #persistShopPatch(patch) {
+    const shops = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS);
+    await game.settings.set(MODULE_ID, SETTING_KEYS.SHOPS, shops.map(s =>
+      s._id !== this.shopId ? s.toObject() : { ...s.toObject(), ...patch }
+    ));
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle removing a player discount override.
+   * @this {ShopConfig}
+   * @param {Event} event
+   * @param {HTMLElement} target
+   */
+  static async #removePlayerDiscount(event, target) {
+    const index = Number(target.dataset.index);
+    const playerDiscounts = this.shop.playerDiscounts.filter((pd, i) => i !== index).map(pd => pd.toObject());
+    await this.#persistShopPatch({ playerDiscounts });
+    this.render();
   }
 }

@@ -1,14 +1,4 @@
 <div class="tab-bar">
-    <div class="tab-row">
-        {{> "templates/generic/tab-navigation.hbs" }}
-        <div class="actor-select mod-item" data-tooltip="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.ActingAs' }}">
-            <i class="fas fa-user" inert></i>
-            <select name="selectedActor" class="uninput">
-                {{#each actorOptions}}
-                <option value="{{ this.value }}" {{#if this.selected}}selected{{/if}}>{{ this.label }}</option>
-                {{/each}}
-            </select>
-        </div>
-    </div>
+    {{> "templates/generic/tab-navigation.hbs" }}
     <hr class="ampersand">
 </div>

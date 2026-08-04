@@ -13,6 +13,10 @@
           "label": "Sell Modifier",
           "hint": "Percentage adjustment applied to item prices in this shop's Sell tab. Negative values lower what the shop pays out, positive values raise it."
         },
+        "fixedValueLootTypes": {
+          "label": "Fixed-Value Item Types",
+          "hint": "Loot subtypes never subject to the Buy/Sell modifiers above (e.g. gemstones, art objects always sell at their listed value)."
+        },
         "goldPool": {
           "unlimited": { "label": "Unlimited" }
         }
@@ -59,9 +63,18 @@
       "AddItems": "Add Items",
       "Tabs": {
         "Buy": "Buy",
-        "Sell": "Sell"
+        "Sell": "Sell",
+        "Description": "Description"
       },
+      "Location": "Location",
       "ActingAs": "Acting As",
+      "Shop": "Shop",
+      "Player": "Player",
+      "Haggling": "Haggle",
+      "HagglingSkill": "Skill",
+      "HagglingCurrent": "Current Discount",
+      "HagglingRoll": "Roll",
+      "EditPlayers": "Edit Player Discounts",
       "NoActorSelected": "— None —",
       "ShopName": "Shop Name",
       "LocationPlaceholder": "e.g. Baldur's Gate",
@@ -86,6 +99,9 @@
       "PriceTooltip": "Edit Price",
       "PriceModifier": "Price Modifier",
       "DiscountTooltip": "Edit Price Modifier",
+      "ShopDefault": "Shop",
+      "ItemOverride": "Item Override",
+      "FixedValueItem": "Fixed-Value Item",
       "Stock": "Stock",
       "StockTooltip": "Edit Stock",
       "StockMax": "Max Stock (Restock Target)",
@@ -104,7 +120,12 @@
     },
     "ShopConfig": {
       "Tabs": {
-        "Economy": "Economy"
+        "Economy": "Economy",
+        "Players": "Players"
+      },
+      "Players": {
+        "None": "No player-specific discounts yet.",
+        "DropHint": "Drop an actor here to add a player-specific discount"
       },
       "Discount": "Discount",
       "ShopImage": "Image"

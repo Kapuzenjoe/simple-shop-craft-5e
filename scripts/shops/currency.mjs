@@ -52,15 +52,13 @@ export function goldPoolCurrencies() {
 /* -------------------------------------------- */
 
 /**
- * Round a GP amount up (in magnitude) to the nearest whole copper piece, matching
- * {@link breakdownPrice}'s own rounding so a transaction always charges/awards exactly
- * the amount that was displayed to the player.
+ * Round a GP amount to the nearest whole copper piece
  * @param {number} valueGP
  * @returns {number}
  */
 export function roundToCopper(valueGP) {
   const cpPerGP = CONFIG.DND5E.currencies.cp.conversion / CONFIG.DND5E.currencies.gp.conversion;
-  return Math.sign(valueGP) * Math.ceil(Math.abs(valueGP) * cpPerGP) / cpPerGP;
+  return game.dnd5e.utils.roundCurrency(valueGP * cpPerGP, "cp") / cpPerGP;
 }
 
 /* -------------------------------------------- */

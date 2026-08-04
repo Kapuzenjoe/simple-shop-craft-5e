@@ -3,6 +3,7 @@
         <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopConfig.Discount" }}</legend>
         {{ formField fields.buyModifier value=buyModifier rootId="economy" }}
         {{ formField fields.sellModifier value=sellModifier rootId="economy" }}
+        {{ formField fields.fixedValueLootTypes value=fixedValueLootTypes options=lootTypeOptions rootId="economy" }}
     </fieldset>
 
     <fieldset>

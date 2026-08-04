@@ -2,6 +2,11 @@
   flex: 0 0 100%;
 }
 
+#tooltip.property-attribution.simple-shop-craft-5e table td.attribution-value {
+  inline-size: auto;
+  white-space: nowrap;
+}
+
 .simple-shop-craft-5e {
   .create-child {
     position: absolute;
@@ -14,6 +19,10 @@
 
   .sign {
     margin-right: -2px;
+  }
+
+  .tab:not(.active) {
+    display: none;
   }
 
   .clickable {
@@ -30,16 +39,25 @@
 
     .label { flex: 1; color: var(--color-text-tertiary); font-weight: normal; }
   }
+
+  .item-discount {
+    width: 70px;
+
+    .unit { color: var(--color-text-tertiary); font-size: var(--font-size-12); }
+  }
 }
 
 .simple-shop-craft-5e.shop-editor {
   .sheet-header {
     display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .header-top {
+    display: flex;
     align-items: flex-start;
     gap: 12px;
-    padding-bottom: 8px;
-    margin-bottom: 8px;
-    border-bottom: 1px solid var(--dnd5e-color-gold);
   }
 
   .left {
@@ -49,92 +67,37 @@
     gap: 4px;
     flex: 0 0 auto;
     --dnd5e-document-image-size: 96px;
-    padding-right: 12px;
-    border-right: 1px solid var(--dnd5e-color-gold);
   }
 
-  .shop-portrait {
-    &[data-action="editImage"] .document-image { cursor: pointer; }
-    &[data-action="editImage"]:hover .document-image { box-shadow: 0 0 8px var(--color-shadow-primary); }
-
-    .document-image {
-      width: var(--dnd5e-document-image-size);
-      height: var(--dnd5e-document-image-size);
-      border-radius: 50%;
-      border: 2px solid var(--dnd5e-color-gold);
-      box-shadow: 0 0 4px var(--dnd5e-shadow-45);
-      object-fit: cover;
-      background: var(--dnd5e-background-alt-1);
-    }
+  .card {
+    flex: 1;
   }
 
-  .owner-row {
-    display: flex;
-    flex-direction: column;
+  .shop-summary {
     align-items: center;
-    text-align: center;
-    gap: 6px;
-    margin-bottom: 8px;
+
+    .info { align-self: stretch; }
   }
 
-  .npc-portrait {
-    position: relative;
-
-    &:hover .gold-icon { box-shadow: 0 0 8px var(--color-shadow-primary); }
+  .shop-summary, .player-area {
+    background: transparent;
   }
 
-  .npc-name {
-    display: flex;
-    flex-direction: column;
-
-    .value {
-      font-size: var(--font-size-13);
-    }
+  section.currency i.currency {
+    font-size: var(--font-size-11);
   }
 
-  .mod-row {
+  .player-area {
+    flex-direction: row;
     display: flex;
     align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-  }
+    gap: 8px;
 
-  .mod-item {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    color: var(--dnd5e-color-gold);
-
-    input {
-      background: none;
-      border: none;
-      text-align: center;
-      width: 36px;
-    }
-
-    select { max-width: 120px; }
-  }
-
-  .window-content {
-    display: grid;
-    grid-template-areas: "header header" "owner tabnav" "owner content" "owner cart";
-    grid-template-columns: 200px 1fr;
-    grid-template-rows: auto auto 1fr auto;
-    position: relative;
-  }
-
-  [data-application-part="header"] { grid-area: header; }
-  [data-application-part="tabs"] { grid-area: tabnav; }
-  [data-application-part="cart"] { grid-area: cart; }
-
-  [data-application-part="owner"] {
-    grid-area: owner;
-    overflow-y: auto;
-    padding: 8px 8px 8px 0;
+    select { width: auto; }
   }
 
   [data-application-part].tab.active {
-    grid-area: content;
+    flex: 1;
     min-height: 0;
     overflow: hidden auto;
     scrollbar-gutter: stable;
@@ -161,97 +124,29 @@
     }
   }
 
-  .window-header { --header-height: 46px; }
+  nav.tabs {
+    a {
+      white-space: nowrap;
+      color: var(--color-text-secondary);
+      text-transform: uppercase;
+      font-family: var(--dnd5e-font-roboto);
+      font-weight: bold;
+      font-size: var(--font-size-13);
 
-  .window-titles {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    flex: 1;
-    min-width: 0;
-  }
+      span { padding-bottom: 1px; }
 
-  .window-title, .window-subtitle {
-    flex: 0 0 auto;
-    line-height: 1.3;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
+      &.active {
+        color: var(--color-text-primary);
 
-  .window-subtitle {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    font-size: var(--font-size-11);
-    opacity: .7;
-    margin: 0;
-  }
-
-  .shop-description-block {
-    flex: 1;
-    max-height: 80px;
-    overflow-y: auto;
-  }
-
-  .tab-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-
-    nav.tabs {
-      flex: 0 0 auto;
-      border: none;
-      gap: 16px;
-
-      a {
-        white-space: nowrap;
-        color: var(--color-text-secondary);
-        text-transform: uppercase;
-        font-family: var(--dnd5e-font-roboto);
-        font-weight: bold;
-        font-size: var(--font-size-13);
-
-        span { padding-bottom: 1px; }
-
-        &.active {
-          color: var(--color-text-primary);
-
-          span { border-bottom: 3px solid var(--dnd5e-color-gold); }
-        }
+        span { border-bottom: 3px solid var(--dnd5e-color-gold); }
       }
     }
   }
 
   a.adjustment-button:not([data-action]) { opacity: .2; pointer-events: none; }
 
-  .owner-sidebar {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
   .actor-select {
     justify-content: center;
-  }
-
-  .owner-content {
-    padding: 8px;
-  }
-
-  .owner-mods {
-    margin-bottom: 8px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--dnd5e-color-gold);
-  }
-
-  .npc-bio {
-    color: var(--color-text-secondary);
-    font-size: var(--font-size-13);
-    margin: 0;
   }
 
   .item-cart {
@@ -262,22 +157,12 @@
     padding-right: 4px;
   }
 
-  .item-discount {
-    width: 70px;
-  }
-
-  .item-discount .unit, .mod-item .unit {
-    color: var(--color-text-tertiary);
-    font-size: var(--font-size-12);
-  }
-
   .title .sign {
     color: var(--color-text-tertiary);
   }
 
   .item-price {
-    .separator { color: var(--dnd5e-color-gold); }
-    .original { color: var(--color-text-secondary); }
+    min-width: 120px;
   }
 
   .item.suppressed {

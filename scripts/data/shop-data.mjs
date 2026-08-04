@@ -1,11 +1,29 @@
 const {
   ArrayField, BooleanField, DocumentIdField, DocumentUUIDField, EmbeddedDataField, FilePathField, HTMLField,
-  NumberField, ObjectField, SchemaField, StringField
+  NumberField, ObjectField, SchemaField, SetField, StringField
 } = foundry.data.fields;
 
 /**
  * @import { ShopItemEntryData, ShopData } from "../_types.mjs";
  */
+
+/**
+ * A data model that represents a per-actor discount override for a shop.
+ * @extends {foundry.abstract.DataModel}
+ */
+export class ShopPlayerDiscount extends foundry.abstract.DataModel {
+
+  /** @override */
+  static defineSchema() {
+    return {
+      actor: new DocumentUUIDField({ type: "Actor" }),
+      buyModifier: new NumberField({ initial: null, nullable: true, integer: true, min: -100, max: 1000 }),
+      sellModifier: new NumberField({ initial: null, nullable: true, integer: true, min: -100, max: 1000 })
+    };
+  }
+}
+
+/* -------------------------------------------- */
 
 /**
  * A data model that represents a single item entry within a shop.
@@ -64,6 +82,8 @@ export class Shop extends foundry.abstract.DataModel {
       active: new BooleanField({ initial: false }),
       buyModifier: new NumberField({ required: true, initial: 0, integer: true, min: -100, max: 1000 }),
       sellModifier: new NumberField({ required: true, initial: -50, integer: true, min: -100, max: 1000 }),
+      fixedValueLootTypes: new SetField(new StringField(), { initial: ["gem", "art"] }),
+      playerDiscounts: new ArrayField(new EmbeddedDataField(ShopPlayerDiscount)),
       npc: new DocumentUUIDField({ type: "Actor", blank: true }),
       location: new StringField({ blank: true }),
       settlementCap: new SchemaField({

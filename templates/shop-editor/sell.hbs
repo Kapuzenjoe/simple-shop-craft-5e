@@ -31,23 +31,19 @@
                         {{> "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs"
                             img=this.item.img name=this.item.name }}
                     </div>
-                    <div class="item-detail item-discount">
+                    <div class="item-detail item-discount"
+                         {{#if this.discountTooltip}}data-tooltip="{{ this.discountTooltip }}"
+                         data-tooltip-class="property-attribution simple-shop-craft-5e"{{/if}}>
                         <span class="value">{{ this.discountPercent }}</span>
                         <span class="unit">%</span>
                     </div>
                     <div class="item-detail item-price">
                         <div class="price-display">
-                            {{#each this.priceDisplay.parts}}
+                            {{#each this.priceDisplay}}
                             <span class="value">{{ dnd5e-numberFormat this.value }}</span>
                             <i class="currency {{ this.denomination }}"
                                aria-label="{{ lookup (lookup @root.config.currencies this.denomination) 'label' }}"></i>
                             {{/each}}
-                            {{#if this.priceDisplay.original}}
-                            <span class="separator">/</span>
-                            <span class="original">
-                                {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=this.priceDisplay.original }}
-                            </span>
-                            {{/if}}
                         </div>
                     </div>
                     {{> "modules/simple-shop-craft-5e/templates/partials/item-weight-cell.hbs" weight=this.weight }}

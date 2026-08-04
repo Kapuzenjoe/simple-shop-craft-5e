@@ -37,8 +37,9 @@
                         {{/if}}
                     </div>
                     <div class="item-detail item-discount{{#if @root.editable}} clickable{{/if}}"
-                         {{#if @root.editable}}data-action="editDiscount" role="button" data-tooltip
-                         aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.DiscountTooltip' }}"{{/if}}
+                         {{#if @root.editable}}data-action="editDiscount" role="button"{{/if}}
+                         data-tooltip="{{ this.discountTooltip }}"
+                         data-tooltip-class="property-attribution simple-shop-craft-5e"
                          data-key="{{ this.key }}">
                         <span class="value">{{ this.discountPercent }}</span>
                         <span class="unit">%</span>
@@ -48,17 +49,11 @@
                              {{#if @root.editable}}data-action="editPrice" role="button" data-tooltip
                              aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.PriceTooltip' }}"{{/if}}
                              data-key="{{ this.key }}">
-                            {{#each this.priceDisplay.parts}}
+                            {{#each this.priceDisplay}}
                             <span class="value">{{ dnd5e-numberFormat this.value }}</span>
                             <i class="currency {{ this.denomination }}"
                                aria-label="{{ lookup (lookup @root.config.currencies this.denomination) 'label' }}"></i>
                             {{/each}}
-                            {{#if this.priceDisplay.original}}
-                            <span class="separator">/</span>
-                            <span class="original">
-                                {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=this.priceDisplay.original }}
-                            </span>
-                            {{/if}}
                         </div>
                     </div>
                     {{> "modules/simple-shop-craft-5e/templates/partials/item-weight-cell.hbs" weight=this.weight }}
