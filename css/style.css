@@ -25,21 +25,6 @@
     display: none;
   }
 
-  .clickable {
-    cursor: pointer;
-
-    &:hover { text-shadow: 0 0 8px var(--color-shadow-primary); }
-  }
-
-  .cart-total {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-weight: bold;
-
-    .label { flex: 1; color: var(--color-text-tertiary); font-weight: normal; }
-  }
-
   .item-discount {
     width: 70px;
 
@@ -48,6 +33,19 @@
 }
 
 .simple-shop-craft-5e.shop-editor {
+  > .window-header .mode-slider {
+    flex: none;
+    margin-inline-end: auto;
+  }
+
+  .item-controls {
+    align-items: center;
+  }
+
+  .item-discount, .item-price, .item-quantity {
+    .config-button i { font-size: var(--font-size-11); }
+  }
+
   .sheet-header {
     display: flex;
     flex-direction: column;
@@ -56,31 +54,33 @@
 
   .header-top {
     display: flex;
-    align-items: flex-start;
+    align-items: stretch;
     gap: 12px;
   }
 
-  .left {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    flex: 0 0 auto;
-    --dnd5e-document-image-size: 96px;
-  }
-
-  .card {
+  .shop-summary {
     flex: 1;
   }
 
-  .shop-summary {
+  .shop-summary-body {
+    display: flex;
+    gap: 12px;
     align-items: center;
 
-    .info { align-self: stretch; }
+    .document-image {
+      border: none;
+      box-shadow: none;
+    }
   }
 
-  .shop-summary, .player-area {
-    background: transparent;
+  .shop-summary-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .document-image {
+    --dnd5e-document-image-size: 96px;
   }
 
   section.currency i.currency {
@@ -88,12 +88,18 @@
   }
 
   .player-area {
-    flex-direction: row;
+    flex: 0 0 200px;
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
     gap: 8px;
+  }
 
-    select { width: auto; }
+  .player-area-actions {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
   }
 
   [data-application-part].tab.active {

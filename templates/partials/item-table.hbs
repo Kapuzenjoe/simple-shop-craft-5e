@@ -1,0 +1,23 @@
+<section class="items-list">
+    {{#each sections}}
+    <div class="items-section card">
+        <div class="items-header header">
+            {{#each this.columns}}
+            {{#if (eq this.id "name")}}
+            <h3 class="item-name">{{ localize ../label }}</h3>
+            {{else}}
+            <div class="item-header item-{{ this.id }}">{{#if this.label}}{{ localize this.label }}{{/if}}</div>
+            {{/if}}
+            {{/each}}
+        </div>
+        <ol class="item-list unlist">
+            {{#each this.rows}}
+            {{> (lookup this "template") this }}
+            {{/each}}
+        </ol>
+    </div>
+    {{/each}}
+    {{#unless hasRows}}
+    <p>{{ localize emptyLabel }}</p>
+    {{/unless}}
+</section>

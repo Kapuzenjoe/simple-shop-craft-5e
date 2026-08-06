@@ -1,0 +1,26 @@
+<li class="item" data-actor-uuid="{{ actorUuid }}">
+    <div class="item-row">
+        <div class="item-name">
+            {{ dnd5e-icon actorImg alt=actorName classes="item-image gold-icon" }}
+            {{{ dnd5e-linkForUuid actorUuid renderBroken=true }}}
+            <input type="hidden" name="playerDiscounts.{{ index }}.actor" value="{{ actorUuid }}">
+        </div>
+        <div class="item-detail item-discount">
+            {{ numberInput buyModifier name=(concat "playerDiscounts." index ".buy")
+                class="uninput" placeholder="—" min=-100 max=1000 step=1 }}
+            <span class="unit">%</span>
+        </div>
+        <div class="item-detail item-discount">
+            {{ numberInput sellModifier name=(concat "playerDiscounts." index ".sell")
+                class="uninput" placeholder="—" min=-100 max=1000 step=1 }}
+            <span class="unit">%</span>
+        </div>
+        <div class="item-detail item-controls always-visible">
+            <button type="button" class="unbutton config-button item-control always-interactive"
+                    data-action="removePlayerDiscount" data-tooltip
+                    aria-label="{{ localize 'DND5E.ItemDelete' }}">
+                <i class="fa-solid fa-trash" inert></i>
+            </button>
+        </div>
+    </div>
+</li>

@@ -1,70 +1,78 @@
 <div class="simple-shop-craft-5e chat-card purchase-card">
-    <header class="card-header description">
-        <div class="summary">
+    <section class="card-header description">
+        <header class="summary">
             <img class="gold-icon" src="{{ shopImg }}" alt="{{ shopName }}">
             <div class="name-stacked">
                 <span class="title">{{ shopName }}</span>
                 <span class="subtitle">{{ localize "SIMPLE_SHOP_CRAFT_5E.PurchaseCard.Buyer" }}: {{ actorName }}</span>
             </div>
-        </div>
-    </header>
+        </header>
+    </section>
 
     {{#if buyLines.length}}
-    <div class="card-tray collapsible{{#unless pending}} collapsed{{/unless}}">
+    <div class="card-tray buy-tray collapsible">
         <label class="roboto-upper">
-            <i class="fa-solid fa-basket-shopping"></i>
+            <i class="fa-solid fa-basket-shopping" inert></i>
             <span>{{ localize "SIMPLE_SHOP_CRAFT_5E.PurchaseCard.Buying" }} ({{ buyLines.length }})</span>
-            <i class="fa-solid fa-caret-down"></i>
+            <i class="fa-solid fa-caret-down" inert></i>
         </label>
         <div class="collapsible-content">
             <div class="wrapper">
-                <ol class="targets unlist">
+                <ul class="targets unlist">
                     {{#each buyLines}}
                     <li class="target">
                         <img class="gold-icon" src="{{ this.img }}" alt="{{ this.name }}">
                         <div class="name-stacked">
-                            <span class="title">{{ this.name }} <span class="bundle-size">×{{ this.quantity }}</span></span>
+                            <span class="title">{{ this.name }}</span>
+                            <span class="subtitle">&times;{{ this.quantity }}</span>
                         </div>
                         {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=this.subtotal }}
                     </li>
                     {{/each}}
-                </ol>
+                </ul>
             </div>
         </div>
     </div>
     {{/if}}
 
     {{#if sellLines.length}}
-    <div class="card-tray collapsible{{#unless pending}} collapsed{{/unless}}">
+    <div class="card-tray sell-tray collapsible">
         <label class="roboto-upper">
-            <i class="fa-solid fa-hand-holding-dollar"></i>
+            <i class="fa-solid fa-hand-holding-dollar" inert></i>
             <span>{{ localize "SIMPLE_SHOP_CRAFT_5E.PurchaseCard.Selling" }} ({{ sellLines.length }})</span>
-            <i class="fa-solid fa-caret-down"></i>
+            <i class="fa-solid fa-caret-down" inert></i>
         </label>
         <div class="collapsible-content">
             <div class="wrapper">
-                <ol class="targets unlist">
+                <ul class="targets unlist">
                     {{#each sellLines}}
                     <li class="target">
                         <img class="gold-icon" src="{{ this.img }}" alt="{{ this.name }}">
                         <div class="name-stacked">
-                            <span class="title">{{ this.name }} <span class="bundle-size">×{{ this.quantity }}</span></span>
+                            <span class="title">{{ this.name }}</span>
+                            <span class="subtitle">&times;{{ this.quantity }}</span>
                         </div>
                         {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=this.subtotal }}
                     </li>
                     {{/each}}
-                </ol>
+                </ul>
             </div>
         </div>
     </div>
     {{/if}}
-
-    <div class="cart-total">
-        <span class="label roboto-upper">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopCart.Total" }}</span>
-        {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=total }}
+    <hr>
+    <div class="card-tray">
+        <ul class="targets unlist">
+            <li class="target">
+                <div class="name-stacked">
+                    <span class="title">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopCart.Total" }}</span>
+                </div>
+                {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=total }}
+            </li>
+        </ul>
     </div>
 
-    <p class="status-line">{{ statusLabel }}</p>
+    <p class="supplement">{{ statusLabel }}</p>
 
     {{#if pending}}
     <div class="card-buttons">

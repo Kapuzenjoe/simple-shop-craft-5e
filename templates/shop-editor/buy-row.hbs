@@ -1,0 +1,80 @@
+<li class="item{{#if suppressed}} suppressed{{/if}}"
+    {{#if suppressed}}{{#unless @root.editable}}hidden{{/unless}}{{/if}}>
+    <div class="item-row">
+        <div class="item-detail item-cart">
+            <a class="adjustment-button" data-action="adjustCartQty" data-key="{{ key }}" data-delta="-1"
+               aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.DecreaseQuantity' }}">
+                <i class="fa-solid fa-minus" inert></i>
+            </a>
+            <span>{{ cartQuantity }}</span>
+            <a class="adjustment-button" data-action="adjustCartQty" data-key="{{ key }}" data-delta="+1"
+               aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.IncreaseQuantity' }}">
+                <i class="fa-solid fa-plus" inert></i>
+            </a>
+        </div>
+        <div class="item-name item-tooltip rollable" data-action="openItemSheet" role="button" aria-label="{{ itemName }}">
+            {{> "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs"
+                img=itemImg name=itemName bundleSize=bundleSize }}
+            {{#if suppressed}}
+            {{#if @root.editable}}
+            <i class="fa-solid fa-triangle-exclamation warning" data-tooltip="{{ suppressReason }}"></i>
+            {{/if}}
+            {{/if}}
+        </div>
+        <div class="item-detail item-discount"
+             data-tooltip="{{ discountTooltip }}"
+             data-tooltip-class="property-attribution simple-shop-craft-5e"
+             data-key="{{ key }}">
+            {{#if (and @root.editable @root.isEditMode)}}
+            <button type="button" class="unbutton config-button item-control item-action" data-action="editDiscount"
+                    data-key="{{ key }}" data-tooltip
+                    aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.DiscountTooltip' }}">
+                <i class="fas fa-cog" inert></i>
+            </button>
+            {{else}}
+            <span class="value">{{ discountPercent }}</span>
+            <span class="unit">%</span>
+            {{/if}}
+        </div>
+        <div class="item-detail item-price">
+            {{#if (and @root.editable @root.isEditMode)}}
+            <button type="button" class="unbutton config-button item-control item-action" data-action="editPrice"
+                    data-key="{{ key }}" data-tooltip
+                    aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.PriceTooltip' }}">
+                <i class="fas fa-cog" inert></i>
+            </button>
+            {{else}}
+            {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=priceDisplay}}
+            {{/if}}
+        </div>
+        {{> "modules/simple-shop-craft-5e/templates/partials/item-weight-cell.hbs" weight=weight }}
+        <div class="item-detail item-quantity">
+            {{#if (and @root.editable @root.isEditMode)}}
+            <button type="button" class="unbutton config-button item-control item-action" data-action="editMaxStock"
+                    data-key="{{ key }}" data-tooltip
+                    aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.StockTooltip' }}">
+                <i class="fas fa-cog" inert></i>
+            </button>
+            {{else}}
+            <div class="stock-display">
+                {{#if stockTracked}}
+                <span class="value">
+                    {{ entry.stock.current }}{{#unless entry.noRestock}} / {{ entry.stock.max }}{{/unless}}
+                </span>
+                {{else}}
+                <i class="fas fa-infinity" inert></i>
+                {{/if}}
+            </div>
+            {{/if}}
+        </div>
+        <div class="item-detail item-controls">
+            {{#if (and @root.editable @root.isEditMode)}}
+            <button type="button" class="unbutton config-button item-control item-action"
+                    data-action="removeItem" data-key="{{ key }}"
+                    data-tooltip aria-label="{{ localize 'DND5E.ItemDelete' }}">
+                <i class="fas fa-trash" inert></i>
+            </button>
+            {{/if}}
+        </div>
+    </div>
+</li>

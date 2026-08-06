@@ -1,5 +1,22 @@
-<section class="tab {{#if tab.active}}active{{/if}}" data-group="primary" data-tab="description">
+<section class="tab {{ tab.cssClass }}" data-tab="description" data-group="{{ tab.group }}">
+    <div class="info-block">
+        <div>
+            <div class="label">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Location" }}</div>
+            <div class="value">
+                {{#if (and isGM isEditMode)}}
+                <input type="text" name="location" value="{{ shop.location }}" class="uninput"
+                       placeholder="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.LocationPlaceholder' }}">
+                {{else}}
+                {{#if shop.location}}{{ shop.location }}{{else}}—{{/if}}
+                {{/if}}
+            </div>
+        </div>
+    </div>
+    {{#if (and isGM isEditMode)}}
+    <prose-mirror name="description" value="{{ shop.description }}"></prose-mirror>
+    {{else}}
     <div class="editor">
         <div class="editor-content">{{{ shop.description }}}</div>
     </div>
+    {{/if}}
 </section>

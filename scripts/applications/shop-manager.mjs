@@ -1,21 +1,19 @@
 import { MODULE_ID, SETTING_KEYS, SETTLEMENT_CAPS, GOLD_POOL_DEFAULT } from "../config.mjs";
 import { getStarterItems, getStarterPackOptions } from "../data/starter-packs.mjs";
-import ShopConfig from "./shop-config.mjs";
 import ShopEditor from "./shop-editor.mjs";
+import BasePromptDialog from "./base-prompt-dialog.mjs";
 
-const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
+const { Application5e } = game.dnd5e.applications.api;
 
 /**
  * GM-facing application for managing shops.
- * @mixes HandlebarsApplicationMixin
- * @extends {ApplicationV2}
  */
-export default class ShopManager extends HandlebarsApplicationMixin(ApplicationV2) {
+export default class ShopManager extends Application5e {
 
   /** @override */
   static DEFAULT_OPTIONS = {
     id: "shop-manager",
-    classes: ["dnd5e2", "simple-shop-craft-5e", "shop-manager", "standard-form"],
+    classes: ["simple-shop-craft-5e", "shop-manager", "standard-form"],
     window: {
       title: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Title",
       resizable: true
@@ -26,7 +24,6 @@ export default class ShopManager extends HandlebarsApplicationMixin(ApplicationV
     },
     actions: {
       createShop: ShopManager.#createShop,
-      editShopConfig: ShopManager.#editShopConfig,
       editShop: ShopManager.#editShop,
       toggleActive: ShopManager.#toggleActive
     }
@@ -58,11 +55,25 @@ export default class ShopManager extends HandlebarsApplicationMixin(ApplicationV
     const context = await super._prepareContext(options);
     context.isGM = game.user.isGM;
     const shops = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS).filter(s => context.isGM || s.active);
-    context.shops = shops.toSorted((a, b) => b.active - a.active).map(shop => ({
+    const rows = shops.toSorted((a, b) => b.active - a.active).map(shop => ({
       shop,
       npc: shop.npc ? fromUuidSync(shop.npc) : null,
-      subtitle: [shop.location || null, ShopManager.#settlementCapLabel(shop) || null].filter(Boolean).join(" · ")
+      subtitle: [shop.location || null, ShopManager.#settlementCapLabel(shop) || null].filter(Boolean).join(" · "),
+      template: "modules/simple-shop-craft-5e/templates/shop-manager/shop-row.hbs"
     }));
+    context.table = {
+      hasRows: rows.length > 0,
+      emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.None",
+      sections: [{
+        label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Shop",
+        columns: [
+          { id: "name" },
+          { id: "npc", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Owner" },
+          { id: "controls" }
+        ],
+        rows
+      }]
+    };
     return context;
   }
 
@@ -127,11 +138,6 @@ export default class ShopManager extends HandlebarsApplicationMixin(ApplicationV
   #getShopContextOptions(shop) {
     return [
       {
-        label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.EditConfig",
-        icon: '<i class="fas fa-gear fa-fw"></i>',
-        onClick: () => new ShopConfig({ shopId: shop._id }).render({ force: true })
-      },
-      {
         label: shop.active
           ? "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Deactivate"
           : "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Activate",
@@ -190,72 +196,54 @@ export default class ShopManager extends HandlebarsApplicationMixin(ApplicationV
    * @this {ShopManager}
    */
   static async #createShop() {
-    const { createFormGroup, createTextInput, createSelectInput } = foundry.applications.fields;
-    const content = `
-      ${createFormGroup({
-        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.StarterPack"),
-        input: createSelectInput({
-          name: "starterPack",
-          options: [
-            { value: "", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Empty") },
-            ...getStarterPackOptions()
-          ]
-        })
-      }).outerHTML}
-      ${createFormGroup({
-        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Shop"),
-        input: createTextInput({ name: "name" })
-      }).outerHTML}
-    `;
-    const data = await foundry.applications.api.DialogV2.wait({
+    const shopManager = this;
+    const starterPackOptions = [
+      { value: "", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Empty") },
+      ...getStarterPackOptions()
+    ];
+
+    const dialog = new BasePromptDialog({
       window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Create" },
-      position: { width: 480 },
-      content,
-      buttons: [
+      fields: [
         {
-          action: "create",
-          label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Create",
-          icon: "fas fa-plus",
-          default: true,
-          callback: (event, target) => new foundry.applications.ux.FormDataExtended(target.form).object
+          field: new foundry.data.fields.StringField(), name: "starterPack",
+          label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.StarterPack"), options: starterPackOptions
         },
-        { action: "cancel", label: game.i18n.localize("Cancel"), icon: "fas fa-xmark" }
+        {
+          field: new foundry.data.fields.StringField(), name: "name",
+          label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Shop")
+        }
       ],
-      render: (event, dialog) => {
-        const select = dialog.element.querySelector('select[name="starterPack"]');
-        const name = dialog.element.querySelector('input[name="name"]');
+      buttons: [
+        { action: "create", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Create", icon: "fas fa-plus", default: true }
+      ],
+      onRender: app => {
+        const select = app.element.querySelector('select[name="starterPack"]');
+        const name = app.element.querySelector('input[name="name"]');
         select?.addEventListener("change", () => {
           name.placeholder = select.value ? (select.selectedOptions[0]?.text ?? "") : "";
         });
+      },
+      form: {
+        handler: async function(event, form, formData) {
+          const data = foundry.utils.expandObject(formData.object);
+          const packs = getStarterPackOptions();
+          const shops = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS);
+          const newShop = {
+            name: data.name || packs.find(p => p.value === data.starterPack)?.label
+              || _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Create"),
+            goldPool: { max: { gp: GOLD_POOL_DEFAULT }, current: { gp: GOLD_POOL_DEFAULT }, unlimited: false },
+            items: getStarterItems(data.starterPack).map(identifier => ({ identifier, stock: { max: null, current: null } }))
+          };
+          await game.settings.set(MODULE_ID, SETTING_KEYS.SHOPS, [...shops.map(s => s.toObject()), newShop]);
+          shopManager.render();
+          const created = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS).at(-1);
+          new ShopEditor({ shopId: created._id, mode: ShopEditor.MODES.EDIT }).render({ force: true });
+          await this.close();
+        }
       }
     });
-    if ( !data || (data === "cancel") ) return;
-
-    const packs = getStarterPackOptions();
-    const shops = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS);
-    const newShop = {
-      name: data.name || packs.find(p => p.value === data.starterPack)?.label
-        || _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Create"),
-      goldPool: { max: { gp: GOLD_POOL_DEFAULT }, current: { gp: GOLD_POOL_DEFAULT }, unlimited: false },
-      items: getStarterItems(data.starterPack).map(identifier => ({ identifier, stock: { max: null, current: null } }))
-    };
-    await game.settings.set(MODULE_ID, SETTING_KEYS.SHOPS, [...shops.map(s => s.toObject()), newShop]);
-    this.render();
-
-    const created = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS).at(-1);
-    new ShopConfig({ shopId: created._id }).render({ force: true });
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Handle opening the settings dialog for an existing shop.
-   * @this {ShopManager}
-   * @param {Event} event         Triggering click event.
-   * @param {HTMLElement} target  Button that was clicked.
-   */
-  static #editShopConfig(event, target) {
-    new ShopConfig({ shopId: target.dataset.shopId }).render({ force: true });
+    await dialog.render({ force: true });
   }
 
   /* -------------------------------------------- */

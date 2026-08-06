@@ -1,75 +1,110 @@
 <header class="sheet-header">
     <div class="header-top">
-        <div class="left">
-            <img class="document-image" src="{{ shop.img }}" alt="{{ shop.name }}">
-        </div>
         <fieldset class="card shop-summary">
             <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Shop" }}</legend>
-            <div class="info">
-                <div>
-                    <span class="label">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Location" }}</span>
-                    <span class="value">{{#if shop.location}}{{ shop.location }}{{else}}—{{/if}}</span>
-                </div>
-                {{#if isGM}}
-                <div>
-                    <span class="label">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SettlementCap" }}</span>
-                    <span class="value">{{ settlementCapDisplay }}</span>
-                </div>
-                {{/if}}
-                <div>
-                    <span class="label">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Owner" }}</span>
-                    <span class="value">
-                        {{#if shop.npc}}{{{ dnd5e-linkForUuid shop.npc renderBroken=true }}}{{else}}—{{/if}}
-                    </span>
-                </div>
-                <div>
-                    <span class="label">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Buy" }}</span>
-                    <span class="value">{{ shop.buyModifier }}%</span>
-                </div>
-                <div>
-                    <span class="label">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Sell" }}</span>
-                    <span class="value">{{ shop.sellModifier }}%</span>
+            <div class="shop-summary-body">
+                <img class="document-image" src="{{ shop.img }}" alt="{{ shop.name }}"
+                     {{#if (and isGM isEditMode)}}data-action="editImage" data-edit="img"{{/if}}>
+                <div class="shop-summary-info">
+                    <div class="info">
+                        {{#if isGM}}
+                        <div>
+                            <span class="label">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SettlementCap" }}</span>
+                            {{#if isEditMode}}
+                            <button type="button" class="unbutton config-button item-control item-action" data-action="editSettlementCap"
+                                    data-tooltip aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.SettlementCap' }}">
+                                <i class="fas fa-cog" inert></i>
+                            </button>
+                            {{else}}
+                            <span class="value">{{ settlementCapDisplay }}</span>
+                            {{/if}}
+                        </div>
+                        {{/if}}
+                        <div>
+                            <span class="label">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Owner" }}</span>
+                            {{#if (and isGM isEditMode)}}
+                            <button type="button" class="unbutton config-button item-control item-action" data-action="editOwner"
+                                    data-tooltip aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.Owner' }}">
+                                <i class="fas fa-cog" inert></i>
+                            </button>
+                            {{else}}
+                            <span class="value">
+                                {{#if shop.npc}}{{{ dnd5e-linkForUuid shop.npc renderBroken=true }}}{{else}}—{{/if}}
+                            </span>
+                            {{/if}}
+                        </div>
+                        <div>
+                            <span class="label">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Buy" }}</span>
+                            {{#if (and isGM isEditMode)}}
+                            <button type="button" class="unbutton config-button item-control item-action" data-action="editModifiers"
+                                    data-tooltip aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopConfig.Discount' }}">
+                                <i class="fas fa-cog" inert></i>
+                            </button>
+                            {{else}}
+                            <span class="value">{{ shop.buyModifier }}%</span>
+                            {{/if}}
+                        </div>
+                        <div>
+                            <span class="label">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Sell" }}</span>
+                            {{#if (and isGM isEditMode)}}
+                            <button type="button" class="unbutton config-button item-control item-action" data-action="editModifiers"
+                                    data-tooltip aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopConfig.Discount' }}">
+                                <i class="fas fa-cog" inert></i>
+                            </button>
+                            {{else}}
+                            <span class="value">{{ shop.sellModifier }}%</span>
+                            {{/if}}
+                        </div>
+                    </div>
+                    <div class="info">
+                        <div>
+                            <span class="label">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GoldPool" }}</span>
+                            <section class="currency">
+                                {{#if (and editable isEditMode)}}
+                                <button type="button" class="item-action unbutton always-interactive" data-action="editVendorGold" data-tooltip
+                                        aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.GoldPoolMax' }}">
+                                    <i class="fas fa-cog" inert></i>
+                                </button>
+                                {{/if}}
+                                {{#if goldPoolDisplay}}
+                                {{> "modules/simple-shop-craft-5e/templates/partials/currency-inputs.hbs"
+                                    rows=goldPoolDisplay disabled=(not isEditMode)}}
+                                {{else}}
+                                <i class="fas fa-infinity" inert></i>
+                                {{/if}}
+                                {{#if editable}}
+                                <button type="button" class="item-action unbutton always-interactive" data-action="resetShop" data-tooltip
+                                        aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.ResetRestock' }}">
+                                    <i class="fa-solid fa-rotate-left" inert></i>
+                                </button>
+                                {{/if}}
+                            </section>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <section class="currency">
-                {{#if editable}}
-                <button type="button" class="item-action unbutton always-interactive" data-action="resetShop" data-tooltip
-                        aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.ResetRestock' }}">
-                    <i class="fa-solid fa-rotate-left" inert></i>
+        </fieldset>
+        <fieldset class="card player-area">
+            <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Player" }}</legend>
+            <select name="selectedActor" class="uninput always-interactive" data-tooltip="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.ActingAs' }}">
+                {{#each actorOptions}}
+                <option value="{{ this.value }}" {{#if this.selected}}selected{{/if}}>{{ this.label }}</option>
+                {{/each}}
+            </select>
+            <div class="player-area-actions">
+                {{#if actor}}
+                <button type="button" class="gold-button always-interactive" data-action="haggle" data-tooltip
+                        aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.Haggling' }}">
+                    <i class="fa-solid fa-handshake" inert></i>
                 </button>
                 {{/if}}
-                {{#if goldPoolDisplay}}
-                {{#each goldPoolDisplay}}
-                <label>
-                    <i class="currency {{ this.denomination }}" data-tooltip
-                       aria-label="{{ lookup (lookup @root.config.currencies this.denomination) 'label' }}"></i>
-                    {{ numberInput this.value class="uninput" readonly=true }}
-                </label>
-                {{/each}}
-                {{else}}
-                <i class="fas fa-infinity" inert></i>
+                {{#if isGM}}
+                <button type="button" class="gold-button always-interactive" data-action="editPlayers" data-tooltip
+                        aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.EditPlayers' }}">
+                    <i class="fa-solid fa-users" inert></i>
+                </button>
                 {{/if}}
-            </section>
+            </div>
         </fieldset>
     </div>
-    <fieldset class="card player-area">
-        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Player" }}</legend>
-        <select name="selectedActor" class="uninput" data-tooltip="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.ActingAs' }}">
-            {{#each actorOptions}}
-            <option value="{{ this.value }}" {{#if this.selected}}selected{{/if}}>{{ this.label }}</option>
-            {{/each}}
-        </select>
-        {{#if actor}}
-        <button type="button" class="item-action unbutton always-interactive" data-action="haggle" data-tooltip
-                aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.Haggling' }}">
-            <i class="fa-solid fa-handshake" inert></i>
-        </button>
-        {{/if}}
-        {{#if isGM}}
-        <button type="button" class="item-action unbutton always-interactive" data-action="editPlayers" data-tooltip
-                aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.EditPlayers' }}">
-            <i class="fa-solid fa-users" inert></i>
-        </button>
-        {{/if}}
-    </fieldset>
 </header>

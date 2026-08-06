@@ -1,6 +1,4 @@
 import { MODULE_ID, SETTING_KEYS } from "./config.mjs";
-import ShopManager from "./applications/shop-manager.mjs";
-import ShopEditor from "./applications/shop-editor.mjs";
 import { Shop } from "./data/shop-data.mjs";
 
 const { ArrayField, EmbeddedDataField } = foundry.data.fields;
@@ -23,11 +21,17 @@ const SETTINGS = [
 
 /**
  * Re-render any open shop management applications after settings change elsewhere.
- * @returns {void}
+ * @returns {Promise<void>}
  */
-function refreshShopApps() {
+async function refreshShopApps() {
+  const { default: ShopManager } = await import("./applications/shop-manager.mjs");
+  const { default: ShopEditor } = await import("./applications/shop-editor.mjs");
   foundry.applications.instances.forEach(app => {
-    if ( (app instanceof ShopManager) || (app instanceof ShopEditor) ) app.render();
+    if ( app instanceof ShopManager ) app.render();
+    if ( (app instanceof ShopEditor) ) {
+      if ( app.shop ) app.render();
+      else app.close();
+    }
   });
 }
 

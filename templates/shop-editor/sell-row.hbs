@@ -1,0 +1,33 @@
+<li class="item">
+    <div class="item-row">
+        <div class="item-detail item-cart">
+            <a class="adjustment-button" data-action="adjustSellQty" data-item-id="{{ item.id }}" data-delta="-1"
+               aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.DecreaseQuantity' }}">
+                <i class="fa-solid fa-minus" inert></i>
+            </a>
+            <span>{{ sellQuantity }}</span>
+            <a class="adjustment-button" data-action="adjustSellQty" data-item-id="{{ item.id }}" data-delta="+1"
+               aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.IncreaseQuantity' }}">
+                <i class="fa-solid fa-plus" inert></i>
+            </a>
+        </div>
+        <div class="item-name item-tooltip rollable" data-action="openItemSheet" role="button" aria-label="{{ item.name }}">
+            {{> "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs"
+                img=item.img name=item.name }}
+        </div>
+        <div class="item-detail item-discount"
+             {{#if discountTooltip}}data-tooltip="{{ discountTooltip }}"
+             data-tooltip-class="property-attribution simple-shop-craft-5e"{{/if}}>
+            <span class="value">{{ discountPercent }}</span>
+            <span class="unit">%</span>
+        </div>
+        <div class="item-detail item-price">
+            {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=priceDisplay}}
+        </div>
+        {{> "modules/simple-shop-craft-5e/templates/partials/item-weight-cell.hbs" weight=weight }}
+        <div class="item-detail item-quantity">
+            <span>{{ owned }}</span>
+        </div>
+        <div class="item-detail item-controls"></div>
+    </div>
+</li>

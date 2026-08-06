@@ -1,0 +1,58 @@
+<section>
+    {{#if buyRows.length}}
+    <fieldset class="card-tray">
+        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopCart.Buying" }}</legend>
+        <ol class="targets unlist">
+            {{#each buyRows}}
+            <li class="target">
+                <img class="gold-icon" src="{{ this.img }}" alt="{{ this.name }}">
+                <div class="name-stacked">
+                    <span class="title">{{ this.name }}</span>
+                    <span class="subtitle">&times;{{ this.quantity }}</span>
+                </div>
+                {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=this.subtotal }}
+            </li>
+            {{/each}}
+        </ol>
+    </fieldset>
+    {{/if}}
+
+    {{#if sellRows.length}}
+    <fieldset class="card-tray">
+        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopCart.Selling" }}</legend>
+        <ol class="targets unlist">
+            {{#each sellRows}}
+            <li class="target">
+                <img class="gold-icon" src="{{ this.img }}" alt="{{ this.name }}">
+                <div class="name-stacked">
+                    <span class="title">{{ this.name }}</span>
+                    <span class="subtitle">&times;{{ this.quantity }}</span>
+                </div>
+                {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=this.subtotal }}
+            </li>
+            {{/each}}
+        </ol>
+    </fieldset>
+    {{/if}}
+
+    {{#if hasLines}}
+    <fieldset class="card-tray">
+        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopCart.Balance" }}</legend>
+        <ol class="targets unlist">
+            <li class="target">
+                <div class="name-stacked">
+                    <span class="title">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopCart.Total" }}</span>
+                </div>
+                {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=total.parts }}
+            </li>
+        </ol>
+        {{#if balance.insufficient}}
+        <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopCart.InsufficientFunds" }}</p>
+        {{/if}}
+    </fieldset>
+    {{else}}
+    <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopCart.Empty" }}</p>
+    {{/if}}
+    {{#unless actor}}<p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopCart.NoActor" }}</p>{{/unless}}
+    {{#if noActiveGM}}<p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopCart.NoActiveGM" }}</p>{{/if}}
+</section>

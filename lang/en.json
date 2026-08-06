@@ -11,7 +11,7 @@
         },
         "sellModifier": {
           "label": "Sell Modifier",
-          "hint": "Percentage adjustment applied to item prices in this shop's Sell tab. Negative values lower what the shop pays out, positive values raise it."
+          "hint": "Percentage adjustment applied to item prices in this shop's Sell tab. Negative values lower the price, positive values raise it."
         },
         "fixedValueLootTypes": {
           "label": "Fixed-Value Item Types",
@@ -51,7 +51,6 @@
         "Create": "New Shop",
         "Delete": "Delete Shop",
         "Duplicate": "Duplicate Shop",
-        "EditConfig": "Edit Shop Settings",
         "DeleteConfirm": "Delete this shop? This cannot be undone."
       },
       "Crafting": {
@@ -75,20 +74,23 @@
       "HagglingCurrent": "Current Discount",
       "HagglingRoll": "Roll",
       "EditPlayers": "Edit Player Discounts",
+      "RenameShop": "Rename Shop",
+      "Spotlight": "Show to All Players",
+      "SpotlightNoTargets": "No other players are currently connected.",
+      "SpotlightSuccess": "Shop shown to all connected players.",
       "NoActorSelected": "— None —",
       "ShopName": "Shop Name",
       "LocationPlaceholder": "e.g. Baldur's Gate",
-      "BuyModifierHint": "Default buy-side price modifier in percent (negative = discount, positive = markup).",
-      "SellModifierHint": "Default sell-back price modifier in percent (negative = discount, positive = markup).",
       "SettlementCap": "Settlement Cap",
       "NoCap": "No Cap",
       "Village": "Village (20 GP)",
       "Town": "Town (2,000 GP)",
       "City": "City (200,000 GP)",
       "Custom": "Custom",
-      "SettlementCapValue": "Custom Cap Value",
+      "SettlementCapValue": "Custom",
       "GoldPool": "Shop Money",
       "GoldPoolMax": "Max. Shop Money",
+      "GoldPoolMaxHint": "Restored to this amount when the shop is restocked.",
       "GoldPoolUnlimited": "Unlimited",
       "ResetRestock": "Reset Stock & Shop Money",
       "NoRestock": "Exclude from Restock",
@@ -97,14 +99,16 @@
       "OwnerDescription": "Owner Description",
       "OpenNpcSheet": "Open NPC Sheet",
       "PriceTooltip": "Edit Price",
+      "PriceOverrideHint": "Override this item's default price for this shop.",
       "PriceModifier": "Price Modifier",
       "DiscountTooltip": "Edit Price Modifier",
+      "DiscountOverrideHint": "Override the shop's price modifier for this item specifically.",
       "ShopDefault": "Shop",
       "ItemOverride": "Item Override",
       "FixedValueItem": "Fixed-Value Item",
       "Stock": "Stock",
       "StockTooltip": "Edit Stock",
-      "StockMax": "Max Stock (Restock Target)",
+      "StockMax": "Max Stock",
       "StockMaxHint": "Empty means unlimited stock.",
       "StockCurrent": "Current Stock",
       "CartQuantity": "Buy",
@@ -120,15 +124,13 @@
     },
     "ShopConfig": {
       "Tabs": {
-        "Economy": "Economy",
         "Players": "Players"
       },
       "Players": {
         "None": "No player-specific discounts yet.",
         "DropHint": "Drop an actor here to add a player-specific discount"
       },
-      "Discount": "Discount",
-      "ShopImage": "Image"
+      "Discount": "Discount"
     },
     "ShopCart": {
       "Title": "Shopping Cart",

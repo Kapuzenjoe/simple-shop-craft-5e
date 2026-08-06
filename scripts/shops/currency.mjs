@@ -79,14 +79,29 @@ export function effectiveGoldPool(goldPool) {
 /* -------------------------------------------- */
 
 /**
- * Break a shop's current gold pool down into its non-zero denominations for display.
- * @param {{current: Record<string, number>, unlimited: boolean}} goldPool
- * @returns {Array<{denomination: string, value: number}>|null}  `null` if unlimited.
+ * Build currency-input row data for every shop-usable currency, given a source amount object.
+ * @param {Record<string, number>} [amounts]
+ * @param {string} [namePrefix]
+ * @returns {Array<{denomination: string, value: number|null, name: string, label: string, icon: string}>}
  */
-export function displayGoldPool(goldPool) {
+export function currencyRows(amounts={}, namePrefix="") {
+  return goldPoolCurrencies().map(denomination => ({
+    denomination, value: amounts[denomination] ?? null, name: `${namePrefix}${denomination}`,
+    label: CONFIG.DND5E.currencies[denomination].label, icon: CONFIG.DND5E.currencies[denomination].icon
+  }));
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Build currency-input row data for a shop's current gold pool.
+ * @param {{current: Record<string, number>, unlimited: boolean}} goldPool
+ * @param {object} [options]
+ * @param {string} [options.namePrefix]
+ * @returns {Array<{denomination: string, value: number|null, name: string, label: string, icon: string}>|null}
+ *   `null` if unlimited.
+ */
+export function displayGoldPool(goldPool, { namePrefix="" }={}) {
   if ( goldPool.unlimited ) return null;
-  const amounts = goldPool.current ?? {};
-  return Object.keys(CONFIG.DND5E.currencies)
-    .filter(denom => amounts[denom])
-    .map(denomination => ({ denomination, value: amounts[denomination] }));
+  return currencyRows(goldPool.current, namePrefix);
 }

@@ -198,8 +198,11 @@ async function applyPurchase(purchase) {
   }
 
   if ( purchase.netGP < 0 ) {
+    const parts = breakdownPrice(-purchase.netGP, "gp");
     try {
-      await game.dnd5e.applications.CurrencyManager.deductActorCurrency(actor, -purchase.netGP, "gp");
+      for ( const part of parts ) {
+        await game.dnd5e.applications.CurrencyManager.deductActorCurrency(actor, part.value, part.denomination);
+      }
     } catch ( err ) {
       ui.notifications.error(err.message);
       return false;

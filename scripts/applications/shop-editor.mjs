@@ -1,31 +1,52 @@
-import { MODULE_ID, SETTING_KEYS } from "../config.mjs";
+import { MODULE_ID, SETTING_KEYS, SETTLEMENT_CAPS } from "../config.mjs";
 import { entryKey, pickItemIdentifiers, resolveShopItems } from "../shops/item-resolver.mjs";
-import { breakdownPrice, displayGoldPool, getCurrencyOptions } from "../shops/currency.mjs";
+import { breakdownPrice, currencyRows, displayGoldPool, getCurrencyOptions, goldPoolCurrencies } from "../shops/currency.mjs";
 import ShopCart from "./shop-cart.mjs";
-import ShopConfig from "./shop-config.mjs";
+import BaseConfigDialog from "./base-config-dialog.mjs";
+import BasePromptDialog from "./base-prompt-dialog.mjs";
+import { Shop, ShopItemEntry } from "../data/shop-data.mjs";
 
-const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
+const { Application5e } = game.dnd5e.applications.api;
+
+const BUY_COLUMNS = [
+  { id: "cart", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.CartQuantity" },
+  { id: "name" },
+  { id: "discount", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.PriceModifier" },
+  { id: "price", label: "DND5E.Price" },
+  { id: "weight", label: "DND5E.Weight" },
+  { id: "quantity", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Stock" },
+  { id: "controls" }
+];
+const SELL_COLUMNS = [
+  { id: "cart", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SellQuantity" },
+  { id: "name" },
+  { id: "discount", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.PriceModifier" },
+  { id: "price", label: "DND5E.Price" },
+  { id: "weight", label: "DND5E.Weight" },
+  { id: "quantity", label: "DND5E.Quantity" },
+  { id: "controls" }
+];
 
 /**
  * GM-facing application for editing a single shop's item list.
- * @mixes HandlebarsApplicationMixin
- * @extends {ApplicationV2}
  */
-export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2) {
+export default class ShopEditor extends Application5e {
 
   /**
    * @param {object} [options]
    * @param {string} [options.shopId]  Id of the ShopData being edited.
+   * @param {number} [options.mode]    Initial {@link ShopEditor.MODES} to open in; defaults to Play.
    */
   constructor(options={}) {
     super(options);
     this.shopId = options.shopId;
+    if ( options.mode ) this._mode = options.mode;
   }
 
   /** @override */
   static DEFAULT_OPTIONS = {
     id: "shop-editor-{id}",
-    classes: ["dnd5e2", "sheet", "simple-shop-craft-5e", "shop-editor"],
+    classes: ["sheet", "simple-shop-craft-5e", "shop-editor", "standard-form"],
     tag: "form",
     window: {
       title: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Title",
@@ -43,6 +64,7 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
     actions: {
       addItems: ShopEditor.#addItems,
       removeItem: ShopEditor.#removeItem,
+      editImage: ShopEditor.#editImage,
       editPrice: ShopEditor.#editPrice,
       editDiscount: ShopEditor.#editDiscount,
       adjustCartQty: ShopEditor.#adjustCartQty,
@@ -52,9 +74,65 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
       editMaxStock: ShopEditor.#editMaxStock,
       openItemSheet: ShopEditor.#openItemSheet,
       haggle: ShopEditor.#haggle,
-      editPlayers: ShopEditor.#editPlayers
+      editPlayers: ShopEditor.#editPlayers,
+      toggleActive: ShopEditor.#toggleActive,
+      spotlight: ShopEditor.#spotlight,
+      changeMode: ShopEditor.#changeMode,
+      editModifiers: ShopEditor.#editModifiers,
+      editSettlementCap: ShopEditor.#editSettlementCap,
+      editVendorGold: ShopEditor.#editVendorGold,
+      editOwner: ShopEditor.#editOwner,
+      renameShop: ShopEditor.#renameShop
     }
   };
+
+  /**
+   * Available sheet modes.
+   * @enum {number}
+   */
+  static MODES = {
+    PLAY: 1,
+    EDIT: 2
+  };
+
+  /** @override */
+  _getHeaderControls() {
+    const controls = super._getHeaderControls();
+    if ( !game.user.isGM ) return controls;
+    return [
+      ...controls,
+      { icon: "fa-solid fa-pen", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.RenameShop", action: "renameShop" },
+      {
+        icon: this.shop.active ? "fa-solid fa-toggle-on" : "fa-solid fa-toggle-off",
+        label: this.shop.active
+          ? "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Deactivate" : "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Activate",
+        action: "toggleActive"
+      },
+      { icon: "fa-solid fa-bullhorn", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Spotlight", action: "spotlight" }
+    ];
+  }
+
+  /**
+   * The mode the sheet is currently in. GM-only — players always effectively view in Play mode.
+   * @type {number}
+   */
+  _mode = ShopEditor.MODES.PLAY;
+
+  /**
+   * Is the sheet in edit mode?
+   * @type {boolean}
+   */
+  get isEditMode() {
+    return this._mode === ShopEditor.MODES.EDIT;
+  }
+
+  /**
+   * Can the current user edit this sheet at all? GM-only.
+   * @type {boolean}
+   */
+  get isEditable() {
+    return game.user.isGM;
+  }
 
   /**
    * UUID of the actor (or party) currently selected for buy/sell. Per-user, not persisted across sessions.
@@ -87,24 +165,28 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
       templates: ["modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs"]
     },
     tabs: {
-      template: "modules/simple-shop-craft-5e/templates/shop-editor/tabs.hbs",
+      template: "systems/dnd5e/templates/shared/horizontal-tabs.hbs",
       templates: ["templates/generic/tab-navigation.hbs"]
     },
     buy: {
-      template: "modules/simple-shop-craft-5e/templates/shop-editor/buy.hbs",
+      template: "modules/simple-shop-craft-5e/templates/partials/tab-item-table.hbs",
       templates: [
         "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs",
         "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs",
-        "modules/simple-shop-craft-5e/templates/partials/item-weight-cell.hbs"
+        "modules/simple-shop-craft-5e/templates/partials/item-weight-cell.hbs",
+        "modules/simple-shop-craft-5e/templates/partials/item-table.hbs",
+        "modules/simple-shop-craft-5e/templates/shop-editor/buy-row.hbs"
       ],
       scrollable: [""]
     },
     sell: {
-      template: "modules/simple-shop-craft-5e/templates/shop-editor/sell.hbs",
+      template: "modules/simple-shop-craft-5e/templates/partials/tab-item-table.hbs",
       templates: [
         "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs",
         "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs",
-        "modules/simple-shop-craft-5e/templates/partials/item-weight-cell.hbs"
+        "modules/simple-shop-craft-5e/templates/partials/item-weight-cell.hbs",
+        "modules/simple-shop-craft-5e/templates/partials/item-table.hbs",
+        "modules/simple-shop-craft-5e/templates/shop-editor/sell-row.hbs"
       ],
       scrollable: [""]
     },
@@ -170,6 +252,7 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
     context.config = CONFIG.DND5E;
     context.isGM = game.user.isGM;
     context.editable = game.user.isGM;
+    context.isEditMode = this.isEditMode;
     const { characters, party } = ShopEditor.#getSelectableActors();
     if ( this.selectedActorUuid === undefined ) {
       this.selectedActorUuid = game.user.character?.type === "character" ? game.user.character.uuid : "";
@@ -196,7 +279,7 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
     this.lastSellGroups = context.sellGroups;
 
     context.cart = ShopEditor.#summarizeCart(context.groups, context.sellGroups);
-    context.goldPoolDisplay = displayGoldPool(context.shop.goldPool);
+    context.goldPoolDisplay = displayGoldPool(context.shop.goldPool, { namePrefix: "currentGold." });
     context.settlementCapDisplay = context.shop.settlementCap.value != null
       ? `${context.shop.settlementCap.value} ${context.shop.settlementCap.denomination.toUpperCase()}`
       : "∞";
@@ -229,7 +312,42 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
   async _preparePartContext(partId, context, options) {
     context = await super._preparePartContext(partId, context, options);
     context.tab = context.tabs?.[partId];
+    if ( partId === "buy" ) {
+      context.tabId = "buy";
+      context.table = ShopEditor.#buildItemTable(
+        context.groups, "SIMPLE_SHOP_CRAFT_5E.ShopEditor.None", BUY_COLUMNS,
+        "modules/simple-shop-craft-5e/templates/shop-editor/buy-row.hbs"
+      );
+    }
+    if ( partId === "sell" ) {
+      context.tabId = "sell";
+      context.showNoActor = !context.actor;
+      context.noActorLabel = "SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoActorForSell";
+      context.table = ShopEditor.#buildItemTable(
+        context.sellGroups, "SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoSellableItems", SELL_COLUMNS,
+        "modules/simple-shop-craft-5e/templates/shop-editor/sell-row.hbs"
+      );
+    }
     return context;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Build the `item-table.hbs` context for a set of item-type groups.
+   * @param {Array<{label: string, items: object[]}>} groups
+   * @param {string} emptyLabel
+   * @param {object[]} columns
+   * @param {string} rowTemplate
+   * @returns {{hasRows: boolean, emptyLabel: string, sections: object[]}}
+   */
+  static #buildItemTable(groups, emptyLabel, columns, rowTemplate) {
+    const sections = groups.map(group => ({
+      label: group.label,
+      columns,
+      rows: group.items.map(row => ({ ...row, template: rowTemplate }))
+    }));
+    return { hasRows: sections.some(s => s.rows.length > 0), emptyLabel, sections };
   }
 
   /* -------------------------------------------- */
@@ -238,10 +356,22 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
   async _onRender(context, options) {
     await super._onRender(context, options);
 
-    const addButton = this.element.querySelector(".create-child");
-    if ( addButton ) addButton.hidden = !context.editable || !context.tabs?.buy?.active;
+    this._renderModeToggle();
+    if ( this._mode === ShopEditor.MODES.PLAY ) this._disableFields();
 
-    this.window.title.textContent = this.shop.name;
+    const addButton = this.element.querySelector(".create-child");
+    if ( addButton ) addButton.hidden = !context.editable || !this.isEditMode || !context.tabs?.buy?.active;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle toggling the sheet's Play/Edit mode.
+   * @this {ShopEditor}
+   */
+  static async #changeMode() {
+    this._mode = this.isEditMode ? ShopEditor.MODES.PLAY : ShopEditor.MODES.EDIT;
+    this.render();
   }
 
   /* -------------------------------------------- */
@@ -607,7 +737,17 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
       return result;
     });
 
-    await this.#updateShop({ items });
+    const patch = { items };
+    if ( data.img !== undefined ) patch.img = data.img;
+    if ( data.location !== undefined ) patch.location = data.location;
+    if ( data.description !== undefined ) patch.description = data.description;
+    if ( data.currentGold ) {
+      const current = Object.fromEntries(
+        Object.entries(data.currentGold).map(([denom, value]) => [denom, Math.max(0, Math.round(value ?? 0))])
+      );
+      patch.goldPool = { ...this.shop.goldPool, current };
+    }
+    await this.#updateShop(patch);
   }
 
   /* -------------------------------------------- */
@@ -640,45 +780,40 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
   static async #editMaxStock(event, target) {
     const key = target.dataset.key;
     const entry = this.shop.items.find(i => entryKey(i) === key);
+    const shopEditor = this;
+    const stockFields = ShopItemEntry.schema.fields.stock.fields;
 
-    const { createFormGroup, createNumberInput, createCheckboxInput } = foundry.applications.fields;
-    const content = `<fieldset>
-      ${createFormGroup({
-        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StockMax"),
-        hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StockMaxHint"),
-        input: createNumberInput({ name: "max", value: entry.stock.max, placeholder: "∞", min: 0 })
-      }).outerHTML}
-      ${createFormGroup({
-        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StockCurrent"),
-        input: createNumberInput({ name: "current", value: entry.stock.current, placeholder: "∞", min: 0 })
-      }).outerHTML}
-      ${createFormGroup({
-        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoRestock"),
-        hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoRestockHint"),
-        input: createCheckboxInput({ name: "noRestock", value: entry.noRestock })
-      }).outerHTML}
-    </fieldset>`;
-
-    const data = await foundry.applications.api.DialogV2.input({
-      window: { title: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StockMax") },
+    const dialog = new BaseConfigDialog({
+      window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.StockMax" },
       position: { width: 480 },
-      content,
-      render: (event, dialog) => {
-        const maxInput = dialog.element.querySelector('input[name="max"]');
-        const noRestockInput = dialog.element.querySelector('input[name="noRestock"]');
-        const sync = () => maxInput.readOnly = noRestockInput.checked;
-        noRestockInput.addEventListener("change", sync);
-        sync();
+      state: { max: entry.stock.max, current: entry.stock.current, noRestock: entry.noRestock },
+      fields: formState => [
+        {
+          field: stockFields.max, name: "max", value: formState.max, placeholder: "∞", disabled: !!formState.noRestock,
+          label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StockMax"), hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StockMaxHint")
+        },
+        {
+          field: stockFields.current, name: "current", value: formState.current, placeholder: "∞",
+          label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StockCurrent")
+        },
+        {
+          field: ShopItemEntry.schema.fields.noRestock, name: "noRestock", value: !!formState.noRestock,
+          label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoRestock"), hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoRestockHint")
+        }
+      ],
+      form: {
+        handler: async (event, form, formData) => {
+          const data = foundry.utils.expandObject(formData.object);
+          const items = shopEditor.shop.items.map(i => entryKey(i) !== key ? i.toObject() : {
+            ...i.toObject(),
+            stock: { max: data.noRestock ? null : (data.max ?? null), current: data.current ?? null },
+            noRestock: !!data.noRestock
+          });
+          await shopEditor.#updateShop({ items });
+        }
       }
     });
-    if ( !data ) return;
-
-    const items = this.shop.items.map(i => entryKey(i) !== key ? i.toObject() : {
-      ...i.toObject(),
-      stock: { max: data.noRestock ? null : (data.max ?? null), current: data.current ?? null },
-      noRestock: !!data.noRestock
-    });
-    await this.#updateShop({ items });
+    await dialog.render({ force: true });
   }
 
   /* -------------------------------------------- */
@@ -740,6 +875,29 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
   /* -------------------------------------------- */
 
   /**
+   * Handle opening the file picker to change this shop's image, mirroring core's own
+   * `DocumentSheetV2#_onEditImage` (`document-sheet.mjs:320`).
+   * @this {ShopEditor}
+   * @param {Event} event         Triggering click event.
+   * @param {HTMLElement} target  The `<img data-edit="img">` element that was clicked.
+   */
+  static async #editImage(event, target) {
+    const fp = new foundry.applications.apps.FilePicker.implementation({
+      current: this.shop.img,
+      type: "image",
+      redirectToRoot: [Shop.DEFAULT_ICON],
+      callback: path => {
+        target.src = path;
+        if ( this.options.form.submitOnChange ) this.form.dispatchEvent(new Event("submit", { cancelable: true }));
+      },
+      position: { top: this.position.top + 40, left: this.position.left + 10 }
+    });
+    await fp.browse();
+  }
+
+  /* -------------------------------------------- */
+
+  /**
    * Handle opening a small dialog to edit an item's price.
    * @this {ShopEditor}
    * @param {Event} event         Triggering click event.
@@ -749,34 +907,35 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
     const key = target.dataset.key;
     const entry = this.shop.items.find(i => entryKey(i) === key);
     const item = (await resolveShopItems([entry]))[0]?.item;
+    const shopEditor = this;
+    const priceFields = ShopItemEntry.schema.fields.price.fields;
 
-    const { createFormGroup, createNumberInput, createSelectInput } = foundry.applications.fields;
-    const content = `<fieldset>
-      ${createFormGroup({
-        label: _loc("DND5E.Price"),
-        input: createNumberInput({ name: "value", value: entry.price?.value, placeholder: item?.system?.price?.value })
-      }).outerHTML}
-      ${createFormGroup({
-        label: _loc("DND5E.Currency"),
-        input: createSelectInput({
-          name: "denomination",
-          value: entry.price?.denomination ?? item?.system?.price?.denomination ?? "gp",
-          options: getCurrencyOptions()
-        })
-      }).outerHTML}
-    </fieldset>`;
-
-    const data = await foundry.applications.api.DialogV2.input({
+    const dialog = new BaseConfigDialog({
       window: { title: "DND5E.Price" },
-      content
+      fields: [
+        {
+          field: priceFields.value, name: "value", value: entry.price?.value,
+          label: _loc("DND5E.Price"), hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.PriceOverrideHint"),
+          placeholder: item?.system?.price?.value
+        },
+        {
+          field: priceFields.denomination, name: "denomination",
+          value: entry.price?.denomination ?? item?.system?.price?.denomination ?? "gp",
+          label: _loc("DND5E.Currency"), options: getCurrencyOptions()
+        }
+      ],
+      form: {
+        handler: async (event, form, formData) => {
+          const data = foundry.utils.expandObject(formData.object);
+          const items = shopEditor.shop.items.map(i => entryKey(i) !== key ? i.toObject() : {
+            ...i.toObject(),
+            price: { value: data.value ?? null, denomination: data.denomination }
+          });
+          await shopEditor.#updateShop({ items });
+        }
+      }
     });
-    if ( !data ) return;
-
-    const items = this.shop.items.map(i => entryKey(i) !== key ? i.toObject() : {
-      ...i.toObject(),
-      price: { value: data.value ?? null, denomination: data.denomination }
-    });
-    await this.#updateShop({ items });
+    await dialog.render({ force: true });
   }
 
   /* -------------------------------------------- */
@@ -792,28 +951,31 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
     const entry = this.shop.items.find(i => entryKey(i) === key);
     const playerOverride = ShopEditor.#getPlayerOverride(this.shop.playerDiscounts, this.selectedActorUuid);
     const effectiveDefault = this.shop.buyModifier + (playerOverride.buy ?? 0);
+    const shopEditor = this;
 
-    const { createFormGroup, createNumberInput } = foundry.applications.fields;
-    const content = `<fieldset>
-      ${createFormGroup({
-        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.PriceModifier"),
-        input: createNumberInput({
-          name: "discount", value: entry.discount, placeholder: String(effectiveDefault), min: -100, max: 1000
-        })
-      }).outerHTML}
-    </fieldset>`;
-
-    const data = await foundry.applications.api.DialogV2.input({
+    const dialog = new BaseConfigDialog({
       window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.PriceModifier" },
-      content
+      fields: [
+        {
+          field: ShopItemEntry.schema.fields.discount, name: "discount", value: entry.discount,
+          input: (field, config) => foundry.applications.fields.createNumberInput(config),
+          label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.PriceModifier"),
+          hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.DiscountOverrideHint"),
+          placeholder: String(effectiveDefault)
+        }
+      ],
+      form: {
+        handler: async (event, form, formData) => {
+          const data = foundry.utils.expandObject(formData.object);
+          const items = shopEditor.shop.items.map(i => entryKey(i) !== key ? i.toObject() : {
+            ...i.toObject(),
+            discount: data.discount ?? null
+          });
+          await shopEditor.#updateShop({ items });
+        }
+      }
     });
-    if ( !data ) return;
-
-    const items = this.shop.items.map(i => entryKey(i) !== key ? i.toObject() : {
-      ...i.toObject(),
-      discount: data.discount ?? null
-    });
-    await this.#updateShop({ items });
+    await dialog.render({ force: true });
   }
 
   /* -------------------------------------------- */
@@ -825,31 +987,229 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
   static async #haggle() {
     const actor = this.selectedActorUuid ? fromUuidSync(this.selectedActorUuid) : null;
     if ( !actor ) return;
-
     const playerOverride = ShopEditor.#getPlayerOverride(this.shop.playerDiscounts, this.selectedActorUuid);
     const effectiveBuy = this.shop.buyModifier + (playerOverride.buy ?? 0);
     const effectiveSell = this.shop.sellModifier + (playerOverride.sell ?? 0);
-
     const chaSkills = Object.entries(CONFIG.DND5E.skills).filter(([, s]) => s.ability === "cha");
-    const { createFormGroup, createSelectInput } = foundry.applications.fields;
-    const content = `<fieldset>
-      <p>${_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.HagglingCurrent")}:
-        ${_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Buy")} ${effectiveBuy}% /
-        ${_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Sell")} ${effectiveSell}%</p>
-      ${createFormGroup({
-        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.HagglingSkill"),
-        input: createSelectInput({ name: "skill", options: chaSkills.map(([value, s]) => ({ value, label: s.label })) })
-      }).outerHTML}
-    </fieldset>`;
 
-    const data = await foundry.applications.api.DialogV2.input({
+    const dialog = new BasePromptDialog({
       window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Haggling" },
-      content,
-      ok: { label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.HagglingRoll" }
+      hint: `${_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.HagglingCurrent")}: `
+        + `${_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Buy")} ${effectiveBuy}% / `
+        + `${_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Sell")} ${effectiveSell}%`,
+      fields: [
+        {
+          field: new foundry.data.fields.StringField(), name: "skill",
+          label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.HagglingSkill"),
+          options: chaSkills.map(([value, s]) => ({ value, label: s.label }))
+        }
+      ],
+      buttons: [
+        { action: "roll", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.HagglingRoll", icon: "fa-solid fa-dice-d20", default: true }
+      ],
+      form: {
+        handler: async function(event, form, formData) {
+          const data = foundry.utils.expandObject(formData.object);
+          await actor.rollSkill({ skill: data.skill });
+          await this.close();
+        }
+      }
     });
-    if ( !data ) return;
+    await dialog.render({ force: true });
+  }
 
-    await actor.rollSkill({ skill: data.skill });
+  /* -------------------------------------------- */
+
+  /**
+   * Handle opening a dialog to edit the shop's buy/sell price modifiers.
+   * @this {ShopEditor}
+   */
+  static async #editModifiers() {
+    const shopEditor = this;
+    const fields = Shop.schema.fields;
+    const lootTypeOptions = Object.entries(CONFIG.DND5E.lootTypes).map(([value, cfg]) => ({ value, label: cfg.label }));
+
+    const dialog = new BaseConfigDialog({
+      window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopConfig.Discount" },
+      fields: [
+        {
+          field: fields.buyModifier, name: "buyModifier", value: this.shop.buyModifier,
+          input: (field, config) => foundry.applications.fields.createNumberInput(config),
+          placeholder: fields.buyModifier.getInitialValue({})
+        },
+        {
+          field: fields.sellModifier, name: "sellModifier", value: this.shop.sellModifier,
+          input: (field, config) => foundry.applications.fields.createNumberInput(config),
+          placeholder: fields.sellModifier.getInitialValue({})
+        },
+        {
+          field: fields.fixedValueLootTypes, name: "fixedValueLootTypes",
+          value: Array.from(this.shop.fixedValueLootTypes), options: lootTypeOptions
+        }
+      ],
+      form: {
+        handler: async (event, form, formData) => {
+          const data = foundry.utils.expandObject(formData.object);
+          await shopEditor.#updateShop({
+            buyModifier: Math.clamp(Math.round(data.buyModifier ?? 0), -100, 1000),
+            sellModifier: Math.clamp(Math.round(data.sellModifier ?? -50), -100, 1000),
+            fixedValueLootTypes: data.fixedValueLootTypes ?? []
+          });
+        }
+      }
+    });
+    await dialog.render({ force: true });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle opening a dialog to edit the shop's settlement cap.
+   * @this {ShopEditor}
+   */
+  static async #editSettlementCap() {
+    const shopEditor = this;
+    const settlementCap = this.shop.settlementCap;
+    const preset = Object.entries(SETTLEMENT_CAPS).find(([, v]) => v === settlementCap.value)?.[0]
+      ?? (settlementCap.value != null ? "custom" : "");
+    const presetOptions = [
+      { value: "", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoCap") },
+      { value: "village", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.Village") },
+      { value: "town", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.Town") },
+      { value: "city", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.City") },
+      { value: "custom", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.Custom") }
+    ];
+    const capFields = Shop.schema.fields.settlementCap.fields;
+
+    const dialog = new BaseConfigDialog({
+      window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SettlementCap" },
+      state: { settlementCapPreset: preset, settlementCapValue: settlementCap.value, settlementCapDenomination: settlementCap.denomination },
+      fields: formState => {
+        const fields = [
+          {
+            field: new foundry.data.fields.StringField(), name: "settlementCapPreset", value: formState.settlementCapPreset,
+            label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SettlementCap"), options: presetOptions
+          }
+        ];
+        if ( formState.settlementCapPreset === "custom" ) {
+          fields.push({
+            group: { label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SettlementCapValue") },
+            fields: [
+              { field: capFields.value, name: "settlementCapValue", value: formState.settlementCapValue },
+              {
+                field: capFields.denomination, name: "settlementCapDenomination",
+                value: formState.settlementCapDenomination, options: getCurrencyOptions()
+              }
+            ]
+          });
+        }
+        return fields;
+      },
+      form: {
+        handler: async (event, form, formData) => {
+          const data = foundry.utils.expandObject(formData.object);
+          const value = data.settlementCapPreset === "custom" ? (data.settlementCapValue ?? null)
+            : (data.settlementCapPreset === "" ? null : SETTLEMENT_CAPS[data.settlementCapPreset]);
+          const denomination = (data.settlementCapPreset === "custom") ? (data.settlementCapDenomination || "gp") : "gp";
+          await shopEditor.#updateShop({ settlementCap: { value, denomination } });
+        }
+      }
+    });
+    await dialog.render({ force: true });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle opening a dialog to edit the shop's maximum money pool.
+   * @this {ShopEditor}
+   */
+  static async #editVendorGold() {
+    const shopEditor = this;
+    const goldPool = this.shop.goldPool;
+    const currencies = goldPoolCurrencies();
+
+    const dialog = new BaseConfigDialog({
+      window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GoldPoolMax" },
+      state: { unlimited: goldPool.unlimited, ...goldPool.max },
+      fields: formState => [
+        {
+          field: Shop.schema.fields.goldPool.fields.unlimited, name: "unlimited", value: !!formState.unlimited,
+          hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GoldPoolMaxHint")
+        }
+      ],
+      extraContent: async formState => {
+        if ( formState.unlimited ) return "";
+        const rows = currencyRows(formState);
+        const amountsHtml = await foundry.applications.handlebars.renderTemplate(
+          "modules/simple-shop-craft-5e/templates/partials/currency-inputs.hbs", { rows }
+        );
+        return `<section class="currency">${amountsHtml}</section>`;
+      },
+      form: {
+        handler: async (event, form, formData) => {
+          const data = foundry.utils.expandObject(formData.object);
+          const currentMax = shopEditor.shop.goldPool.max;
+          const max = currencies.reduce((obj, denom) => {
+            obj[denom] = (denom in data) ? Math.max(0, Math.round(data[denom] ?? 0)) : (currentMax[denom] ?? 0);
+            return obj;
+          }, {});
+          await shopEditor.#updateShop({
+            goldPool: { ...shopEditor.shop.goldPool, max, unlimited: !!data.unlimited }
+          });
+        }
+      }
+    });
+    await dialog.render({ force: true });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle opening a dialog to edit the shop's owner.
+   * @this {ShopEditor}
+   */
+  static async #editOwner() {
+    const shopEditor = this;
+    const dialog = new BaseConfigDialog({
+      window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Owner" },
+      fields: [
+        {
+          field: Shop.schema.fields.npc, name: "npc", value: this.shop.npc ?? "",
+          label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.Owner")
+        }
+      ],
+      form: {
+        handler: async (event, form, formData) => {
+          const data = foundry.utils.expandObject(formData.object);
+          await shopEditor.#updateShop({ npc: data.npc || null });
+        }
+      }
+    });
+    await dialog.render({ force: true });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle opening a dialog to rename this shop.
+   * @this {ShopEditor}
+   */
+  static async #renameShop() {
+    const shopEditor = this;
+    const dialog = new BaseConfigDialog({
+      window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.RenameShop" },
+      fields: [
+        { field: Shop.schema.fields.name, name: "name", value: this.shop.name }
+      ],
+      form: {
+        handler: async (event, form, formData) => {
+          const data = foundry.utils.expandObject(formData.object);
+          await shopEditor.#updateShop({ name: data.name || shopEditor.shop.name });
+        }
+      }
+    });
+    await dialog.render({ force: true });
   }
 
   /* -------------------------------------------- */
@@ -859,9 +1219,110 @@ export default class ShopEditor extends HandlebarsApplicationMixin(ApplicationV2
    * @this {ShopEditor}
    */
   static async #editPlayers() {
-    const app = new ShopConfig({ shopId: this.shopId });
-    await app.render({ force: true });
-    app.changeTab("players", "primary");
+    const shopEditor = this;
+    const buildRows = actorUuids => actorUuids.map((uuid, index) => {
+      const existing = shopEditor.shop.playerDiscounts.find(pd => pd.actor === uuid);
+      const actor = fromUuidSync(uuid);
+      return {
+        index, actorUuid: uuid, actorImg: actor?.img, actorName: actor?.name,
+        buyModifier: existing?.buyModifier ?? null, sellModifier: existing?.sellModifier ?? null,
+        template: "modules/simple-shop-craft-5e/templates/shop-editor/players-dialog-row.hbs"
+      };
+    });
+
+    const dialog = new BaseConfigDialog({
+      window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopConfig.Tabs.Players" },
+      classes: ["dnd5e2"],
+      autoRerender: false,
+      state: { actorUuids: this.shop.playerDiscounts.map(pd => pd.actor) },
+      extraContent: async formState => {
+        const rows = buildRows(formState.actorUuids);
+        const tableHtml = await foundry.applications.handlebars.renderTemplate(
+          "modules/simple-shop-craft-5e/templates/partials/item-table.hbs",
+          {
+            hasRows: rows.length > 0,
+            emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopConfig.Players.None",
+            sections: [{
+              label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Player",
+              columns: [
+                { id: "name" },
+                { id: "discount", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Buy" },
+                { id: "discount", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Sell" },
+                { id: "controls" }
+              ],
+              rows
+            }]
+          }
+        );
+        return `${tableHtml}<document-tags name="newPlayerActors" type="Actor" class="drop-area" `
+          + `data-drop-hint="${_loc("SIMPLE_SHOP_CRAFT_5E.ShopConfig.Players.DropHint")}"></document-tags>`;
+      },
+      onRender: app => {
+        const persistPlayerList = async () => {
+          const existing = new Map(shopEditor.shop.playerDiscounts.map(pd => [pd.actor, pd]));
+          const playerDiscounts = app.formState.actorUuids.map(uuid => ({
+            actor: uuid,
+            buyModifier: existing.get(uuid)?.buyModifier ?? null,
+            sellModifier: existing.get(uuid)?.sellModifier ?? null
+          }));
+          await shopEditor.#updateShop({ playerDiscounts });
+        };
+
+        const tags = app.element.querySelector('document-tags[name="newPlayerActors"]');
+        tags?.addEventListener("change", async () => {
+          const uuids = Array.from(new Set([...app.formState.actorUuids, ...tags.value]));
+          app.formState = { actorUuids: uuids };
+          await persistPlayerList();
+          app.render({ parts: ["content"] });
+        });
+        app.element.querySelector(".item-list")?.addEventListener("click", async event => {
+          const button = event.target.closest('[data-action="removePlayerDiscount"]');
+          if ( !button ) return;
+          const uuid = button.closest("li")?.dataset.actorUuid;
+          app.formState = { actorUuids: app.formState.actorUuids.filter(u => u !== uuid) };
+          await persistPlayerList();
+          app.render({ parts: ["content"] });
+        });
+      },
+      form: {
+        handler: async (event, form, formData) => {
+          const data = foundry.utils.expandObject(formData.object);
+          const playerDiscounts = Object.values(data.playerDiscounts ?? {}).map(row => ({
+            actor: row.actor,
+            buyModifier: (row.buy === "" || row.buy == null) ? null : Number(row.buy),
+            sellModifier: (row.sell === "" || row.sell == null) ? null : Number(row.sell)
+          }));
+          await shopEditor.#updateShop({ playerDiscounts });
+        }
+      }
+    });
+    await dialog.render({ force: true });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle toggling this shop's active/visible state.
+   * @this {ShopEditor}
+   */
+  static async #toggleActive() {
+    await this.#updateShop({ active: !this.shop.active });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle broadcasting this shop to every connected client, opening it in their Shop Editor.
+   * @this {ShopEditor}
+   */
+  static async #spotlight() {
+    const targets = game.users.filter(u => u.active && (u.id !== game.user.id));
+    if ( !targets.length ) {
+      ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SpotlightNoTargets");
+      return;
+    }
+    await User.queryMany(targets, `${MODULE_ID}.spotlight`, { shopId: this.shopId });
+    ui.notifications.info("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SpotlightSuccess");
   }
 
   /* -------------------------------------------- */

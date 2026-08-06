@@ -1,0 +1,7 @@
+<section class="tab {{ tab.cssClass }}" data-tab="{{ tabId }}" data-group="{{ tab.group }}">
+    {{#if showNoActor}}
+    <p class="hint">{{ localize noActorLabel }}</p>
+    {{else}}
+    {{> "modules/simple-shop-craft-5e/templates/partials/item-table.hbs" table}}
+    {{/if}}
+</section>

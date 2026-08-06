@@ -1,0 +1,27 @@
+<li class="item" data-id="{{ shop._id }}" data-shop-id="{{ shop._id }}">
+    <div class="item-row">
+        <div class="item-name rollable" data-action="editShop" role="button" data-shop-id="{{ shop._id }}">
+            {{> "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs"
+                img=shop.img name=shop.name subtitle=subtitle }}
+        </div>
+        <div class="item-detail item-npc{{#unless npc}} empty{{/unless}}">
+            {{#if npc}}
+            <span class="title">{{ npc.name }}</span>
+            {{/if}}
+        </div>
+        <div class="item-detail item-controls always-visible">
+            {{#if @root.isGM}}
+            <button type="button" class="unbutton config-button item-control item-action{{#if shop.active}} active{{/if}}"
+                    data-action="toggleActive" data-shop-id="{{ shop._id }}"
+                    data-tooltip
+                    aria-label="{{ localize (concat 'SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.' (ifThen shop.active 'Deactivate' 'Activate')) }}">
+                <i class="fa-solid fa-toggle-{{ ifThen shop.active 'on' 'off' }}" inert></i>
+            </button>
+            <button type="button" class="unbutton config-button item-control always-interactive" data-context-menu
+                    aria-label="{{ localize 'DND5E.AdditionalControls' }}">
+                <i class="fa-solid fa-ellipsis-vertical" inert></i>
+            </button>
+            {{/if}}
+        </div>
+    </div>
+</li>
