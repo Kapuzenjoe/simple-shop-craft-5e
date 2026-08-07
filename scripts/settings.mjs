@@ -5,7 +5,7 @@ const { ArrayField, EmbeddedDataField } = foundry.data.fields;
 
 /**
  * Settings definitions for Simple Shop & Craft 5e.
- * These entries are registered under {@link MODULE_ID} by {@link initSettings}.
+ * These entries are registered under {@link MODULE_ID} by {@link registerSettings}.
  */
 const SETTINGS = [
   {
@@ -20,30 +20,30 @@ const SETTINGS = [
 /* -------------------------------------------- */
 
 /**
- * Re-render any open shop management applications after settings change elsewhere.
- * @returns {Promise<void>}
+ * Register all module settings.
+ *
+ * @returns {void}
  */
-async function refreshShopApps() {
-  const { default: ShopManager } = await import("./applications/shop-manager.mjs");
-  const { default: ShopEditor } = await import("./applications/shop-editor.mjs");
-  foundry.applications.instances.forEach(app => {
-    if ( app instanceof ShopManager ) app.render();
-    if ( (app instanceof ShopEditor) ) {
-      if ( app.shop ) app.render();
-      else app.close();
-    }
-  });
+export function registerSettings() {
+  for ( const { key, ...data } of SETTINGS ) {
+    game.settings.register(MODULE_ID, key, data);
+  }
 }
 
 /* -------------------------------------------- */
 
 /**
- * Register all module settings.
- *
- * @returns {void}
+ * Re-render any open shop management applications after settings change elsewhere.
+ * @returns {Promise<void>}
  */
-export function initSettings() {
-  for ( const { key, ...data } of SETTINGS ) {
-    game.settings.register(MODULE_ID, key, data);
-  }
+async function refreshShopApps() {
+  const { default: ShopManager } = await import("./applications/shop-manager.mjs");
+  const { default: ShopSheet } = await import("./applications/shop-sheet.mjs");
+  foundry.applications.instances.forEach(app => {
+    if ( app instanceof ShopManager ) app.render();
+    if ( ( app instanceof ShopSheet ) ) {
+      if ( app.shop ) app.render();
+      else app.close();
+    }
+  });
 }

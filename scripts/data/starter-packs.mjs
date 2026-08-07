@@ -1,7 +1,7 @@
 /**
  * Starter packs a GM can pick from when creating a new template, to pre-fill its item list.
  * Item identifiers are verified against the dnd5e 2024 equipment compendium.
- * @type {Record<string, {label: string, items: string[]}>}
+ * @type {Record<string, {label: string, items: Array<string|{identifier: string, bundleSize: number}>>}>}
  */
 export const STARTER_PACKS = {
   blacksmith: {
@@ -48,20 +48,23 @@ export const STARTER_PACKS = {
 /* -------------------------------------------- */
 
 /**
- * Get the localized label/value pairs for the starter pack selection dropdown.
- * @returns {Array<{value: string, label: string}>}
+ * Get the item identifiers included in a starter pack.
+ * @param {string} pack  Starter pack key.
+ * @returns {{ identifier: string, bundleSize: number|null }[]}
  */
-export function getStarterPackOptions() {
-  return Object.entries(STARTER_PACKS).map(([value, pack]) => ({ value, label: _loc(pack.label) }));
+export function getStarterItems(pack) {
+  return (STARTER_PACKS[pack]?.items ?? []).map(item => {
+    return typeof item === "string" ? { identifier: item, bundleSize: null } : { identifier: item.identifier, bundleSize: item.bundleSize ?? null };
+  }
+  );
 }
 
 /* -------------------------------------------- */
 
 /**
- * Get the item identifiers included in a starter pack.
- * @param {string} pack  Starter pack key.
- * @returns {string[]}
+ * Get the localized label/value pairs for the starter pack selection dropdown.
+ * @returns {{ value: string, label: string }[]}
  */
-export function getStarterItems(pack) {
-  return STARTER_PACKS[pack]?.items ?? [];
+export function getStarterPackOptions() {
+  return Object.entries(STARTER_PACKS).map(([value, pack]) => ({ value, label: _loc(pack.label) }));
 }

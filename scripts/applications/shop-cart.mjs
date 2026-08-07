@@ -1,5 +1,6 @@
-import { breakdownPrice, roundToCopper } from "../shops/currency.mjs";
 import { createPurchaseMessage } from "../chat/purchase-card.mjs";
+import { breakdownCopper } from "../shops/currency.mjs";
+
 import BasePromptDialog from "./base-prompt-dialog.mjs";
 
 /**
@@ -9,79 +10,81 @@ export default class ShopCart extends BasePromptDialog {
 
   /**
    * @param {object} [options]
-   * @param {ShopEditor} [options.shopEditor]  The shop editor this cart belongs to.
+   * @param {ShopSheet} [options.shopSheet]  The shop editor this cart belongs to.
    */
-  constructor({ shopEditor, ...options }={}) {
+  constructor({ shopSheet, ...options }={}) {
     super({
       window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopCart.Title", resizable: true },
-      extraContent: () => ShopCart.#renderContent(shopEditor),
+      extraContent: () => ShopCart.#renderContent(shopSheet),
       buttons: () => {
-        const state = ShopCart.#computeState(shopEditor);
+        const state = ShopCart.#computeState(shopSheet);
         return [{ action: "confirm", label: "SIMPLE_SHOP_CRAFT_5E.ShopCart.Confirm", disabled: state.confirmDisabled }];
       },
       form: {
         closeOnSubmit: false,
         handler: async function(event, form, formData) {
-          const state = ShopCart.#computeState(shopEditor);
-          await createPurchaseMessage(shopEditor, state.actor, state.lines, state.sellLines, state.total.parts, state.netGP);
-          ui.notifications.info(_loc("SIMPLE_SHOP_CRAFT_5E.ShopCart.PurchaseRequested"));
-          shopEditor.cart.clear();
-          shopEditor.sellCart.clear();
-          await shopEditor.render();
+          const state = ShopCart.#computeState(shopSheet);
+          await createPurchaseMessage(
+            shopSheet, state.actor, state.lines, state.sellLines, state.total.parts, state.netCP
+          );
+          ui.notifications.info("SIMPLE_SHOP_CRAFT_5E.ShopCart.PurchaseRequested");
+          shopSheet.cart.clear();
+          shopSheet.sellCart.clear();
+          await shopSheet.render();
           this.render();
         }
       },
       ...options
     });
-    this.shopEditor = shopEditor;
+    this.shopSheet = shopSheet;
   }
 
   /* -------------------------------------------- */
 
   /**
    * Compute the current buy/sell lines, net total, and confirm-eligibility for a shop editor's cart.
-   * @param {ShopEditor} shopEditor
+   * @param {ShopSheet} shopSheet
    * @returns {object}
    */
-  static #computeState(shopEditor) {
-    const lines = shopEditor.cartLines.map(row => ({
+  static #computeState(shopSheet) {
+    const lines = shopSheet.cartLines.map(row => ({
       ...row,
-      subtotal: breakdownPrice(row.priceGP * row.cartQuantity, "gp", true)
+      subtotal: breakdownCopper(row.priceCP * row.cartQuantity, { negative: true })
     }));
-    const sellLines = shopEditor.sellLines.map(row => ({
+    const sellLines = shopSheet.sellLines.map(row => ({
       ...row,
-      subtotal: breakdownPrice(row.priceGP * row.sellQuantity, "gp")
+      subtotal: breakdownCopper(row.priceCP * row.sellQuantity)
     }));
 
-    let buyTotalGP = 0;
-    for ( const row of lines ) buyTotalGP += row.priceGP * row.cartQuantity;
-    let sellTotalGP = 0;
-    for ( const row of sellLines ) sellTotalGP += row.priceGP * row.sellQuantity;
-    const netGP = roundToCopper(sellTotalGP - buyTotalGP);
+    let buyTotalCP = 0;
+    for ( const row of lines ) buyTotalCP += row.priceCP * row.cartQuantity;
+    let sellTotalCP = 0;
+    for ( const row of sellLines ) sellTotalCP += row.priceCP * row.sellQuantity;
+    const netCP = sellTotalCP - buyTotalCP;
     const hasLines = lines.length || sellLines.length;
-    const total = { parts: hasLines ? breakdownPrice(Math.abs(netGP), "gp", netGP < 0) : [] };
+    const total = { parts: hasLines ? breakdownCopper(Math.abs(netCP), { negative: netCP < 0 }) : [] };
 
-    const actor = shopEditor.selectedActorUuid ? fromUuidSync(shopEditor.selectedActorUuid) : null;
+    const actor = shopSheet.selectedActorUuid ? fromUuidSync(shopSheet.selectedActorUuid) : null;
     const balance = { insufficient: false };
-    if ( actor && (netGP < 0) ) {
-      const updates = game.dnd5e.applications.CurrencyManager.getActorCurrencyUpdates(actor, -netGP, "gp", {});
+    if ( actor && (netCP < 0) ) {
+      const updates = game.dnd5e.applications.CurrencyManager.getActorCurrencyUpdates(actor, -netCP, "cp", {});
       balance.insufficient = !updates.remainder.almostEqual(0);
     }
 
     const noActiveGM = !game.users.activeGM;
     const confirmDisabled = noActiveGM || !hasLines || !actor || !!balance.insufficient;
-    return { lines, sellLines, netGP, hasLines, total, actor, balance, noActiveGM, confirmDisabled };
+    return { lines, sellLines, netCP, hasLines, total, actor, balance, noActiveGM, confirmDisabled };
   }
 
   /* -------------------------------------------- */
 
   /**
    * Render the buy list, sell list, and balance sections for the dialog's content.
-   * @param {ShopEditor} shopEditor
+   * @param {ShopSheet} shopSheet
    * @returns {Promise<string>}
    */
-  static async #renderContent(shopEditor) {
-    const state = ShopCart.#computeState(shopEditor);
+  static async #renderContent(shopSheet) {
+    const state = ShopCart.#computeState(shopSheet);
     const buyRows = state.lines.map(row => ({
       img: row.item.img, name: row.item.name, quantity: row.cartQuantity, subtotal: row.subtotal
     }));

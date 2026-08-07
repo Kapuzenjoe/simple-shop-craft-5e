@@ -10,7 +10,7 @@ export default class BasePromptDialog extends Dialog5e {
     position: { width: 400 }
   };
 
-  /** @override */
+  /** @inheritDoc */
   static PARTS = {
     ...super.PARTS,
     content: {
@@ -18,7 +18,15 @@ export default class BasePromptDialog extends Dialog5e {
     }
   };
 
-  /** @override */
+  /** @inheritDoc */
+  async _onRender(context, options) {
+    await super._onRender(context, options);
+    this.options.onRender?.(this);
+  }
+
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
   async _prepareContentContext(context, options) {
     context = await super._prepareContentContext(context, options);
     context.hint = this.options.hint;
@@ -28,16 +36,12 @@ export default class BasePromptDialog extends Dialog5e {
     return context;
   }
 
+  /* -------------------------------------------- */
+
   /** @override */
   async _prepareFooterContext(context, options) {
     const buttons = (this.options.buttons instanceof Function) ? this.options.buttons() : (this.options.buttons ?? []);
     context.buttons = buttons.map(button => ({ ...button, cssClass: button.class }));
     return context;
-  }
-
-  /** @override */
-  async _onRender(context, options) {
-    await super._onRender(context, options);
-    this.options.onRender?.(this);
   }
 }

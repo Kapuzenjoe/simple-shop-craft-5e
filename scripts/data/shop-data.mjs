@@ -4,26 +4,8 @@ const {
 } = foundry.data.fields;
 
 /**
- * @import { ShopItemEntryData, ShopData } from "../_types.mjs";
+ * @import { ShopPlayerDiscountData, ShopItemEntryData, ShopData } from "../_types.mjs";
  */
-
-/**
- * A data model that represents a per-actor discount override for a shop.
- * @extends {foundry.abstract.DataModel}
- */
-export class ShopPlayerDiscount extends foundry.abstract.DataModel {
-
-  /** @override */
-  static defineSchema() {
-    return {
-      actor: new DocumentUUIDField({ type: "Actor" }),
-      buyModifier: new NumberField({ initial: null, nullable: true, integer: true, min: -100, max: 1000 }),
-      sellModifier: new NumberField({ initial: null, nullable: true, integer: true, min: -100, max: 1000 })
-    };
-  }
-}
-
-/* -------------------------------------------- */
 
 /**
  * A data model that represents a single item entry within a shop.
@@ -47,7 +29,27 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
       price: new SchemaField({
         value: new NumberField({ initial: null, nullable: true, min: 0 }),
         denomination: new StringField({ initial: "gp" })
-      })
+      }),
+      bundleSize: new NumberField({ initial: null, nullable: true, integer: true, min: 1 })
+    };
+  }
+}
+
+/* -------------------------------------------- */
+
+/**
+ * A data model that represents a per-actor discount override for a shop.
+ * @extends {foundry.abstract.DataModel<ShopPlayerDiscountData>}
+ * @mixes ShopPlayerDiscountData
+ */
+export class ShopPlayerDiscount extends foundry.abstract.DataModel {
+
+  /** @override */
+  static defineSchema() {
+    return {
+      actor: new DocumentUUIDField({ type: "Actor" }),
+      buyModifier: new NumberField({ initial: null, nullable: true, integer: true, min: -100, max: 1000 }),
+      sellModifier: new NumberField({ initial: null, nullable: true, integer: true, min: -100, max: 1000 })
     };
   }
 }

@@ -1,7 +1,8 @@
 import { MODULE_ID, SETTING_KEYS, SETTLEMENT_CAPS, GOLD_POOL_DEFAULT } from "../config.mjs";
 import { getStarterItems, getStarterPackOptions } from "../data/starter-packs.mjs";
-import ShopEditor from "./shop-editor.mjs";
+
 import BasePromptDialog from "./base-prompt-dialog.mjs";
+import ShopSheet from "./shop-sheet.mjs";
 
 const { Application5e } = game.dnd5e.applications.api;
 
@@ -30,17 +31,6 @@ export default class ShopManager extends Application5e {
   };
 
   /** @override */
-  static TABS = {
-    primary: {
-      tabs: [
-        { id: "shops", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Tabs.Shops" },
-        { id: "crafting", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Tabs.Crafting" }
-      ],
-      initial: "shops"
-    }
-  };
-
-  /** @override */
   static PARTS = {
     tabs: { template: "templates/generic/tab-navigation.hbs" },
     shops: {
@@ -51,145 +41,15 @@ export default class ShopManager extends Application5e {
   };
 
   /** @override */
-  async _prepareContext(options) {
-    const context = await super._prepareContext(options);
-    context.isGM = game.user.isGM;
-    const shops = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS).filter(s => context.isGM || s.active);
-    const rows = shops.toSorted((a, b) => b.active - a.active).map(shop => ({
-      shop,
-      npc: shop.npc ? fromUuidSync(shop.npc) : null,
-      subtitle: [shop.location || null, ShopManager.#settlementCapLabel(shop) || null].filter(Boolean).join(" · "),
-      template: "modules/simple-shop-craft-5e/templates/shop-manager/shop-row.hbs"
-    }));
-    context.table = {
-      hasRows: rows.length > 0,
-      emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.None",
-      sections: [{
-        label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Shop",
-        columns: [
-          { id: "name" },
-          { id: "npc", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Owner" },
-          { id: "controls" }
-        ],
-        rows
-      }]
-    };
-    return context;
-  }
-
-  /* -------------------------------------------- */
-
-  /** @override */
-  async _preparePartContext(partId, context, options) {
-    context = await super._preparePartContext(partId, context, options);
-    context.tab = context.tabs?.[partId];
-    return context;
-  }
-
-  /* -------------------------------------------- */
-
-  /** @override */
-  async _onFirstRender(context, options) {
-    await super._onFirstRender(context, options);
-    new game.dnd5e.applications.ContextMenu5e(this.element, "[data-shop-id]", [], {
-      onOpen: element => {
-        const shop = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS).find(s => s._id === element.dataset.shopId);
-        ui.context.menuItems = this.#getShopContextOptions(shop);
-      },
-      jQuery: false
-    });
-  }
-
-  /* -------------------------------------------- */
-
-  /** @override */
-  _attachPartListeners(partId, htmlElement, options) {
-    super._attachPartListeners(partId, htmlElement, options);
-    if ( partId === "shops" ) {
-      htmlElement.querySelectorAll("[data-context-menu]").forEach(control =>
-        control.addEventListener("click", game.dnd5e.applications.ContextMenu5e.triggerEvent));
+  static TABS = {
+    primary: {
+      tabs: [
+        { id: "shops", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Tabs.Shops" },
+        { id: "crafting", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Tabs.Crafting" }
+      ],
+      initial: "shops"
     }
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Determine the display label for a shop's settlement cap: the matching preset name, "Custom" for a
-   * non-preset value, or an empty string when uncapped.
-   * @param {Shop} shop
-   * @returns {string}
-   */
-  static #settlementCapLabel(shop) {
-    const preset = Object.entries(SETTLEMENT_CAPS).find(([, v]) => v === shop.settlementCap.value)?.[0];
-    if ( preset ) {
-      const label = _loc(`SIMPLE_SHOP_CRAFT_5E.ShopEditor.${preset[0].toUpperCase()}${preset.slice(1)}`);
-      return label.replace(/\s*\(.*\)$/, "");
-    }
-    return shop.settlementCap.value != null ? _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.Custom") : "";
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Build the "..." context menu entries for a shop row.
-   * @param {Shop} shop
-   * @returns {object[]}
-   */
-  #getShopContextOptions(shop) {
-    return [
-      {
-        label: shop.active
-          ? "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Deactivate"
-          : "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Activate",
-        icon: `<i class="fa-solid fa-toggle-${shop.active ? "off" : "on"} fa-fw"></i>`,
-        onClick: () => this.#setShopActive(shop, !shop.active)
-      },
-      {
-        label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Duplicate",
-        icon: '<i class="fa-solid fa-copy fa-fw"></i>',
-        onClick: () => this.#duplicateShop(shop)
-      },
-      {
-        label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Delete",
-        icon: '<i class="fa-solid fa-trash fa-fw"></i>',
-        onClick: () => this.#confirmDeleteShop(shop)
-      }
-    ];
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Handle duplicating an existing shop.
-   * @param {Shop} shop
-   */
-  async #duplicateShop(shop) {
-    const clone = shop.toObject();
-    delete clone._id;
-    clone.name = game.i18n.format("DOCUMENT.CopyOf", { name: shop.name });
-    const shops = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS);
-    await game.settings.set(MODULE_ID, SETTING_KEYS.SHOPS, [...shops.map(s => s.toObject()), clone]);
-    this.render();
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Add a button to the Item Directory sidebar header to open this application.
-   * @param {HTMLElement} html  Rendered Item Directory element.
-   */
-  static injectSidebarButton(html) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.classList.add("open-shop-manager");
-    button.innerHTML = `<i class="fas fa-store" inert></i> ${_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Action.Open")}`;
-    button.addEventListener("click", () => (new ShopManager()).render({ force: true }));
-    html.querySelector(".header-actions").append(button);
-  }
-
-  /* -------------------------------------------- */
-  /*  Creation                                     */
-  /* -------------------------------------------- */
+  };
 
   /**
    * Handle creating a new shop: small name/starter-pack prompt, then opens the full edit view.
@@ -233,12 +93,14 @@ export default class ShopManager extends Application5e {
             name: data.name || packs.find(p => p.value === data.starterPack)?.label
               || _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Create"),
             goldPool: { max: { gp: GOLD_POOL_DEFAULT }, current: { gp: GOLD_POOL_DEFAULT }, unlimited: false },
-            items: getStarterItems(data.starterPack).map(identifier => ({ identifier, stock: { max: null, current: null } }))
+            items: getStarterItems(data.starterPack).map(({ identifier, bundleSize }) => ({
+              identifier, bundleSize, stock: { max: null, current: null }
+            }))
           };
           await game.settings.set(MODULE_ID, SETTING_KEYS.SHOPS, [...shops.map(s => s.toObject()), newShop]);
           shopManager.render();
           const created = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS).at(-1);
-          new ShopEditor({ shopId: created._id, mode: ShopEditor.MODES.EDIT }).render({ force: true });
+          new ShopSheet({ shopId: created._id }).render({ force: true, mode: ShopSheet.MODES.EDIT });
           await this.close();
         }
       }
@@ -255,26 +117,21 @@ export default class ShopManager extends Application5e {
    * @param {HTMLElement} target  Button that was clicked.
    */
   static #editShop(event, target) {
-    new ShopEditor({ shopId: target.dataset.shopId }).render({ force: true });
+    new ShopSheet({ shopId: target.dataset.shopId }).render({ force: true });
   }
 
   /* -------------------------------------------- */
 
   /**
-   * Handle deleting an existing shop, after confirmation.
+   * Determine the display label for a shop's settlement cap: the matching preset name, "Custom" for a
+   * non-preset value, or an empty string when uncapped.
    * @param {Shop} shop
+   * @returns {string}
    */
-  async #confirmDeleteShop(shop) {
-    const confirmed = await foundry.applications.api.DialogV2.confirm({
-      window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Delete" },
-      content: `<p>${_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.DeleteConfirm")}</p>`
-    });
-    if ( !confirmed ) return;
-
-    const shops = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS);
-    await game.settings.set(MODULE_ID, SETTING_KEYS.SHOPS,
-      shops.filter(s => s._id !== shop._id).map(s => s.toObject()));
-    this.render();
+  static #settlementCapLabel(shop) {
+    const preset = Object.entries(SETTLEMENT_CAPS).find(([, v]) => v.value === shop.settlementCap.value)?.[0];
+    if ( preset ) return _loc(SETTLEMENT_CAPS[preset].label);
+    return shop.settlementCap.value != null ? _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.Custom") : "";
   }
 
   /* -------------------------------------------- */
@@ -293,15 +150,163 @@ export default class ShopManager extends Application5e {
   /* -------------------------------------------- */
 
   /**
+   * Add a button to the Item Directory sidebar header to open this application.
+   * @param {HTMLElement} html  Rendered Item Directory element.
+   */
+  static injectSidebarButton(html) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.classList.add("open-shop-manager");
+    button.innerHTML = `<i class="fas fa-store" inert></i> ${_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Action.Open")}`;
+    button.addEventListener("click", () => (new ShopManager()).render({ force: true }));
+    html.querySelector(".header-actions").append(button);
+  }
+
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  _attachPartListeners(partId, htmlElement, options) {
+    super._attachPartListeners(partId, htmlElement, options);
+    if ( partId === "shops" ) {
+      htmlElement.querySelectorAll("[data-context-menu]").forEach(control => {
+        return control.addEventListener("click", game.dnd5e.applications.ContextMenu5e.triggerEvent);
+      });
+    }
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Prepare an array of context menu options which are available for a shop row.
+   * @param {Shop} shop
+   * @returns {ContextMenuEntry[]}
+   * @protected
+   */
+  _getContextOptions(shop) {
+    return [
+      {
+        label: shop.active
+          ? "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Deactivate"
+          : "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Activate",
+        icon: `<i class="fa-solid fa-toggle-${shop.active ? "off" : "on"} fa-fw"></i>`,
+        onClick: () => this.#setShopActive(shop, !shop.active)
+      },
+      {
+        label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Duplicate",
+        icon: '<i class="fa-solid fa-copy fa-fw"></i>',
+        onClick: () => this.#duplicateShop(shop)
+      },
+      {
+        label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Delete",
+        icon: '<i class="fa-solid fa-trash fa-fw"></i>',
+        onClick: () => this.#confirmDeleteShop(shop)
+      }
+    ];
+  }
+
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  async _onFirstRender(context, options) {
+    await super._onFirstRender(context, options);
+    new game.dnd5e.applications.ContextMenu5e(this.element, "[data-shop-id]", [], {
+      onOpen: element => {
+        const shop = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS).find(s => s._id === element.dataset.shopId);
+        ui.context.menuItems = this._getContextOptions(shop);
+      },
+      jQuery: false
+    });
+  }
+
+  /* -------------------------------------------- */
+  /*  Creation                                     */
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  async _prepareContext(options) {
+    const context = await super._prepareContext(options);
+    context.isGM = game.user.isGM;
+    const shops = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS).filter(s => context.isGM || s.active);
+    const rows = shops.toSorted((a, b) => b.active - a.active).map(shop => ({
+      shop,
+      npc: shop.npc ? fromUuidSync(shop.npc) : null,
+      subtitle: [shop.location || null, ShopManager.#settlementCapLabel(shop) || null].filter(Boolean).join(" · "),
+      template: "modules/simple-shop-craft-5e/templates/shop-manager/shop-row.hbs"
+    }));
+    context.table = {
+      hasRows: rows.length > 0,
+      emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.None",
+      sections: [{
+        label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Shop",
+        columns: [
+          { id: "name" },
+          { id: "npc", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Owner" },
+          { id: "controls" }
+        ],
+        rows
+      }]
+    };
+    return context;
+  }
+
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  async _preparePartContext(partId, context, options) {
+    context = await super._preparePartContext(partId, context, options);
+    context.tab = context.tabs?.[partId];
+    return context;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle deleting an existing shop, after confirmation.
+   * @param {Shop} shop
+   */
+  async #confirmDeleteShop(shop) {
+    const confirmed = await foundry.applications.api.DialogV2.confirm({
+      window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Delete" },
+      content: `<p>${_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.DeleteConfirm")}</p>`
+    });
+    if ( !confirmed ) return;
+    await this.#persistShops(shops => shops.filter(s => s._id !== shop._id).map(s => s.toObject()));
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle duplicating an existing shop.
+   * @param {Shop} shop
+   */
+  async #duplicateShop(shop) {
+    const clone = shop.toObject();
+    delete clone._id;
+    clone.name = game.i18n.format("DOCUMENT.CopyOf", { name: shop.name });
+    await this.#persistShops(shops => [...shops.map(s => s.toObject()), clone]);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Persist a transformed copy of the shops list and re-render.
+   * @param {(shops: Shop[]) => object[]} transform  Produces the new shops array (as plain objects).
+   * @returns {Promise<void>}
+   */
+  async #persistShops(transform) {
+    const shops = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS);
+    await game.settings.set(MODULE_ID, SETTING_KEYS.SHOPS, transform(shops));
+    this.render();
+  }
+
+  /* -------------------------------------------- */
+
+  /**
    * Set a shop's active/visible state.
    * @param {Shop} shop
    * @param {boolean} active
    */
   async #setShopActive(shop, active) {
-    const shops = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS);
-    await game.settings.set(MODULE_ID, SETTING_KEYS.SHOPS, shops.map(s =>
-      s._id === shop._id ? { ...s.toObject(), active } : s.toObject()
-    ));
-    this.render();
+    await this.#persistShops(shops => shops.map(s => s._id === shop._id ? { ...s.toObject(), active } : s.toObject()));
   }
 }

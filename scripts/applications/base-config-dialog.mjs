@@ -9,20 +9,6 @@ export default class BaseConfigDialog extends Application5e {
     this.#formState = { ...options.state };
   }
 
-  /**
-   * State derived from the form's last change, available to a `fields`/`extraContent` function.
-   * @type {object}
-   */
-  #formState;
-
-  get formState() {
-    return this.#formState;
-  }
-
-  set formState(value) {
-    this.#formState = value;
-  }
-
   /** @override */
   static DEFAULT_OPTIONS = {
     classes: ["simple-shop-craft-5e", "config-sheet", "standard-form"],
@@ -43,23 +29,21 @@ export default class BaseConfigDialog extends Application5e {
     }
   };
 
-  /** @override */
-  async _prepareContext(options) {
-    const context = await super._prepareContext(options);
-    context.hint = this.options.hint;
-    context.fields = (this.options.fields instanceof Function) ? this.options.fields(this.#formState) : (this.options.fields ?? []);
-    context.extraContent = (this.options.extraContent instanceof Function)
-      ? await this.options.extraContent(this.#formState) : (this.options.extraContent ?? "");
-    return context;
+  /**
+   * State derived from the form's last change, available to a `fields`/`extraContent` function.
+   * @type {object}
+   */
+  #formState;
+
+  /* -------------------------------------------- */
+
+  get formState() {
+    return this.#formState;
   }
 
-  /** @override */
-  async _onRender(context, options) {
-    await super._onRender(context, options);
-    this.options.onRender?.(this);
-  }
+  /* -------------------------------------------- */
 
-  /** @override */
+  /** @inheritDoc */
   _onChangeForm(formConfig, event) {
     super._onChangeForm(formConfig, event);
     if ( this.options.autoRerender === false ) return;
@@ -67,5 +51,32 @@ export default class BaseConfigDialog extends Application5e {
     const formData = new foundry.applications.ux.FormDataExtended(this.form);
     foundry.utils.mergeObject(this.#formState, formData.object);
     this.render({ parts: ["content"] });
+  }
+
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  async _onRender(context, options) {
+    await super._onRender(context, options);
+    this.options.onRender?.(this);
+  }
+
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  async _prepareContext(options) {
+    const context = await super._prepareContext(options);
+    context.hint = this.options.hint;
+    context.fields = (this.options.fields instanceof Function)
+      ? this.options.fields(this.#formState) : (this.options.fields ?? []);
+    context.extraContent = (this.options.extraContent instanceof Function)
+      ? await this.options.extraContent(this.#formState) : (this.options.extraContent ?? "");
+    return context;
+  }
+
+  /* -------------------------------------------- */
+
+  set formState(value) {
+    this.#formState = value;
   }
 }

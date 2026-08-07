@@ -17,13 +17,12 @@ export const SETTING_KEYS = {
 
 /**
  * Settlement cap guideline values per DMG 2024 "Settlements by Size".
- * @readonly
- * @enum {number}
+ * @type {Record<string, { label: string, value: number }>}
  */
 export const SETTLEMENT_CAPS = {
-  village: 20,
-  town: 2000,
-  city: 200000
+  village: { label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Village", value: 20 },
+  town: { label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Town", value: 2000 },
+  city: { label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.City", value: 200000 }
 };
 
 /**

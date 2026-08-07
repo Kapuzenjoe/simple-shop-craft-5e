@@ -2,17 +2,18 @@
     {{#if suppressed}}{{#unless @root.editable}}hidden{{/unless}}{{/if}}>
     <div class="item-row">
         <div class="item-detail item-cart">
-            <a class="adjustment-button" data-action="adjustCartQty" data-key="{{ key }}" data-delta="-1"
+            <a class="adjustment-button" data-action="adjustCartQuantity" data-key="{{ key }}" data-delta="-1"
                aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.DecreaseQuantity' }}">
                 <i class="fa-solid fa-minus" inert></i>
             </a>
             <span>{{ cartQuantity }}</span>
-            <a class="adjustment-button" data-action="adjustCartQty" data-key="{{ key }}" data-delta="+1"
+            <a class="adjustment-button" data-action="adjustCartQuantity" data-key="{{ key }}" data-delta="+1"
                aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.IncreaseQuantity' }}">
                 <i class="fa-solid fa-plus" inert></i>
             </a>
         </div>
-        <div class="item-name item-tooltip rollable" data-action="openItemSheet" role="button" aria-label="{{ itemName }}">
+        <div class="item-name item-tooltip rollable" data-action="openItemSheet" data-uuid="{{ item.uuid }}"
+             role="button" aria-label="{{ itemName }}">
             {{> "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs"
                 img=itemImg name=itemName bundleSize=bundleSize }}
             {{#if suppressed}}
