@@ -447,6 +447,7 @@ export default class ShopSheet extends Application5e {
       return {
         index, actorUuid: uuid, actorImg: actor?.img, actorName: actor?.name,
         buyModifier: existing?.buyModifier ?? null, sellModifier: existing?.sellModifier ?? null,
+        hagglingLocked: !!existing?.hagglingLocked,
         template: "modules/simple-shop-craft-5e/templates/shop-sheet/players-dialog-row.hbs"
       };
     });
@@ -484,7 +485,9 @@ export default class ShopSheet extends Application5e {
           const playerDiscounts = app.formState.actorUuids.map(uuid => ({
             actor: uuid,
             buyModifier: existing.get(uuid)?.buyModifier ?? null,
-            sellModifier: existing.get(uuid)?.sellModifier ?? null
+            sellModifier: existing.get(uuid)?.sellModifier ?? null,
+            hagglingLocked: existing.get(uuid)?.hagglingLocked ?? false,
+            hagglingTimestamp: existing.get(uuid)?.hagglingTimestamp ?? null
           }));
           await shopSheet.#updateShop({ playerDiscounts });
         };
@@ -497,21 +500,32 @@ export default class ShopSheet extends Application5e {
           app.render({ parts: ["content"] });
         });
         app.element.querySelector(".item-list")?.addEventListener("click", async event => {
-          const button = event.target.closest('[data-action="removePlayerDiscount"]');
-          if ( !button ) return;
-          const uuid = button.closest("li")?.dataset.actorUuid;
-          app.formState = { actorUuids: app.formState.actorUuids.filter(u => u !== uuid) };
-          await persistPlayerList();
-          app.render({ parts: ["content"] });
+          const removeButton = event.target.closest('[data-action="removePlayerDiscount"]');
+          if ( removeButton ) {
+            const uuid = removeButton.closest("li")?.dataset.actorUuid;
+            app.formState = { actorUuids: app.formState.actorUuids.filter(u => u !== uuid) };
+            await persistPlayerList();
+            app.render({ parts: ["content"] });
+            return;
+          }
+          const unlockButton = event.target.closest('[data-action="resetHaggling"]');
+          if ( unlockButton ) {
+            const uuid = unlockButton.closest("li")?.dataset.actorUuid;
+            await shopSheet.#patchPlayerDiscount(uuid, { hagglingLocked: false, hagglingTimestamp: null });
+            app.render({ parts: ["content"] });
+          }
         });
       },
       form: {
         handler: async (event, form, formData) => {
           const data = foundry.utils.expandObject(formData.object);
+          const existing = new Map(shopSheet.shop.playerDiscounts.map(pd => [pd.actor, pd]));
           const playerDiscounts = Object.values(data.playerDiscounts ?? {}).map(row => ({
             actor: row.actor,
             buyModifier: ((row.buy === "") || (row.buy == null)) ? null : Number(row.buy),
-            sellModifier: ((row.sell === "") || (row.sell == null)) ? null : Number(row.sell)
+            sellModifier: ((row.sell === "") || (row.sell == null)) ? null : Number(row.sell),
+            hagglingLocked: existing.get(row.actor)?.hagglingLocked ?? false,
+            hagglingTimestamp: existing.get(row.actor)?.hagglingTimestamp ?? null
           }));
           await shopSheet.#updateShop({ playerDiscounts });
         }
@@ -546,7 +560,7 @@ export default class ShopSheet extends Application5e {
         },
         {
           field: priceFields.denomination, name: "denomination",
-          value: entry.price?.denomination ?? item?.system?.price?.denomination ?? "gp",
+          value: entry.price?.denomination ?? item?.system?.price?.denomination ?? CONFIG.DND5E.defaultCurrency,
           label: _loc("DND5E.Currency"), options: getCurrencyOptions()
         },
         {
@@ -623,7 +637,8 @@ export default class ShopSheet extends Application5e {
           const data = foundry.utils.expandObject(formData.object);
           const value = data.settlementCapPreset === "custom" ? (data.settlementCapValue ?? null)
             : (data.settlementCapPreset === "" ? null : SETTLEMENT_CAPS[data.settlementCapPreset].value);
-          const denomination = (data.settlementCapPreset === "custom") ? (data.settlementCapDenomination || "gp") : "gp";
+          const denomination = (data.settlementCapPreset === "custom")
+            ? (data.settlementCapDenomination || CONFIG.DND5E.defaultCurrency) : CONFIG.DND5E.defaultCurrency;
           await shopSheet.#updateShop({ settlementCap: { value, denomination } });
         }
       }
@@ -745,7 +760,7 @@ export default class ShopSheet extends Application5e {
       const basePrice = row.entry.price?.value ?? row.item?.system?.price?.value ?? 0;
       const denomination = (row.entry.price?.value != null)
         ? row.entry.price.denomination
-        : (row.item?.system?.price?.denomination ?? "gp");
+        : (row.item?.system?.price?.denomination ?? CONFIG.DND5E.defaultCurrency);
       const isFixedValue = ShopSheet.#isFixedValue(row.item, fixedValueLootTypes);
       const { percent: discountPercent, tooltip: discountTooltip } = await ShopSheet.#resolveDiscount(
         row.entry.discount, isFixedValue, buyModifier, playerBuyModifier, actorName
@@ -758,9 +773,8 @@ export default class ShopSheet extends Application5e {
       row.discountPercent = discountPercent;
       row.discountTooltip = discountTooltip;
       row.cartQuantity = cart.get(row.key) ?? 0;
-      const isAmmo = (row.item?.type === "consumable") && (row.item?.system?.type?.value === "ammo");
       const bundleSize = row.entry.bundleSize
-        ?? ((isAmmo && (row.item?.system?.quantity > 1)) ? row.item.system.quantity : 1);
+        ?? ((row.item?.system?.quantity > 1) ? row.item.system.quantity : 1);
       row.bundleSize = bundleSize > 1 ? bundleSize : null;
       row.weight = ShopSheet.#resolveWeight(row.item?.system, targetUnit);
       row.stockTracked = row.entry.stock.current !== null;
@@ -800,10 +814,9 @@ export default class ShopSheet extends Application5e {
     const groups = new Map();
     for ( const [index, item] of sellable.entries() ) {
       const catalogItem = resolved[index].item;
-      const isAmmo = (item.type === "consumable") && (item.system?.type?.value === "ammo");
-      const bundleSize = (isAmmo && (catalogItem?.system?.quantity > 1)) ? catalogItem.system.quantity : 1;
+      const bundleSize = (catalogItem?.system?.quantity > 1) ? catalogItem.system.quantity : 1;
       const basePrice = (item.system.price?.value ?? 0) / bundleSize;
-      const denomination = item.system.price?.denomination ?? "gp";
+      const denomination = item.system.price?.denomination ?? CONFIG.DND5E.defaultCurrency;
       const isFixedValue = ShopSheet.#isFixedValue(item, fixedValueLootTypes);
       const { percent: discountPercent, tooltip: discountTooltip } = await ShopSheet.#resolveDiscount(
         null, isFixedValue, sellModifier, playerSellModifier, actorName
@@ -836,6 +849,7 @@ export default class ShopSheet extends Application5e {
   static async #haggle() {
     const actor = this.selectedActorUuid ? fromUuidSync(this.selectedActorUuid) : null;
     if ( !actor ) return;
+    const shopSheet = this;
     const playerOverride = ShopSheet.#getPlayerOverride(this.shop.playerDiscounts, this.selectedActorUuid);
     const effectiveBuy = this.shop.buyModifier + (playerOverride.buy ?? 0);
     const effectiveSell = this.shop.sellModifier + (playerOverride.sell ?? 0);
@@ -874,10 +888,15 @@ export default class ShopSheet extends Application5e {
       form: {
         handler: async function(event, form, formData) {
           const data = foundry.utils.expandObject(formData.object);
-          await actor.rollSkill({
+          const rolls = await actor.rollSkill({
             skill: data.skill, target: dc,
             advantage: data.attitude === "friendly", disadvantage: data.attitude === "hostile"
           });
+          if ( rolls?.[0] ) {
+            await shopSheet.#patchPlayerDiscount(
+              actor.uuid, rolls[0].isFailure ? { hagglingLocked: true, hagglingTimestamp: Date.now() } : {}
+            );
+          }
           await this.close();
         }
       }
@@ -896,6 +915,18 @@ export default class ShopSheet extends Application5e {
    */
   static #isFixedValue(item, fixedValueLootTypes) {
     return (item?.type === "loot") && fixedValueLootTypes.has(item?.system?.type?.value);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Whether an actor is currently locked out from Haggling for this shop after a failed Influence check.
+   * @param {ShopPlayerDiscount[]} playerDiscounts
+   * @param {string} [actorUuid]
+   * @returns {boolean}
+   */
+  static #isHagglingLocked(playerDiscounts, actorUuid) {
+    return !!(actorUuid && playerDiscounts.find(pd => pd.actor === actorUuid)?.hagglingLocked);
   }
 
   /* -------------------------------------------- */
@@ -1372,6 +1403,7 @@ export default class ShopSheet extends Application5e {
       ...characters.map(a => ({ value: a.uuid, label: a.name }))
     ].map(o => ({ ...o, selected: o.value === this.selectedActorUuid }));
     context.actor = this.selectedActorUuid ? fromUuidSync(this.selectedActorUuid) : null;
+    context.hagglingLocked = ShopSheet.#isHagglingLocked(context.shop.playerDiscounts, this.selectedActorUuid);
     const playerOverride = ShopSheet.#getPlayerOverride(context.shop.playerDiscounts, this.selectedActorUuid);
 
     const resolved = await resolveShopItems(context.shop.items);
@@ -1431,6 +1463,24 @@ export default class ShopSheet extends Application5e {
     const entries = new Map(this.shop.items.map(i => [entryKey(i), i.toObject()]));
     for ( const entry of newEntries ) entries.set(entryKey(entry), entry);
     await this.#updateShop({ items: Array.from(entries.values()) });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Merge a patch into an actor's playerDiscounts entry for this shop, creating one with no discount
+   * overrides yet if it doesn't already exist.
+   * @param {string} actorUuid
+   * @param {object} patch
+   * @returns {Promise<void>}
+   */
+  async #patchPlayerDiscount(actorUuid, patch) {
+    const existing = this.shop.playerDiscounts.map(pd => pd.toObject());
+    const index = existing.findIndex(pd => pd.actor === actorUuid);
+    const playerDiscounts = index >= 0
+      ? existing.map((pd, i) => i === index ? { ...pd, ...patch } : pd)
+      : [...existing, { actor: actorUuid, buyModifier: null, sellModifier: null, ...patch }];
+    await this.#updateShop({ playerDiscounts });
   }
 
   /* -------------------------------------------- */

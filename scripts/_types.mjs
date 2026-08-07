@@ -1,10 +1,14 @@
 /**
  * @typedef ShopPlayerDiscountData
- * @property {string} actor              UUID of the actor this override applies to.
- * @property {number|null} buyModifier   Percent discount (negative) or markup (positive) override, replacing the
- *                                       shop's buyModifier. `null` = no override.
- * @property {number|null} sellModifier  Percent discount (negative) or markup (positive) override, replacing the
- *                                       shop's sellModifier. `null` = no override.
+ * @property {string} actor                    UUID of the actor this override applies to.
+ * @property {number|null} buyModifier         Percent discount (negative) or markup (positive) override, replacing
+ *                                             the shop's buyModifier. `null` = no override.
+ * @property {number|null} sellModifier        Percent discount (negative) or markup (positive) override, replacing
+ *                                             the shop's sellModifier. `null` = no override.
+ * @property {boolean} hagglingLocked          Whether this actor is locked out from Haggling for this shop after a
+ *                                             failed Influence check.
+ * @property {number|null} hagglingTimestamp   When the lockout was set, or `null` if never locked. Reserved for a
+ *                                             future calendar-based automatic reset.
  */
 
 /* -------------------------------------------- */

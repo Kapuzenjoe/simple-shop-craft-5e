@@ -9,7 +9,7 @@
             <span class="title">{{ npc.name }}</span>
             {{/if}}
         </div>
-        <div class="item-detail item-controls always-visible">
+        <div class="item-detail item-active always-visible">
             {{#if @root.isGM}}
             <button type="button" class="unbutton config-button item-control item-action{{#if shop.active}} active{{/if}}"
                     data-action="toggleActive" data-shop-id="{{ shop._id }}"
@@ -17,6 +17,10 @@
                     aria-label="{{ localize (concat 'SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.' (ifThen shop.active 'Deactivate' 'Activate')) }}">
                 <i class="fa-solid fa-toggle-{{ ifThen shop.active 'on' 'off' }}" inert></i>
             </button>
+            {{/if}}
+        </div>
+        <div class="item-detail item-controls always-visible">
+            {{#if @root.isGM}}
             <button type="button" class="unbutton config-button item-control always-interactive" data-context-menu
                     aria-label="{{ localize 'DND5E.AdditionalControls' }}">
                 <i class="fa-solid fa-ellipsis-vertical" inert></i>

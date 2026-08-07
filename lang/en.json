@@ -41,6 +41,9 @@
       },
       "Shops": {
         "Shop": "Shop",
+        "Active": "Active",
+        "Inactive": "Inactive",
+        "Status": "Status",
         "Owner": "Owner",
         "Location": "Location",
         "Activate": "Activate Shop",
@@ -74,6 +77,8 @@
       "HagglingAttitude": "Attitude",
       "HagglingCurrent": "Current Discount",
       "HagglingRoll": "Roll",
+      "HagglingLocked": "Haggling Locked",
+      "HagglingUnlock": "Reset Haggling Lock",
       "EditPlayers": "Edit Player Discounts",
       "RenameShop": "Rename Shop",
       "Spotlight": "Show to All Players",

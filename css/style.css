@@ -2,6 +2,20 @@
   flex: 0 0 100%;
 }
 
+.simple-shop-craft-5e.shop-manager {
+  .item-npc {
+    width: 120px;
+  }
+
+  .item-active {
+    width: 90px;
+  }
+
+  .item-controls {
+    width: 70px;
+  }
+}
+
 #tooltip.property-attribution.simple-shop-craft-5e table td.attribution-value {
   inline-size: auto;
   white-space: nowrap;
@@ -15,10 +29,6 @@
 
   &:has(.cart-footer:not(.empty)) .create-child {
     bottom: 60px;
-  }
-
-  .sign {
-    margin-right: -2px;
   }
 
   .tab:not(.active) {
@@ -163,8 +173,11 @@
     padding-right: 4px;
   }
 
-  .title .sign {
-    color: var(--color-text-tertiary);
+  .title .bundle-size {
+    font-size: var(--font-size-10);
+    color: var(--color-text-secondary);
+    font-weight: normal;
+    margin-left: 4px;
   }
 
   .item-price {

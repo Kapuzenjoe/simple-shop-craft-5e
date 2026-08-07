@@ -93,11 +93,12 @@ async function resolveIdentifierIndex(identifiers) {
     for ( const pack of packsByPackageType.get(packageType) ?? [] ) {
       const index = await pack.getIndex({ fields: [
         "system.identifier", "system.source.rules", "system.price.value", "system.price.denomination",
-        "system.weight.value", "system.weight.units", "system.quantity"
+        "system.weight.value", "system.weight.units", "system.quantity", "system.type.value"
       ] });
       for ( const entry of index ) {
         const identifier = entry.system?.identifier;
         if ( !identifier || !remaining.has(identifier) ) continue;
+        if ( entry.system?.container ) continue;
         const entryRules = entry.system?.source?.rules;
         if ( entryRules && (entryRules !== rules) ) continue;
         if ( !CONFIG.Item.dataModels[entry.type]?.inventorySection ) continue;

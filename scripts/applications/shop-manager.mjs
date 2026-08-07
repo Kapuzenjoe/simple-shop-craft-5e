@@ -227,24 +227,28 @@ export default class ShopManager extends Application5e {
     const context = await super._prepareContext(options);
     context.isGM = game.user.isGM;
     const shops = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS).filter(s => context.isGM || s.active);
-    const rows = shops.toSorted((a, b) => b.active - a.active).map(shop => ({
+    const rows = shops.toSorted((a, b) => a.name.localeCompare(b.name)).map(shop => ({
       shop,
       npc: shop.npc ? fromUuidSync(shop.npc) : null,
       subtitle: [shop.location || null, ShopManager.#settlementCapLabel(shop) || null].filter(Boolean).join(" · "),
       template: "modules/simple-shop-craft-5e/templates/shop-manager/shop-row.hbs"
     }));
+    const columns = [
+      { id: "name" },
+      { id: "npc", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Owner" },
+      { id: "active", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Status" },
+      { id: "controls" }
+    ];
+    const sections = context.isGM
+      ? [
+        { label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Active", columns, rows: rows.filter(r => r.shop.active) },
+        { label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Inactive", columns, rows: rows.filter(r => !r.shop.active) }
+      ].filter(s => s.rows.length)
+      : [{ label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Shop", columns, rows }];
     context.table = {
       hasRows: rows.length > 0,
       emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.None",
-      sections: [{
-        label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Shop",
-        columns: [
-          { id: "name" },
-          { id: "npc", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Owner" },
-          { id: "controls" }
-        ],
-        rows
-      }]
+      sections
     };
     return context;
   }

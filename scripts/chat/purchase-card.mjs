@@ -190,7 +190,7 @@ async function applyPurchase(purchase) {
 
   const goldPool = { ...shop.goldPool };
   if ( effectiveGoldCurrent !== null ) {
-    const parts = breakdownCopper(effectiveGoldCurrent - purchase.netCP, { exclude: ["ep"] });
+    const parts = breakdownCopper(effectiveGoldCurrent - purchase.netCP);
     goldPool.current = Object.fromEntries(parts.map(p => [p.denomination, p.value]));
   }
 

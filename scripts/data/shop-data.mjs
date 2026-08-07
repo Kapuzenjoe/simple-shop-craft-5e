@@ -28,7 +28,7 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
       noRestock: new BooleanField({ initial: false }),
       price: new SchemaField({
         value: new NumberField({ initial: null, nullable: true, min: 0 }),
-        denomination: new StringField({ initial: "gp" })
+        denomination: new StringField({ initial: () => CONFIG.DND5E.defaultCurrency })
       }),
       bundleSize: new NumberField({ initial: null, nullable: true, integer: true, min: 1 })
     };
@@ -49,7 +49,9 @@ export class ShopPlayerDiscount extends foundry.abstract.DataModel {
     return {
       actor: new DocumentUUIDField({ type: "Actor" }),
       buyModifier: new NumberField({ initial: null, nullable: true, integer: true, min: -100, max: 1000 }),
-      sellModifier: new NumberField({ initial: null, nullable: true, integer: true, min: -100, max: 1000 })
+      sellModifier: new NumberField({ initial: null, nullable: true, integer: true, min: -100, max: 1000 }),
+      hagglingLocked: new BooleanField({ initial: false }),
+      hagglingTimestamp: new NumberField({ initial: null, nullable: true, integer: true })
     };
   }
 }
@@ -90,7 +92,7 @@ export class Shop extends foundry.abstract.DataModel {
       location: new StringField({ blank: true }),
       settlementCap: new SchemaField({
         value: new NumberField({ initial: null, nullable: true, min: 0 }),
-        denomination: new StringField({ initial: "gp" })
+        denomination: new StringField({ initial: () => CONFIG.DND5E.defaultCurrency })
       }),
       goldPool: new SchemaField({
         max: new ObjectField({ initial: {} }),
@@ -102,4 +104,14 @@ export class Shop extends foundry.abstract.DataModel {
       items: new ArrayField(new EmbeddedDataField(ShopItemEntry))
     };
   }
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Register this module's localization for the Shop data model.
+ * @returns {void}
+ */
+export function registerLocalization() {
+  foundry.helpers.Localization.localizeDataModel(Shop);
 }

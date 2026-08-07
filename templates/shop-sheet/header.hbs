@@ -94,7 +94,8 @@
             <div class="player-area-actions">
                 {{#if actor}}
                 <button type="button" class="gold-button always-interactive" data-action="haggle" data-tooltip
-                        aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.Haggling' }}">
+                        {{#if hagglingLocked}}disabled aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.HagglingLocked' }}"
+                        {{else}}aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.Haggling' }}"{{/if}}>
                     <i class="fa-solid fa-handshake" inert></i>
                 </button>
                 {{/if}}

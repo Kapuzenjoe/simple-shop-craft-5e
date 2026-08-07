@@ -16,6 +16,13 @@
             <span class="unit">%</span>
         </div>
         <div class="item-detail item-controls always-visible">
+            {{#if hagglingLocked}}
+            <button type="button" class="unbutton config-button item-control always-interactive"
+                    data-action="resetHaggling" data-tooltip
+                    aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.HagglingUnlock' }}">
+                <i class="fa-solid fa-lock" inert></i>
+            </button>
+            {{/if}}
             <button type="button" class="unbutton config-button item-control always-interactive"
                     data-action="removePlayerDiscount" data-tooltip
                     aria-label="{{ localize 'DND5E.ItemDelete' }}">

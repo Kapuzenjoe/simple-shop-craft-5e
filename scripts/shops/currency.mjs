@@ -1,17 +1,15 @@
 /**
  * Break a copper amount down into whole-unit denominations, largest to smallest, mirroring how
- * CurrencyManager#convertCurrency distributes value across denominations. Platinum is always excluded,
- * matching this module's gold-pool convention (see goldPoolCurrencies()) — most tables don't use it.
+ * CurrencyManager#convertCurrency distributes value across denominations. Uses whichever denominations
+ * the system currently has configured, in system-configured order.
  * @param {number} valueCP
  * @param {object} [options]
  * @param {boolean} [options.negative]  Negate the most significant part, so it renders as e.g. "-10gp 5sp"
  *                                      (a single leading sign) instead of a separately styled symbol.
- * @param {string[]} [options.exclude]  Additional denominations to skip (e.g. electrum).
  * @returns {{ denomination: string, value: number }[]}
  */
-export function breakdownCopper(valueCP, { negative=false, exclude=[] }={}) {
+export function breakdownCopper(valueCP, { negative=false }={}) {
   const ladder = Object.entries(CONFIG.DND5E.currencies)
-    .filter(([denom]) => (denom !== "pp") && !exclude.includes(denom))
     .sort(([, a], [, b]) => a.conversion - b.conversion);
   let remaining = valueCP;
   const parts = [];
@@ -86,12 +84,11 @@ export function getCurrencyOptions({ abbreviated=false }={}) {
 /* -------------------------------------------- */
 
 /**
- * Denominations used for a shop's gold pool. Platinum and electrum are excluded for simplicity —
- * most tables don't use them for shop bookkeeping.
+ * Denominations used for a shop's gold pool, in system-configured order.
  * @returns {string[]}
  */
 export function goldPoolCurrencies() {
-  return Object.keys(CONFIG.DND5E.currencies).filter(d => !["pp", "ep"].includes(d));
+  return Object.keys(CONFIG.DND5E.currencies);
 }
 
 /* -------------------------------------------- */

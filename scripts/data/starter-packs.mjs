@@ -7,36 +7,56 @@ export const STARTER_PACKS = {
   blacksmith: {
     label: "SIMPLE_SHOP_CRAFT_5E.StarterPack.Blacksmith",
     items: [
-      "battleaxe", "club", "dagger", "flail", "greataxe", "greatclub", "greatsword", "halberd", "handaxe",
-      "javelin", "light-crossbow", "heavy-crossbow", "light-hammer", "longsword", "mace", "maul", "morningstar",
-      "pike", "rapier", "scimitar", "shortbow", "sickle", "spear", "war-pick", "warhammer", "whip",
-      "breastplate", "chain-mail", "chain-shirt", "half-plate-armor", "plate-armor", "ring-mail", "scale-mail",
-      "shield", "splint-armor", "studded-leather-armor", "smiths-tools"
+      "battleaxe", "blowgun", "club", "dagger", "dart", "flail", "glaive", "greataxe", "greatclub", "greatsword",
+      "halberd", "hand-crossbow", "handaxe", "heavy-crossbow", "javelin", "lance", "light-crossbow", "light-hammer",
+      "longbow", "longsword", "mace", "maul", "morningstar", "pike", "quarterstaff", "rapier", "scimitar",
+      "shortbow", "shortsword", "sickle", "sling", "spear", "trident", "war-pick", "warhammer", "whip",
+      "breastplate", "chain-mail", "chain-shirt", "half-plate-armor", "hide-armor", "leather-armor", "padded-armor",
+      "plate-armor", "ring-mail", "scale-mail", "shield", "splint-armor", "studded-leather-armor",
+      "arrows", "bolts", "bullets-sling", "needles", "quiver", "case-crossbow-bolt", "smiths-tools"
     ]
   },
   alchemist: {
     label: "SIMPLE_SHOP_CRAFT_5E.StarterPack.Alchemist",
     items: [
-      "acid", "alchemists-fire", "alchemists-supplies", "antitoxin", "candle", "healers-kit", "herbalism-kit",
-      "perfume", "poisoners-kit", "potion-of-climbing", "potion-of-healing", "sprig-of-mistletoe", "truth-serum", "vial"
+      "acid", "alchemists-fire", "alchemists-supplies", "antitoxin", "candle", "component-pouch", "healers-kit",
+      "herbalism-kit", "oil", "paper", "perfume", "poisoners-kit", "potion-of-climbing", "potion-of-healing",
+      "sprig-of-mistletoe", "truth-serum", "vial"
     ]
   },
   magicShop: {
     label: "SIMPLE_SHOP_CRAFT_5E.StarterPack.MagicShop",
-    items: ["book", "component-pouch", "crystal", "ink-pen", "magnifying-glass", "orb", "rod", "staff", "wand"]
+    items: [
+      "amulet", "book", "calligraphers-supplies", "component-pouch", "crystal", "emblem", "ink-pen",
+      "magnifying-glass", "orb", "reliquary", "rod", "spell-scroll-cantrip", "spell-scroll-level-1",
+      "sprig-of-mistletoe", "staff", "wand", "wooden-staff", "yew-wand"
+    ]
   },
   blackmarket: {
     label: "SIMPLE_SHOP_CRAFT_5E.StarterPack.Blackmarket",
     items: [
-      "blowgun", "caltrops", "crowbar", "dagger", "disguise-kit", "forgery-kit", "hooded-lantern", "lock",
-      "manacles", "poisoners-kit", "sling", "thieves-tools"
+      "blowgun", "bullets-sling", "caltrops", "crowbar", "dagger", "disguise-kit", "forgery-kit", "lantern-hooded",
+      "lock", "manacles", "needles", "poison-basic", "poisoners-kit", "sling", "thieves-tools"
     ]
   },
   generalStore: {
     label: "SIMPLE_SHOP_CRAFT_5E.StarterPack.GeneralStore",
     items: [
-      "backpack", "basket", "bedroll", "blanket", "bucket", "chest", "flask", "jug", "lamp", "paper",
-      "parchment", "pouch", "rations", "sack", "tent", "torch", "waterskin"
+      "acid", "alchemists-fire", "antitoxin", "backpack", "ball-bearings", "barrel", "basket", "bedroll", "bell",
+      "blanket", "block-and-tackle", "book", "bottle-glass", "bucket", "burglars-pack", "caltrops", "candle",
+      "case-crossbow-bolt", "case-map-or-scroll", "chain", "chest", "climbers-kit", "clothes-fine",
+      "clothes-travelers", "component-pouch", "costume", "crowbar", "diplomats-pack", "dungeoneers-pack",
+      "entertainers-pack", "explorers-pack", "flask", "grappling-hook", "healers-kit", "holy-water", "hunting-trap",
+      "ink", "ink-pen", "jug", "ladder", "lamp", "lantern-bullseye", "lantern-hooded", "lock", "magnifying-glass",
+      "manacles", "map", "mirror", "net", "oil", "paper", "parchment", "perfume", "poison-basic", "pole",
+      "pot-iron", "potion-of-healing", "pouch", "priests-pack", "quiver", "ram-portable", "rations", "robe", "rope",
+      "sack", "scholars-pack", "shovel", "signal-whistle", "spell-scroll-cantrip", "spell-scroll-level-1",
+      "spikes-iron", "spyglass", "string", "tent", "tinderbox", "torch", "vial", "waterskin",
+      "alchemists-supplies", "bagpipes", "brewers-supplies", "calligraphers-supplies", "carpenters-tools",
+      "cartographers-tools", "cobblers-tools", "cooks-utensils", "dice", "dragonchess", "drum", "dulcimer", "flute",
+      "glassblowers-tools", "herbalism-kit", "horn", "jewelers-tools", "leatherworkers-tools", "lute", "lyre",
+      "masons-tools", "navigators-tools", "painters-supplies", "pan-flute", "playing-cards", "potters-tools",
+      "shawm", "smiths-tools", "three-dragon-ante", "tinkers-tools", "viol", "weavers-tools", "woodcarvers-tools"
     ]
   },
   tavern: {
