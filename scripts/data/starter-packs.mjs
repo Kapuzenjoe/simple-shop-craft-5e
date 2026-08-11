@@ -1,7 +1,6 @@
 /**
- * Starter packs a GM can pick from when creating a new template, to pre-fill its item list.
- * Item identifiers are verified against the dnd5e 2024 equipment compendium.
- * @type {Record<string, {label: string, items: Array<string|{identifier: string, bundleSize: number}>>}>}
+ * Starter packs a GM can pick from when creating a new shop, to pre-fill its item list.
+ * @type {Record<string, { label: string, items: (string|{ identifier: string, bundleSize: number })[] }>}
  */
 export const STARTER_PACKS = {
   blacksmith: {

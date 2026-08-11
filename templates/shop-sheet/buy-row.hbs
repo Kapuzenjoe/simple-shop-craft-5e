@@ -12,7 +12,8 @@
                 <i class="fa-solid fa-plus" inert></i>
             </a>
         </div>
-        <div class="item-name item-tooltip rollable" data-action="openItemSheet" data-uuid="{{ item.uuid }}"
+        <div class="item-name item-tooltip rollable" data-action="openItemSheet" data-key="{{ key }}"
+             {{#unless entry.generated}}data-uuid="{{ item.uuid }}"{{/unless}}
              role="button" aria-label="{{ itemName }}">
             {{> "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs"
                 img=itemImg name=itemName bundleSize=bundleSize }}

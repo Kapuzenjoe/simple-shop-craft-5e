@@ -1,5 +1,7 @@
 import { MODULE_ID } from "../config.mjs";
 
+import { synthesizeEnchantedItem } from "./enchantment.mjs";
+
 /**
  * Package types, in priority order, searched when resolving a shop item's identifier.
  * @type {string[]}
@@ -7,47 +9,35 @@ import { MODULE_ID } from "../config.mjs";
 const PACKAGE_TYPE_ORDER = ["module", "system", "world"];
 
 /**
- * Stable key identifying a shop item entry — `uuid` when present (drag&drop-added entries aren't
- * guaranteed a unique `identifier`), otherwise `identifier`.
+ * Stable key identifying a shop item entry — a composite of the generated recipe for generated entries,
+ * the spell UUID for spell scroll entries, `uuid` when present (drag&drop-added entries aren't guaranteed a
+ * unique `identifier`), otherwise `identifier`.
  * @param {ShopItemEntryData} entry
  * @returns {string}
  */
 export function entryKey(entry) {
+  if ( entry.generated ) return [entry.generated.baseItemUuid, entry.generated.enchantItemUuid, entry.generated.effectId].join("|");
+  if ( entry.spellScroll ) return entry.spellScroll.spellUuid;
   return entry.uuid || entry.identifier;
 }
 
 /* -------------------------------------------- */
 
 /**
- * Open the compendium browser in selection mode and resolve the chosen items to identifier/type pairs.
- * @returns {Promise<{ identifier: string, type: string }[]>}
- */
-export async function pickItemIdentifiers() {
-  const selection = await game.dnd5e.applications.CompendiumBrowser.select({
-    tab: "physical",
-    selection: { min: 1 }
-  });
-  if ( !selection?.size ) return [];
-
-  const items = await Promise.all(Array.from(selection).map(uuid => fromUuid(uuid)));
-  return items
-    .filter(item => item?.system?.identifier)
-    .map(item => ({ identifier: item.system.identifier, type: item.type }));
-}
-
-/* -------------------------------------------- */
-
-/**
  * Resolve a batch of shop item entries (by `identifier` or `uuid`) to their referenced items.
- * Tries `uuid` first, falling back to a batched `identifier` lookup for the rest.
+ * Tries `uuid` first, falling back to a batched `identifier` lookup for the rest. Generated and spell
+ * scroll entries are synthesized fresh from their recipe instead.
  * @param {ShopItemEntryData[]} entries
  * @returns {Promise<{ entry: ShopItemEntryData, item: object|null }[]>}
  */
 export async function resolveShopItems(entries) {
-  const identifiers = new Set(entries.filter(e => !e.uuid && e.identifier).map(e => e.identifier));
+  const identifiers = new Set(entries
+    .filter(e => !e.uuid && !e.generated && !e.spellScroll && e.identifier).map(e => e.identifier));
   const byIdentifier = await resolveIdentifierIndex(identifiers);
 
   return Promise.all(entries.map(async entry => {
+    if ( entry.generated ) return { entry, item: await resolveGeneratedItem(entry.generated) };
+    if ( entry.spellScroll ) return { entry, item: await resolveSpellScrollItem(entry.spellScroll) };
     const byUuid = entry.uuid ? await fromUuid(entry.uuid) : null;
     const item = byUuid ?? (entry.identifier ? byIdentifier.get(entry.identifier) ?? null : null);
     return { entry, item };
@@ -70,6 +60,21 @@ function getPacksByPackageType() {
     packsByPackageType.get(packageType).push(pack);
   }
   return packsByPackageType;
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Resolve a generated shop entry's recipe into a synthesized, non-persisted Item.
+ * @param {{ baseItemUuid: string, enchantItemUuid: string, effectId: string }} generated
+ * @returns {Promise<Item5e|null>}
+ */
+async function resolveGeneratedItem({ baseItemUuid, enchantItemUuid, effectId }) {
+  const baseItem = await fromUuid(baseItemUuid);
+  const enchantItem = await fromUuid(enchantItemUuid);
+  const effect = enchantItem?.effects.get(effectId);
+  if ( !baseItem || !effect ) return null;
+  return synthesizeEnchantedItem(baseItem, enchantItem, effect);
 }
 
 /* -------------------------------------------- */
@@ -112,4 +117,15 @@ async function resolveIdentifierIndex(identifiers) {
     for ( const identifier of byIdentifier.keys() ) remaining.delete(identifier);
   }
   return byIdentifier;
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Resolve a spell scroll shop entry's recipe into a synthesized, non-persisted Item.
+ * @param {{ spellUuid: string }} spellScroll
+ * @returns {Promise<Item5e|null>}
+ */
+async function resolveSpellScrollItem({ spellUuid }) {
+  return Item.implementation.createScrollFromCompendiumSpell(spellUuid, { dialog: false }) ?? null;
 }

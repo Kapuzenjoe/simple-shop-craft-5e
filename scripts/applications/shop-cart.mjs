@@ -1,5 +1,6 @@
 import { createPurchaseMessage } from "../chat/purchase-card.mjs";
-import { breakdownCopper } from "../shops/currency.mjs";
+import { breakdownCopper } from "../shop/currency.mjs";
+import { summarizeNet } from "../shop/pricing.mjs";
 
 import BasePromptDialog from "./base-prompt-dialog.mjs";
 
@@ -56,13 +57,9 @@ export default class ShopCart extends BasePromptDialog {
       subtotal: breakdownCopper(row.priceCP * row.sellQuantity)
     }));
 
-    let buyTotalCP = 0;
-    for ( const row of lines ) buyTotalCP += row.priceCP * row.cartQuantity;
-    let sellTotalCP = 0;
-    for ( const row of sellLines ) sellTotalCP += row.priceCP * row.sellQuantity;
-    const netCP = sellTotalCP - buyTotalCP;
-    const hasLines = lines.length || sellLines.length;
-    const total = { parts: hasLines ? breakdownCopper(Math.abs(netCP), { negative: netCP < 0 }) : [] };
+    const { count, netCP, parts } = summarizeNet(lines, sellLines);
+    const hasLines = count > 0;
+    const total = { parts };
 
     const actor = shopSheet.selectedActorUuid ? fromUuidSync(shopSheet.selectedActorUuid) : null;
     const balance = { insufficient: false };

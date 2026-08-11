@@ -9,6 +9,8 @@ export default class BaseConfigDialog extends Application5e {
     this.#formState = { ...options.state };
   }
 
+  /* -------------------------------------------- */
+
   /** @override */
   static DEFAULT_OPTIONS = {
     classes: ["simple-shop-craft-5e", "config-sheet", "standard-form"],
@@ -22,12 +24,16 @@ export default class BaseConfigDialog extends Application5e {
     }
   };
 
+  /* -------------------------------------------- */
+
   /** @override */
   static PARTS = {
     content: {
       template: "modules/simple-shop-craft-5e/templates/partials/config-dialog-content.hbs"
     }
   };
+
+  /* -------------------------------------------- */
 
   /**
    * State derived from the form's last change, available to a `fields`/`extraContent` function.

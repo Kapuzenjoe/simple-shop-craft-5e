@@ -10,6 +10,8 @@ export default class BasePromptDialog extends Dialog5e {
     position: { width: 400 }
   };
 
+  /* -------------------------------------------- */
+
   /** @inheritDoc */
   static PARTS = {
     ...super.PARTS,
@@ -17,6 +19,8 @@ export default class BasePromptDialog extends Dialog5e {
       template: "modules/simple-shop-craft-5e/templates/partials/config-dialog-content.hbs"
     }
   };
+
+  /* -------------------------------------------- */
 
   /** @inheritDoc */
   async _onRender(context, options) {

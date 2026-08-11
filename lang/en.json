@@ -63,10 +63,18 @@
     "ShopEditor": {
       "Title": "Edit Shop",
       "AddItems": "Add Items",
+      "GenerateItem": "Generate Item",
+      "GenerateItemType": "Item Type",
+      "GenerateItemRarity": "Rarity",
+      "GenerateItemSubtype": "Subtype",
+      "GenerateItemRoll": "Generate",
+      "GenerateItemNone": "No matching items found.",
+      "GenerateItemResult": "Generated {name}.",
       "Tabs": {
         "Buy": "Buy",
         "Sell": "Sell",
-        "Description": "Description"
+        "Description": "Description",
+        "Players": "Players"
       },
       "Location": "Location",
       "ActingAs": "Acting As",
@@ -80,6 +88,10 @@
       "HagglingLocked": "Haggling Locked",
       "HagglingUnlock": "Reset Haggling Lock",
       "EditPlayers": "Edit Player Discounts",
+      "Players": {
+        "None": "No player-specific discounts yet.",
+        "DropHint": "Drop an actor here to add a player-specific discount"
+      },
       "RenameShop": "Rename Shop",
       "Spotlight": "Show to All Players",
       "SpotlightNoTargets": "No other players are currently connected.",
@@ -109,6 +121,7 @@
       "BundleSize": "Bundle Size",
       "BundleSizeHint": "How many individual items the listed price buys (e.g. 20 for a bundle of arrows). Leave blank to guess from the catalog item.",
       "PriceModifier": "Price Modifier",
+      "Discount": "Discount",
       "DiscountTooltip": "Edit Price Modifier",
       "DiscountOverrideHint": "Override the shop's price modifier for this item specifically.",
       "ShopDefault": "Shop",
@@ -129,16 +142,6 @@
       "SuppressedCap": "Exceeds Settlement Cap",
       "SuppressedNotFound": "Item not found in active compendiums — check the identifier or enabled rulebooks",
       "None": "No items yet."
-    },
-    "ShopConfig": {
-      "Tabs": {
-        "Players": "Players"
-      },
-      "Players": {
-        "None": "No player-specific discounts yet.",
-        "DropHint": "Drop an actor here to add a player-specific discount"
-      },
-      "Discount": "Discount"
     },
     "ShopCart": {
       "Title": "Shopping Cart",

@@ -13,7 +13,7 @@ const SETTINGS = [
     key: SETTING_KEYS.SHOPS,
     scope: "world",
     type: new ArrayField(new EmbeddedDataField(Shop)),
-    onChange: refreshShopApps
+    onChange: refreshShopApplications
   }
 ];
 
@@ -83,7 +83,7 @@ export function registerTemplates() {
  * Re-render any open shop management applications after settings change elsewhere.
  * @returns {Promise<void>}
  */
-async function refreshShopApps() {
+async function refreshShopApplications() {
   const { default: ShopManager } = await import("./applications/shop-manager.mjs");
   const { default: ShopSheet } = await import("./applications/shop-sheet.mjs");
   foundry.applications.instances.forEach(app => {

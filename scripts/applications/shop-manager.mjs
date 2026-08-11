@@ -1,4 +1,5 @@
-import { MODULE_ID, SETTING_KEYS, SETTLEMENT_CAPS, GOLD_POOL_DEFAULT } from "../config.mjs";
+import { SETTLEMENT_CAPS, GOLD_POOL_DEFAULT } from "../config.mjs";
+import { createShop, deleteShop, getShop, getShops, updateShop } from "../data/shop-store.mjs";
 import { getStarterItems, getStarterPackOptions } from "../data/starter-packs.mjs";
 
 import BasePromptDialog from "./base-prompt-dialog.mjs";
@@ -51,9 +52,14 @@ export default class ShopManager extends Application5e {
     }
   };
 
+  /* -------------------------------------------- */
+  /*  Creation                                     */
+  /* -------------------------------------------- */
+
   /**
    * Handle creating a new shop: small name/starter-pack prompt, then opens the full edit view.
    * @this {ShopManager}
+   * @returns {Promise<void>}
    */
   static async #createShop() {
     const shopManager = this;
@@ -88,7 +94,6 @@ export default class ShopManager extends Application5e {
         handler: async function(event, form, formData) {
           const data = foundry.utils.expandObject(formData.object);
           const packs = getStarterPackOptions();
-          const shops = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS);
           const newShop = {
             name: data.name || packs.find(p => p.value === data.starterPack)?.label
               || _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Create"),
@@ -97,9 +102,8 @@ export default class ShopManager extends Application5e {
               identifier, bundleSize, stock: { max: null, current: null }
             }))
           };
-          await game.settings.set(MODULE_ID, SETTING_KEYS.SHOPS, [...shops.map(s => s.toObject()), newShop]);
+          const created = await createShop(newShop);
           shopManager.render();
-          const created = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS).at(-1);
           new ShopSheet({ shopId: created._id }).render({ force: true, mode: ShopSheet.MODES.EDIT });
           await this.close();
         }
@@ -115,6 +119,7 @@ export default class ShopManager extends Application5e {
    * @this {ShopManager}
    * @param {Event} event         Triggering click event.
    * @param {HTMLElement} target  Button that was clicked.
+   * @returns {void}
    */
   static #editShop(event, target) {
     new ShopSheet({ shopId: target.dataset.shopId }).render({ force: true });
@@ -141,9 +146,10 @@ export default class ShopManager extends Application5e {
    * @this {ShopManager}
    * @param {Event} event         Triggering click event.
    * @param {HTMLElement} target  Element that was clicked.
+   * @returns {Promise<void>}
    */
   static async #toggleActive(event, target) {
-    const shop = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS).find(s => s._id === target.dataset.shopId);
+    const shop = getShop(target.dataset.shopId);
     await this.#setShopActive(shop, !shop.active);
   }
 
@@ -152,6 +158,7 @@ export default class ShopManager extends Application5e {
   /**
    * Add a button to the Item Directory sidebar header to open this application.
    * @param {HTMLElement} html  Rendered Item Directory element.
+   * @returns {void}
    */
   static injectSidebarButton(html) {
     const button = document.createElement("button");
@@ -211,7 +218,7 @@ export default class ShopManager extends Application5e {
     await super._onFirstRender(context, options);
     new game.dnd5e.applications.ContextMenu5e(this.element, "[data-shop-id]", [], {
       onOpen: element => {
-        const shop = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS).find(s => s._id === element.dataset.shopId);
+        const shop = getShop(element.dataset.shopId);
         ui.context.menuItems = this._getContextOptions(shop);
       },
       jQuery: false
@@ -219,14 +226,12 @@ export default class ShopManager extends Application5e {
   }
 
   /* -------------------------------------------- */
-  /*  Creation                                     */
-  /* -------------------------------------------- */
 
   /** @inheritDoc */
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
     context.isGM = game.user.isGM;
-    const shops = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS).filter(s => context.isGM || s.active);
+    const shops = getShops().filter(s => context.isGM || s.active);
     const rows = shops.toSorted((a, b) => a.name.localeCompare(b.name)).map(shop => ({
       shop,
       npc: shop.npc ? fromUuidSync(shop.npc) : null,
@@ -267,6 +272,7 @@ export default class ShopManager extends Application5e {
   /**
    * Handle deleting an existing shop, after confirmation.
    * @param {Shop} shop
+   * @returns {Promise<void>}
    */
   async #confirmDeleteShop(shop) {
     const confirmed = await foundry.applications.api.DialogV2.confirm({
@@ -274,7 +280,8 @@ export default class ShopManager extends Application5e {
       content: `<p>${_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.DeleteConfirm")}</p>`
     });
     if ( !confirmed ) return;
-    await this.#persistShops(shops => shops.filter(s => s._id !== shop._id).map(s => s.toObject()));
+    await deleteShop(shop._id);
+    this.render();
   }
 
   /* -------------------------------------------- */
@@ -282,24 +289,13 @@ export default class ShopManager extends Application5e {
   /**
    * Handle duplicating an existing shop.
    * @param {Shop} shop
+   * @returns {Promise<void>}
    */
   async #duplicateShop(shop) {
     const clone = shop.toObject();
     delete clone._id;
     clone.name = game.i18n.format("DOCUMENT.CopyOf", { name: shop.name });
-    await this.#persistShops(shops => [...shops.map(s => s.toObject()), clone]);
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Persist a transformed copy of the shops list and re-render.
-   * @param {(shops: Shop[]) => object[]} transform  Produces the new shops array (as plain objects).
-   * @returns {Promise<void>}
-   */
-  async #persistShops(transform) {
-    const shops = game.settings.get(MODULE_ID, SETTING_KEYS.SHOPS);
-    await game.settings.set(MODULE_ID, SETTING_KEYS.SHOPS, transform(shops));
+    await createShop(clone);
     this.render();
   }
 
@@ -309,8 +305,10 @@ export default class ShopManager extends Application5e {
    * Set a shop's active/visible state.
    * @param {Shop} shop
    * @param {boolean} active
+   * @returns {Promise<void>}
    */
   async #setShopActive(shop, active) {
-    await this.#persistShops(shops => shops.map(s => s._id === shop._id ? { ...s.toObject(), active } : s.toObject()));
+    await updateShop(shop._id, { active });
+    this.render();
   }
 }

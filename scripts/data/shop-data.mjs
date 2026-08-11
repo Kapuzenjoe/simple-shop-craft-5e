@@ -30,7 +30,15 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
         value: new NumberField({ initial: null, nullable: true, min: 0 }),
         denomination: new StringField({ initial: () => CONFIG.DND5E.defaultCurrency })
       }),
-      bundleSize: new NumberField({ initial: null, nullable: true, integer: true, min: 1 })
+      bundleSize: new NumberField({ initial: null, nullable: true, integer: true, min: 1 }),
+      generated: new SchemaField({
+        baseItemUuid: new DocumentUUIDField({ type: "Item", blank: true }),
+        enchantItemUuid: new DocumentUUIDField({ type: "Item", blank: true }),
+        effectId: new StringField({ blank: true })
+      }, { nullable: true, initial: null }),
+      spellScroll: new SchemaField({
+        spellUuid: new DocumentUUIDField({ type: "Item", blank: true })
+      }, { nullable: true, initial: null })
     };
   }
 }

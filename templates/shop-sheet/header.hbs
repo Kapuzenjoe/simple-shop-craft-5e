@@ -37,7 +37,7 @@
                             <span class="label">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Buy" }}</span>
                             {{#if (and isGM isEditMode)}}
                             <button type="button" class="unbutton config-button item-control item-action" data-action="editModifiers"
-                                    data-tooltip aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopConfig.Discount' }}">
+                                    data-tooltip aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.Discount' }}">
                                 <i class="fas fa-cog" inert></i>
                             </button>
                             {{else}}
@@ -48,7 +48,7 @@
                             <span class="label">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Sell" }}</span>
                             {{#if (and isGM isEditMode)}}
                             <button type="button" class="unbutton config-button item-control item-action" data-action="editModifiers"
-                                    data-tooltip aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopConfig.Discount' }}">
+                                    data-tooltip aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.Discount' }}">
                                 <i class="fas fa-cog" inert></i>
                             </button>
                             {{else}}
@@ -61,7 +61,7 @@
                             <span class="label">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GoldPool" }}</span>
                             <section class="currency">
                                 {{#if (and editable isEditMode)}}
-                                <button type="button" class="item-action unbutton always-interactive" data-action="editVendorGold" data-tooltip
+                                <button type="button" class="item-action unbutton always-interactive" data-action="editGoldPool" data-tooltip
                                         aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.GoldPoolMax' }}">
                                     <i class="fas fa-cog" inert></i>
                                 </button>

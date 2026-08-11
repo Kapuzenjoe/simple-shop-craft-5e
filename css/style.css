@@ -27,7 +27,15 @@
     inset: auto 16px 16px auto;
   }
 
-  &:has(.cart-footer:not(.empty)) .create-child {
+  .window-content-actions {
+    position: absolute;
+    inset: auto 16px 16px auto;
+    display: flex;
+    gap: 8px;
+  }
+
+  &:has(.cart-footer:not(.empty)) .create-child,
+  &:has(.cart-footer:not(.empty)) .window-content-actions {
     bottom: 60px;
   }
 

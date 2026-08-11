@@ -7,8 +7,8 @@
  *                                             the shop's sellModifier. `null` = no override.
  * @property {boolean} hagglingLocked          Whether this actor is locked out from Haggling for this shop after a
  *                                             failed Influence check.
- * @property {number|null} hagglingTimestamp   When the lockout was set, or `null` if never locked. Reserved for a
- *                                             future calendar-based automatic reset.
+ * @property {number|null} hagglingTimestamp   Timestamp (`Date.now()`) when the lockout was set, or `null` if
+ *                                             never locked.
  */
 
 /* -------------------------------------------- */
@@ -29,6 +29,12 @@
  * @property {string} price.denomination      Currency denomination of the override.
  * @property {number|null} bundleSize    Override for how many individual items the listed price buys
  *                                       (e.g. 20 for a bundle of arrows). `null` = guess from the catalog item.
+ * @property {object|null} generated     Recipe for a generated magic item, `null` for normal entries.
+ * @property {string} generated.baseItemUuid      UUID of the base item the enchantment is applied to.
+ * @property {string} generated.enchantItemUuid   UUID of the item granting the enchantment.
+ * @property {string} generated.effectId          Id of the specific enchantment effect applied.
+ * @property {object|null} spellScroll   Recipe for a generated spell scroll, `null` for normal entries.
+ * @property {string} spellScroll.spellUuid       UUID of the spell the scroll casts.
  */
 
 /* -------------------------------------------- */
