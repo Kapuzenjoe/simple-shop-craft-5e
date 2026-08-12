@@ -1,0 +1,44 @@
+import { MODULE_ID } from "../config.mjs";
+
+/**
+ * Validate and apply an accepted craft start: consume the contributed materials and gold, then create
+ * the in-progress craft item on the actor.
+ * @param {object} craft  Craft flag data.
+ * @returns {Promise<{ ok: true }|{ ok: false, error: string }>}
+ */
+export async function applyCraftStart(craft) {
+  const actor = fromUuidSync(craft.actorUuid);
+  if ( !actor ) return { ok: false, error: "SIMPLE_SHOP_CRAFT_5E.CraftCard.MissingActor" };
+
+  const itemUpdates = [];
+  const itemsToDelete = [];
+  for ( const line of craft.materialLines ) {
+    const owned = actor.items.get(line.itemId);
+    if ( !owned || (owned.system.quantity < 1) ) {
+      return { ok: false, error: "SIMPLE_SHOP_CRAFT_5E.CraftCard.MissingMaterial" };
+    }
+    if ( owned.system.quantity > 1 ) itemUpdates.push({ _id: owned.id, "system.quantity": owned.system.quantity - 1 });
+    else itemsToDelete.push(owned.id);
+  }
+
+  if ( craft.goldCP > 0 ) {
+    try {
+      await game.dnd5e.applications.CurrencyManager.deductActorCurrency(actor, craft.goldCP, "cp");
+    } catch ( err ) {
+      return { ok: false, error: err.message };
+    }
+  }
+
+  if ( itemUpdates.length ) await actor.updateEmbeddedDocuments("Item", itemUpdates);
+  if ( itemsToDelete.length ) await actor.deleteEmbeddedDocuments("Item", itemsToDelete);
+
+  await actor.createEmbeddedDocuments("Item", [{
+    name: game.i18n.format("SIMPLE_SHOP_CRAFT_5E.Craft.InProgressName", { name: craft.targetName }),
+    type: "loot",
+    img: craft.targetImg,
+    system: { quantity: 1, price: { value: 0, denomination: "gp" } },
+    flags: { [MODULE_ID]: { craft: { recipeId: craft.recipeId, targetItem: craft.targetItem } } }
+  }]);
+
+  return { ok: true };
+}

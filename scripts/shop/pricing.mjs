@@ -1,5 +1,5 @@
 import { breakdownCopper, resolveDefaultPrice, toCopper } from "./currency.mjs";
-import { entryKey, resolveShopItems } from "./item-resolver.mjs";
+import { entryKey, resolveShopItems } from "./entry-resolver.mjs";
 
 /**
  * @import { ShopPlayerDiscount } from "../data/shop-data.mjs";

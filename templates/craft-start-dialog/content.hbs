@@ -1,0 +1,114 @@
+<div class="craft-start-content standard-form">
+
+<fieldset>
+    <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Player" }}</legend>
+    <select name="selectedActor" class="uninput always-interactive">
+        {{#each actorOptions}}
+        <option value="{{ this.value }}" {{#if this.selected}}selected{{/if}}>{{ this.label }}</option>
+        {{/each}}
+    </select>
+</fieldset>
+
+{{#if noActor}}
+<p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.NoActor" }}</p>
+{{else}}
+
+<fieldset class="card-tray">
+    <legend>{{ recipe.name }}</legend>
+    <ol class="targets unlist">
+        <li class="target">
+            <img class="gold-icon" src="{{ targetItem.img }}" alt="{{ targetItem.name }}">
+            <div class="name-stacked">
+                <span class="title">{{ targetItem.name }}</span>
+            </div>
+        </li>
+    </ol>
+</fieldset>
+
+{{#if chosenToolKey}}
+<fieldset>
+    <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.Tool" }}</legend>
+    {{#if toolField}}
+    {{> "dnd5e.fieldlist" toolField}}
+    {{else}}
+    <p>{{ toolLabel }}</p>
+    {{/if}}
+    {{#unless toolProficient}}
+    <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.NotProficient" }}</p>
+    {{/unless}}
+    {{#if workshopField}}
+    {{> "dnd5e.fieldlist" workshopField}}
+    {{else if toolProficient}}
+    {{#unless toolOwned}}
+    <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.ToolMissing" }}</p>
+    {{/unless}}
+    {{/if}}
+</fieldset>
+{{/if}}
+
+<fieldset class="card-tray">
+    <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.Materials" }}</legend>
+    <ol class="targets unlist">
+        {{#each fixedMaterials}}
+        <li class="target">
+            <img class="gold-icon" src="{{ this.img }}" alt="{{ this.name }}">
+            <div class="name-stacked">
+                <span class="title">{{ this.name }}</span>
+                {{#unless this.item}}
+                <span class="subtitle">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.MaterialMissing" }}</span>
+                {{/unless}}
+            </div>
+        </li>
+        {{/each}}
+        {{#each freeformItems}}
+        <li class="target">
+            <img class="gold-icon" src="{{ this.img }}" alt="{{ this.name }}">
+            <div class="name-stacked">
+                <span class="title">{{ this.name }}</span>
+            </div>
+            <button type="button" class="unbutton config-button item-control" data-action="removeFreeformMaterial"
+                    data-item-id="{{ this.id }}" data-tooltip
+                    aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.CraftStart.RemoveMaterial' }}">
+                <i class="fa-solid fa-xmark" inert></i>
+            </button>
+        </li>
+        {{/each}}
+    </ol>
+
+    {{#if allowFreeform}}
+    <div class="drop-area" data-drop-area>
+        <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.DropMaterialHint" }}</p>
+    </div>
+    {{/if}}
+
+    <ol class="targets unlist">
+        <li class="target">
+            <div class="name-stacked">
+                <span class="title">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.Supplied" }}</span>
+            </div>
+            {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=suppliedParts }}
+        </li>
+        <li class="target">
+            <div class="name-stacked">
+                <span class="title">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.Threshold" }}</span>
+            </div>
+            {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=thresholdParts }}
+        </li>
+    </ol>
+
+    {{#if goldField}}
+    {{> "dnd5e.fieldlist" goldField}}
+    {{#if fillWithGold}}
+    <p class="hint">
+        {{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.GoldFilled" }}:
+        {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=goldParts }}
+    </p>
+    {{#if goldInsufficient}}
+    <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopCart.InsufficientFunds" }}</p>
+    {{/if}}
+    {{/if}}
+    {{/if}}
+</fieldset>
+
+{{/if}}
+</div>

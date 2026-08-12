@@ -66,3 +66,33 @@
  * @property {string} [description]          Optional shop description.
  * @property {ShopItemEntryData[]} items     Items available in this shop.
  */
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef RecipeMaterialData
+ * @property {string} [identifier]  Stable `system.identifier` of the referenced material item.
+ * @property {string} [uuid]        Direct UUID reference, used when no `system.identifier` match exists.
+ */
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef RecipeData
+ * @property {string} _id                        Unique id of this recipe.
+ * @property {string} name                       Display name of this recipe.
+ * @property {string} img                        Recipe image path.
+ * @property {object} targetItem
+ * @property {string} [targetItem.identifier]    Stable `system.identifier` of the item this recipe produces.
+ * @property {string} [targetItem.uuid]          Direct UUID reference, used when no `system.identifier` match exists.
+ * @property {RecipeMaterialData[]} materials    Fixed materials required by this recipe.
+ * @property {boolean} allowFreeformMaterials    Whether players may substitute any sufficiently valuable item.
+ * @property {Set<string>} unlockedFor           Actor UUIDs allowed to start this craft.
+ * @property {boolean} openToAll                 Whether any actor may start this craft, ignoring `unlockedFor`.
+ * @property {Record<string, number>} materialPrice  Required value of the selected materials, per denomination.
+ * @property {Set<string>} toolProficiencies     Required tool proficiency keys (`CONFIG.DND5E.tools`).
+ * @property {boolean} allowWorkshopOverride     Whether players may claim workshop access instead of owning the tool.
+ * @property {object} durationOverride
+ * @property {number|null} durationOverride.value  Manual override amount. `null` uses the rules-based value.
+ * @property {string} durationOverride.units       Unit for the override (`minute`, `hour`, or `day`).
+ */

@@ -1,0 +1,10 @@
+<section class="tab {{ tab.cssClass }}" data-tab="recipes" data-group="{{ tab.group }}">
+    {{> "modules/simple-shop-craft-5e/templates/partials/item-table.hbs" recipeTable}}
+    {{#if isGM}}
+    <button type="button" data-action="createRecipe" class="gold-button always-interactive create-child"
+            data-tooltip
+            aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Create' }}">
+        <i class="fas fa-plus" inert></i>
+    </button>
+    {{/if}}
+</section>

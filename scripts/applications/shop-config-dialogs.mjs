@@ -1,7 +1,7 @@
 import { SETTLEMENT_CAPS } from "../config.mjs";
 import { Shop, ShopItemEntry } from "../data/shop-data.mjs";
 import { currencyRows, goldPoolCurrencies } from "../shop/currency.mjs";
-import { entryKey, resolveShopItems } from "../shop/item-resolver.mjs";
+import { entryKey, resolveShopItems } from "../shop/entry-resolver.mjs";
 import { getCurrencyOptions } from "../utils.mjs";
 
 import BaseConfigDialog from "./base-config-dialog.mjs";

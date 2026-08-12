@@ -1,8 +1,8 @@
 import { MODULE_ID } from "../config.mjs";
 import { getShop, updateShop } from "../data/shop-store.mjs";
 import { resolveDefaultPrice, resolveGoldPoolRows } from "../shop/currency.mjs";
+import { entryKey, resolveShopItems } from "../shop/entry-resolver.mjs";
 import { isHagglingLocked } from "../shop/haggling.mjs";
-import { entryKey, resolveShopItems } from "../shop/item-resolver.mjs";
 import {
   groupByType, groupSellItems, needsDefaultPrice, resolvePlayerOverride, summarizeCart
 } from "../shop/pricing.mjs";

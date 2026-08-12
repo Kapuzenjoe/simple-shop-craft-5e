@@ -22,6 +22,46 @@
         }
       }
     },
+    "RECIPE": {
+      "FIELDS": {
+        "name": { "label": "Recipe Name" },
+        "img": { "label": "Image" },
+        "targetItem": {
+          "uuid": {
+            "label": "UUID",
+            "hint": "Alternative to the browser above — paste or drop an item UUID directly, useful for world items in no compendium."
+          }
+        },
+        "allowFreeformMaterials": {
+          "label": "Allow Freeform Materials",
+          "hint": "Players may substitute any item of sufficient value for the fixed materials below."
+        },
+        "unlockedFor": {
+          "label": "Unlocked For",
+          "hint": "Actors who may start this craft. Ignored if \"Open to All\" is checked."
+        },
+        "openToAll": {
+          "label": "Open to All",
+          "hint": "Any player may start this craft, regardless of the list above."
+        },
+        "materialPrice": {
+          "label": "Material Price",
+          "hint": "Required value of the selected materials. Leave empty to use the rules-based value for the target item."
+        },
+        "toolProficiencies": { "label": "Tool Proficiencies" },
+        "allowWorkshopOverride": {
+          "label": "Allow Workshop Override",
+          "hint": "Players can claim access to a proper workshop instead of owning the required tool."
+        },
+        "durationOverride": {
+          "value": {
+            "label": "Duration Override",
+            "hint": "Leave empty to use the rules-based duration for the target item."
+          },
+          "units": { "label": "Unit" }
+        }
+      }
+    },
     "StarterPack": {
       "Blacksmith": "Blacksmith",
       "Alchemist": "Alchemist",
@@ -37,7 +77,7 @@
       },
       "Tabs": {
         "Shops": "Shops",
-        "Crafting": "Crafting"
+        "Recipes": "Craft"
       },
       "Shops": {
         "Shop": "Shop",
@@ -56,9 +96,32 @@
         "Duplicate": "Duplicate Shop",
         "DeleteConfirm": "Delete this shop? This cannot be undone."
       },
-      "Crafting": {
-        "None": "Crafting is not implemented yet."
+      "Recipes": {
+        "Recipe": "Recipe",
+        "NewRecipePlaceholder": "New Recipe",
+        "None": "No recipes yet.",
+        "Create": "New Recipe",
+        "Delete": "Delete Recipe",
+        "DeleteConfirm": "Delete this recipe? This cannot be undone.",
+        "Unlocked": "Unlocked",
+        "UnlockedAll": "All",
+        "Locked": "You haven't unlocked this recipe yet."
       }
+    },
+    "RecipeEditor": {
+      "Recipe": "Recipe",
+      "NewRecipePlaceholder": "New Recipe",
+      "TargetItem": "Target Item",
+      "PickTargetItem": "Choose Target Item",
+      "RemoveTargetItem": "Remove Target Item",
+      "Materials": "Materials",
+      "MaterialsNone": "No materials yet. Use the <i class=\"fas fa-plus\"></i> button above to add one.",
+      "AddMaterial": "Add Material",
+      "DropMaterialHint": "Drop an item here to add it as a material.",
+      "RemoveMaterial": "Remove Material",
+      "Tool": "Tool",
+      "Duration": "Duration",
+      "Unlock": "Unlock"
     },
     "ShopEditor": {
       "Title": "Edit Shop",
@@ -174,6 +237,41 @@
         "Accepted": "Accepted",
         "Rejected": "Rejected"
       }
+    },
+    "CraftStart": {
+      "NoActor": "Select a character above to continue.",
+      "Tool": "Tool",
+      "NotProficient": "You are not proficient with this tool.",
+      "ToolMissing": "You don't own this tool.",
+      "WorkshopAccess": "Workshop Access",
+      "Materials": "Materials",
+      "MaterialMissing": "Not in your inventory",
+      "DropMaterialHint": "Drop an item here to use it as a material.",
+      "RemoveMaterial": "Remove Material",
+      "MustOwnMaterial": "You can only use your own items as materials.",
+      "Supplied": "Supplied",
+      "Threshold": "Required",
+      "FillWithGold": "Fill with Gold",
+      "GoldFilled": "From Gold",
+      "Start": "Start Craft",
+      "Requested": "Craft request sent — waiting for GM confirmation."
+    },
+    "CraftCard": {
+      "Crafter": "Crafter",
+      "Materials": "Materials",
+      "GoldFilled": "From Gold",
+      "Accept": "Accept",
+      "Reject": "Reject",
+      "MissingActor": "The crafting character could no longer be found.",
+      "MissingMaterial": "One of the contributed materials could no longer be found — craft not started.",
+      "Status": {
+        "Pending": "Pending GM confirmation…",
+        "Accepted": "Accepted",
+        "Rejected": "Rejected"
+      }
+    },
+    "Craft": {
+      "InProgressName": "Crafting: {name}"
     }
   }
 }

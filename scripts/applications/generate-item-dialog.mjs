@@ -1,5 +1,5 @@
+import { entryKey } from "../shop/entry-resolver.mjs";
 import { rollShopItem } from "../shop/generator.mjs";
-import { entryKey } from "../shop/item-resolver.mjs";
 import { subtypeOptions } from "../utils.mjs";
 
 import BasePromptDialog from "./base-prompt-dialog.mjs";

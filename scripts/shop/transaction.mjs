@@ -1,7 +1,8 @@
 import { getShops, setShops } from "../data/shop-store.mjs";
 
-import { breakdownCopper, effectiveGoldPool } from "./currency.mjs";
-import { entryKey, resolveShopItems } from "./item-resolver.mjs";
+import { breakdownCopper, effectiveGoldPool, resolveDefaultPrice } from "./currency.mjs";
+import { entryKey, resolveShopItems } from "./entry-resolver.mjs";
+import { needsDefaultPrice } from "./pricing.mjs";
 
 /**
  * Validate and apply an accepted transaction: deduct/credit currency, transfer items both ways, adjust
@@ -48,8 +49,12 @@ export async function applyPurchase(purchase) {
     const indexEntry = resolved[index].item;
     const totalQuantity = line.quantity * line.bundleSize;
 
-    const existing = line.identifier ? actor.items.find(i => i.system.identifier === line.identifier) : null;
-    if ( existing ) {
+    const existing = line.identifier
+      ? actor.items.find(i => i.system.identifier === line.identifier)
+      : (line.generated && indexEntry?.system.identifier
+        ? actor.items.find(i => i.system.identifier === indexEntry.system.identifier)
+        : null);
+    if ( existing && (existing.type !== "container") ) {
       itemUpdates.push({ _id: existing.id, "system.quantity": existing.system.quantity + totalQuantity });
       continue;
     }
@@ -60,8 +65,16 @@ export async function applyPurchase(purchase) {
     if ( !fullItem ) return { ok: false, error: "SIMPLE_SHOP_CRAFT_5E.PurchaseCard.MissingItem" };
     const itemData = fullItem.toObject();
     delete itemData._id;
-    itemData.system.quantity = totalQuantity;
-    itemsToCreate.push(itemData);
+    if ( needsDefaultPrice(fullItem) ) {
+      const defaultPrice = resolveDefaultPrice(fullItem);
+      if ( defaultPrice ) itemData.system.price = defaultPrice;
+    }
+    if ( fullItem.type === "container" ) {
+      for ( let i = 0; i < totalQuantity; i++ ) itemsToCreate.push(foundry.utils.deepClone(itemData));
+    } else {
+      itemData.system.quantity = totalQuantity;
+      itemsToCreate.push(itemData);
+    }
   }
 
   const itemsToDelete = [];
@@ -96,11 +109,7 @@ export async function applyPurchase(purchase) {
   for ( const line of purchase.sellLines ) {
     if ( !line.identifier ) continue;
     const existing = items.find(i => i.identifier === line.identifier);
-    if ( existing ) {
-      if ( existing.stock.current !== null ) existing.stock.current += line.quantity;
-    } else {
-      items.push({ identifier: line.identifier, stock: { max: null, current: line.quantity } });
-    }
+    if ( existing && (existing.stock.current !== null) ) existing.stock.current += line.quantity;
   }
 
   const goldPool = { ...shop.goldPool };

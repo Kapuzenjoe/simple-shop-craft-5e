@@ -12,7 +12,8 @@ export const MODULE_ID = "simple-shop-craft-5e";
  * @enum {string}
  */
 export const SETTING_KEYS = {
-  SHOPS: "shops"
+  SHOPS: "shops",
+  RECIPES: "recipes"
 };
 
 /**

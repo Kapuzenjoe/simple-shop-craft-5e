@@ -1,0 +1,68 @@
+<div class="recipe-content">
+<fieldset>
+    <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.TargetItem" }}</legend>
+    {{#if targetItem}}
+    <ol class="item-list unlist">
+        <li class="item">
+            <div class="item-row">
+                <div class="item-name">
+                    {{> "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs"
+                        img=recipe.img name=targetItem.name }}
+                </div>
+                <div class="item-detail item-controls always-visible">
+                    <button type="button" class="unbutton control-button" data-action="removeTargetItem"
+                            data-tooltip aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.RecipeEditor.RemoveTargetItem' }}">
+                        <i class="fa-solid fa-xmark" inert></i>
+                    </button>
+                </div>
+            </div>
+        </li>
+    </ol>
+    {{else}}
+    <button type="button" data-action="editTargetItem">
+        {{ localize "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.PickTargetItem" }}
+    </button>
+    {{> "dnd5e.fieldlist" targetItemUuidField}}
+    {{/if}}
+</fieldset>
+
+{{#if targetItem}}
+<fieldset>
+    <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.Recipe" }}</legend>
+    {{> "dnd5e.fieldlist" identityFields}}
+</fieldset>
+
+<fieldset>
+    <legend>
+        {{ localize "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.Materials" }}
+        <button type="button" class="unbutton control-button" data-action="addMaterial"
+                data-tooltip aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.RecipeEditor.AddMaterial' }}">
+            <i class="fas fa-plus" inert></i>
+        </button>
+    </legend>
+    {{> "dnd5e.fieldlist" materialFields}}
+    <section class="currency">
+        {{> "modules/simple-shop-craft-5e/templates/partials/currency-inputs.hbs" rows=materialPriceRows}}
+    </section>
+    {{> "modules/simple-shop-craft-5e/templates/partials/item-table.hbs" materialsTable}}
+    <div class="drop-area" data-drop-area>
+        <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.DropMaterialHint" }}</p>
+    </div>
+</fieldset>
+
+<fieldset>
+    <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.Tool" }}</legend>
+    {{> "dnd5e.fieldlist" toolFields}}
+</fieldset>
+
+<fieldset>
+    <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.Duration" }}</legend>
+    {{> "dnd5e.fieldlist" durationFields}}
+</fieldset>
+
+<fieldset>
+    <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.Unlock" }}</legend>
+    {{> "dnd5e.fieldlist" unlockFields}}
+</fieldset>
+{{/if}}
+</div>

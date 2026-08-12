@@ -1,0 +1,13 @@
+<li class="item" data-key="{{ key }}">
+    <div class="item-row">
+        <div class="item-name">
+            {{> "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs" img=img name=name }}
+        </div>
+        <div class="item-detail item-controls always-visible">
+            <button type="button" class="unbutton config-button item-control always-interactive" data-action="removeMaterial" data-key="{{ key }}"
+                    data-tooltip aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.RecipeEditor.RemoveMaterial' }}">
+                <i class="fa-solid fa-xmark" inert></i>
+            </button>
+        </div>
+    </div>
+</li>

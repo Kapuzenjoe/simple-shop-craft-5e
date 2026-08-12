@@ -27,7 +27,7 @@ export const STARTER_PACKS = {
     label: "SIMPLE_SHOP_CRAFT_5E.StarterPack.MagicShop",
     items: [
       "amulet", "book", "calligraphers-supplies", "component-pouch", "crystal", "emblem", "ink-pen",
-      "magnifying-glass", "orb", "reliquary", "rod", "spell-scroll-cantrip", "spell-scroll-level-1",
+      "magnifying-glass", "orb", "reliquary", "rod",
       "sprig-of-mistletoe", "staff", "wand", "wooden-staff", "yew-wand"
     ]
   },
@@ -49,7 +49,7 @@ export const STARTER_PACKS = {
       "ink", "ink-pen", "jug", "ladder", "lamp", "lantern-bullseye", "lantern-hooded", "lock", "magnifying-glass",
       "manacles", "map", "mirror", "net", "oil", "paper", "parchment", "perfume", "poison-basic", "pole",
       "pot-iron", "potion-of-healing", "pouch", "priests-pack", "quiver", "ram-portable", "rations", "robe", "rope",
-      "sack", "scholars-pack", "shovel", "signal-whistle", "spell-scroll-cantrip", "spell-scroll-level-1",
+      "sack", "scholars-pack", "shovel", "signal-whistle",
       "spikes-iron", "spyglass", "string", "tent", "tinderbox", "torch", "vial", "waterskin",
       "alchemists-supplies", "bagpipes", "brewers-supplies", "calligraphers-supplies", "carpenters-tools",
       "cartographers-tools", "cobblers-tools", "cooks-utensils", "dice", "dragonchess", "drum", "dulcimer", "flute",

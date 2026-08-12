@@ -1,7 +1,7 @@
 {{#each rows}}
 <label>
     <i class="currency {{ this.denomination }}" data-tooltip aria-label="{{ this.label }}"></i>
-    {{ numberInput this.value name=this.name min=0 step=1
+    {{ numberInput this.value name=this.name min=0 step=1 placeholder=this.placeholder
         disabled=../disabled }}
 </label>
 {{/each}}

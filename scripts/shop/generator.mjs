@@ -2,7 +2,7 @@ import { MODULE_ID } from "../config.mjs";
 import { excludeFilter } from "../utils.mjs";
 
 import { findEnchantableBaseItem, getEnchantmentProfiles, resolveProfileRarity } from "./enchantment.mjs";
-import { entryKey } from "./item-resolver.mjs";
+import { entryKey } from "./entry-resolver.mjs";
 
 /**
  * Spell levels matching each rarity tier's spell scroll price/rarity.

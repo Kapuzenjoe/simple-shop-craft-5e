@@ -1,4 +1,5 @@
 import { MODULE_ID, SETTING_KEYS } from "./config.mjs";
+import { Recipe } from "./data/recipe-data.mjs";
 import { Shop } from "./data/shop-data.mjs";
 
 const { ArrayField, EmbeddedDataField } = foundry.data.fields;
@@ -13,6 +14,13 @@ const SETTINGS = [
     key: SETTING_KEYS.SHOPS,
     scope: "world",
     type: new ArrayField(new EmbeddedDataField(Shop)),
+    onChange: refreshShopApplications
+  },
+  {
+    config: false,
+    key: SETTING_KEYS.RECIPES,
+    scope: "world",
+    type: new ArrayField(new EmbeddedDataField(Recipe)),
     onChange: refreshShopApplications
   }
 ];
@@ -70,6 +78,8 @@ export function registerTemplates() {
     "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs",
     "modules/simple-shop-craft-5e/templates/partials/currency-inputs.hbs",
     "modules/simple-shop-craft-5e/templates/partials/item-table.hbs",
+    "modules/simple-shop-craft-5e/templates/shop-manager/recipe-row.hbs",
+    "modules/simple-shop-craft-5e/templates/recipe-sheet/material-row.hbs",
     "modules/simple-shop-craft-5e/templates/shop-manager/shop-row.hbs",
     "modules/simple-shop-craft-5e/templates/shop-sheet/buy-row.hbs",
     "modules/simple-shop-craft-5e/templates/shop-sheet/sell-row.hbs",

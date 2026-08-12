@@ -11,6 +11,10 @@
     width: 90px;
   }
 
+  .item-unlocked {
+    width: 90px;
+  }
+
   .item-controls {
     width: 70px;
   }
@@ -58,6 +62,10 @@
 
   .item-controls {
     align-items: center;
+  }
+
+  .tab[data-tab="buy"] {
+    padding-bottom: 60px;
   }
 
   .item-discount, .item-price, .item-quantity {
@@ -200,5 +208,18 @@
     color: var(--dnd5e-color-failure);
     margin-left: 4px;
     cursor: help;
+  }
+}
+
+.simple-shop-craft-5e.recipe-sheet {
+  .recipe-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .drop-area.is-dragover {
+    border-color: var(--dnd5e-color-gold);
+    box-shadow: 0 0 6px var(--dnd5e-color-gold);
   }
 }

@@ -118,6 +118,11 @@ export function synthesizeEnchantedItem(baseItem, enchantItem, effect) {
     itemData.system.rarity = enchantItem.system.rarity;
   }
 
+  const bonusChange = effect.system.changes?.find(change => change.key === "system.magicalBonus");
+  itemData.system.identifier = bonusChange
+    ? `${itemData.system.identifier}-${bonusChange.value}`
+    : `${enchantItem.system.identifier}-${itemData.system.identifier}`;
+
   return new Item.implementation(itemData);
 }
 

@@ -44,12 +44,14 @@ export function breakdownCopper(valueCP, { negative=false, capAt=CONFIG.DND5E.de
  * Build currency-input row data for every shop-usable currency, given a source amount object.
  * @param {Record<string, number>} [amounts]
  * @param {string} [namePrefix]
+ * @param {Record<string, number>} [placeholders]
  * @returns {{ denomination: string, value: number|null, name: string, label: string, icon: string }[]}
  */
-export function currencyRows(amounts={}, namePrefix="") {
+export function currencyRows(amounts={}, namePrefix="", placeholders={}) {
   return goldPoolCurrencies().map(denomination => ({
     denomination, value: amounts[denomination] ?? null, name: `${namePrefix}${denomination}`,
-    label: CONFIG.DND5E.currencies[denomination].label, icon: CONFIG.DND5E.currencies[denomination].icon
+    label: CONFIG.DND5E.currencies[denomination].label, icon: CONFIG.DND5E.currencies[denomination].icon,
+    placeholder: placeholders[denomination]
   }));
 }
 

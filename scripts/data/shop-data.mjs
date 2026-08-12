@@ -120,6 +120,6 @@ export class Shop extends foundry.abstract.DataModel {
  * Register this module's localization for the Shop data model.
  * @returns {void}
  */
-export function registerLocalization() {
+export function registerShopLocalization() {
   foundry.helpers.Localization.localizeDataModel(Shop);
 }

@@ -1,8 +1,12 @@
 import { SETTLEMENT_CAPS, GOLD_POOL_DEFAULT } from "../config.mjs";
+import { createRecipe, deleteRecipe, getRecipe, getRecipes } from "../data/recipe-store.mjs";
 import { createShop, deleteShop, getShop, getShops, updateShop } from "../data/shop-store.mjs";
 import { getStarterItems, getStarterPackOptions } from "../data/starter-packs.mjs";
+import { resolveEntries } from "../item-resolver.mjs";
 
 import BasePromptDialog from "./base-prompt-dialog.mjs";
+import CraftStartDialog from "./craft-start-dialog.mjs";
+import RecipeSheet from "./recipe-sheet.mjs";
 import ShopSheet from "./shop-sheet.mjs";
 
 const { Application5e } = game.dnd5e.applications.api;
@@ -25,8 +29,11 @@ export default class ShopManager extends Application5e {
       height: 640
     },
     actions: {
+      createRecipe: ShopManager.#createRecipe,
       createShop: ShopManager.#createShop,
+      editRecipe: ShopManager.#editRecipe,
       editShop: ShopManager.#editShop,
+      startCraft: ShopManager.#startCraft,
       toggleActive: ShopManager.#toggleActive
     }
   };
@@ -38,7 +45,10 @@ export default class ShopManager extends Application5e {
       template: "modules/simple-shop-craft-5e/templates/shop-manager/shops.hbs",
       templates: ["modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs"]
     },
-    crafting: { template: "modules/simple-shop-craft-5e/templates/shop-manager/crafting.hbs" }
+    recipes: {
+      template: "modules/simple-shop-craft-5e/templates/shop-manager/recipes.hbs",
+      templates: ["modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs"]
+    }
   };
 
   /** @override */
@@ -46,7 +56,7 @@ export default class ShopManager extends Application5e {
     primary: {
       tabs: [
         { id: "shops", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Tabs.Shops" },
-        { id: "crafting", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Tabs.Crafting" }
+        { id: "recipes", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Tabs.Recipes" }
       ],
       initial: "shops"
     }
@@ -54,6 +64,19 @@ export default class ShopManager extends Application5e {
 
   /* -------------------------------------------- */
   /*  Creation                                     */
+  /* -------------------------------------------- */
+
+  /**
+   * Handle creating a new recipe and opening its editor immediately.
+   * @this {ShopManager}
+   * @returns {Promise<void>}
+   */
+  static async #createRecipe() {
+    const created = await createRecipe({ name: "" });
+    this.render();
+    new RecipeSheet({ recipeId: created._id }).render({ force: true });
+  }
+
   /* -------------------------------------------- */
 
   /**
@@ -115,6 +138,19 @@ export default class ShopManager extends Application5e {
   /* -------------------------------------------- */
 
   /**
+   * Handle opening the editor for an existing recipe.
+   * @this {ShopManager}
+   * @param {Event} event         Triggering click event.
+   * @param {HTMLElement} target  Button that was clicked.
+   * @returns {void}
+   */
+  static #editRecipe(event, target) {
+    new RecipeSheet({ recipeId: target.dataset.recipeId }).render({ force: true });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
    * Handle opening the editor for an existing shop.
    * @this {ShopManager}
    * @param {Event} event         Triggering click event.
@@ -123,6 +159,29 @@ export default class ShopManager extends Application5e {
    */
   static #editShop(event, target) {
     new ShopSheet({ shopId: target.dataset.shopId }).render({ force: true });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle starting a craft from a recipe row.
+   * @this {ShopManager}
+   * @param {Event} event         Triggering click event.
+   * @param {HTMLElement} target  Element that was clicked.
+   * @returns {void}
+   */
+  static #startCraft(event, target) {
+    const recipe = getRecipe(target.dataset.recipeId);
+    if ( !recipe ) return;
+    if ( !game.user.isGM ) {
+      const actor = game.user.character;
+      const allowed = recipe.openToAll || (actor && recipe.unlockedFor.has(actor.uuid));
+      if ( !allowed ) {
+        ui.notifications.warn(_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Locked"));
+        return;
+      }
+    }
+    new CraftStartDialog({ recipeId: recipe._id }).render({ force: true });
   }
 
   /* -------------------------------------------- */
@@ -174,11 +233,29 @@ export default class ShopManager extends Application5e {
   /** @inheritDoc */
   _attachPartListeners(partId, htmlElement, options) {
     super._attachPartListeners(partId, htmlElement, options);
-    if ( partId === "shops" ) {
+    if ( ["shops", "recipes"].includes(partId) ) {
       htmlElement.querySelectorAll("[data-context-menu]").forEach(control => {
         return control.addEventListener("click", game.dnd5e.applications.ContextMenu5e.triggerEvent);
       });
     }
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Prepare an array of context menu options which are available for a recipe row.
+   * @param {Recipe} recipe
+   * @returns {ContextMenuEntry[]}
+   * @protected
+   */
+  _getRecipeContextOptions(recipe) {
+    return [
+      {
+        label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Delete",
+        icon: '<i class="fa-solid fa-trash fa-fw"></i>',
+        onClick: () => this.#confirmDeleteRecipe(recipe)
+      }
+    ];
   }
 
   /* -------------------------------------------- */
@@ -189,7 +266,7 @@ export default class ShopManager extends Application5e {
    * @returns {ContextMenuEntry[]}
    * @protected
    */
-  _getContextOptions(shop) {
+  _getShopContextOptions(shop) {
     return [
       {
         label: shop.active
@@ -219,7 +296,14 @@ export default class ShopManager extends Application5e {
     new game.dnd5e.applications.ContextMenu5e(this.element, "[data-shop-id]", [], {
       onOpen: element => {
         const shop = getShop(element.dataset.shopId);
-        ui.context.menuItems = this._getContextOptions(shop);
+        ui.context.menuItems = this._getShopContextOptions(shop);
+      },
+      jQuery: false
+    });
+    new game.dnd5e.applications.ContextMenu5e(this.element, "[data-recipe-id]", [], {
+      onOpen: element => {
+        const recipe = getRecipe(element.dataset.recipeId);
+        ui.context.menuItems = this._getRecipeContextOptions(recipe);
       },
       jQuery: false
     });
@@ -255,6 +339,30 @@ export default class ShopManager extends Application5e {
       emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.None",
       sections
     };
+    const recipes = getRecipes();
+    const targetResolved = await resolveEntries(recipes.map(r => r.targetItem));
+    const recipeRows = recipes
+      .map((recipe, index) => ({
+        recipe,
+        displayName: recipe.name || targetResolved[index]?.item?.name
+          || _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.NewRecipePlaceholder"),
+        unlockedLabel: recipe.openToAll
+          ? _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.UnlockedAll")
+          : (recipe.unlockedFor.size ? String(recipe.unlockedFor.size) : ""),
+        template: "modules/simple-shop-craft-5e/templates/shop-manager/recipe-row.hbs"
+      }))
+      .toSorted((a, b) => a.displayName.localeCompare(b.displayName));
+    context.recipeTable = {
+      hasRows: recipeRows.length > 0,
+      emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.None",
+      sections: recipeRows.length
+        ? [{
+          label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Recipe",
+          columns: [{ id: "name" }, { id: "unlocked", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Unlocked" }, { id: "controls" }],
+          rows: recipeRows
+        }]
+        : []
+    };
     return context;
   }
 
@@ -265,6 +373,23 @@ export default class ShopManager extends Application5e {
     context = await super._preparePartContext(partId, context, options);
     context.tab = context.tabs?.[partId];
     return context;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle deleting an existing recipe, after confirmation.
+   * @param {Recipe} recipe
+   * @returns {Promise<void>}
+   */
+  async #confirmDeleteRecipe(recipe) {
+    const confirmed = await foundry.applications.api.DialogV2.confirm({
+      window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Delete" },
+      content: `<p>${_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.DeleteConfirm")}</p>`
+    });
+    if ( !confirmed ) return;
+    await deleteRecipe(recipe._id);
+    this.render();
   }
 
   /* -------------------------------------------- */
