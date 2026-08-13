@@ -19,7 +19,7 @@ export default class ShopCart extends BasePromptDialog {
       extraContent: () => ShopCart.#renderContent(shopSheet),
       buttons: () => {
         const state = ShopCart.#computeState(shopSheet);
-        return [{ action: "confirm", label: "SIMPLE_SHOP_CRAFT_5E.ShopCart.Confirm", disabled: state.confirmDisabled }];
+        return [{ action: "confirm", label: "DND5E.Confirm", disabled: state.confirmDisabled }];
       },
       form: {
         closeOnSubmit: false,

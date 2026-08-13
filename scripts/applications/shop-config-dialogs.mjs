@@ -215,11 +215,11 @@ export async function openModifiersDialog(shopSheet, onUpdate) {
  */
 export async function openOwnerDialog(shopSheet, onUpdate) {
   const dialog = new BaseConfigDialog({
-    window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Owner" },
+    window: { title: "SIMPLE_SHOP_CRAFT_5E.Owner" },
     fields: [
       {
         field: Shop.schema.fields.npc, name: "npc", value: shopSheet.shop.npc ?? "",
-        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.Owner")
+        label: _loc("SIMPLE_SHOP_CRAFT_5E.Owner")
       }
     ],
     form: {
@@ -426,7 +426,7 @@ export async function openSettlementCapDialog(shopSheet, onUpdate) {
     ...Object.entries(SETTLEMENT_CAPS).map(([key, { label, value }]) => ({
       value: key, label: `${_loc(label)} (${new Intl.NumberFormat(game.i18n.lang).format(value)} GP)`
     })),
-    { value: "custom", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.Custom") }
+    { value: "custom", label: _loc("SIMPLE_SHOP_CRAFT_5E.Custom") }
   ];
   const capFields = Shop.schema.fields.settlementCap.fields;
 
@@ -445,7 +445,7 @@ export async function openSettlementCapDialog(shopSheet, onUpdate) {
       ];
       if ( formState.settlementCapPreset === "custom" ) {
         fields.push({
-          group: { label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SettlementCapValue") },
+          group: { label: _loc("SIMPLE_SHOP_CRAFT_5E.Custom") },
           fields: [
             { field: capFields.value, name: "settlementCapValue", value: formState.settlementCapValue },
             {

@@ -13,9 +13,9 @@ const TEMPLATE = "modules/simple-shop-craft-5e/templates/chat/craft-card.hbs";
  * @type {Record<string, string>}
  */
 const STATUS_LABELS = {
-  pending: "SIMPLE_SHOP_CRAFT_5E.CraftCard.Status.Pending",
-  accepted: "SIMPLE_SHOP_CRAFT_5E.CraftCard.Status.Accepted",
-  rejected: "SIMPLE_SHOP_CRAFT_5E.CraftCard.Status.Rejected"
+  pending: "SIMPLE_SHOP_CRAFT_5E.Status.Pending",
+  accepted: "SIMPLE_SHOP_CRAFT_5E.Status.Accepted",
+  rejected: "SIMPLE_SHOP_CRAFT_5E.Status.Rejected"
 };
 
 /**
@@ -27,9 +27,14 @@ const STATUS_LABELS = {
  * @param {{ item: Item5e }[]} options.materialLines  Owned items contributed as materials.
  * @param {number} options.goldCP                     Copper amount filled in from the actor's own currency.
  * @param {string|null} options.toolKey               Tool proficiency key used, if any.
+ * @param {number} options.totalHours                 Total progress hours needed to finish the craft.
+ * @param {{ value: number, units: string }} options.weight              Target item's weight.
+ * @param {{ value: number, denomination: string }} options.halfPrice    Half the target item's price.
  * @returns {Promise<ChatMessage>}
  */
-export async function createCraftMessage({ actor, recipe, targetItem, materialLines, goldCP, toolKey }) {
+export async function createCraftMessage({
+  actor, recipe, targetItem, materialLines, goldCP, toolKey, totalHours, weight, halfPrice
+}) {
   const craft = {
     status: "pending",
     recipeId: recipe._id,
@@ -41,7 +46,8 @@ export async function createCraftMessage({ actor, recipe, targetItem, materialLi
     toolKey: toolKey || null,
     materialLines: materialLines.map(line => ({ itemId: line.item.id, name: line.item.name, img: line.item.img })),
     goldCP,
-    goldParts: goldCP > 0 ? breakdownCopper(goldCP) : []
+    goldParts: goldCP > 0 ? breakdownCopper(goldCP) : [],
+    totalHours, weight, halfPrice
   };
 
   return ChatMessage.create({

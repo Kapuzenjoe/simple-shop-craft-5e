@@ -13,7 +13,7 @@
     <div class="card-tray buy-tray collapsible">
         <label class="roboto-upper">
             <i class="fa-solid fa-basket-shopping" inert></i>
-            <span>{{ localize "SIMPLE_SHOP_CRAFT_5E.PurchaseCard.Buying" }} ({{ buyLines.length }})</span>
+            <span>{{ localize "SIMPLE_SHOP_CRAFT_5E.Buying" }} ({{ buyLines.length }})</span>
             <i class="fa-solid fa-caret-down" inert></i>
         </label>
         <div class="collapsible-content">
@@ -39,7 +39,7 @@
     <div class="card-tray sell-tray collapsible">
         <label class="roboto-upper">
             <i class="fa-solid fa-hand-holding-dollar" inert></i>
-            <span>{{ localize "SIMPLE_SHOP_CRAFT_5E.PurchaseCard.Selling" }} ({{ sellLines.length }})</span>
+            <span>{{ localize "SIMPLE_SHOP_CRAFT_5E.Selling" }} ({{ sellLines.length }})</span>
             <i class="fa-solid fa-caret-down" inert></i>
         </label>
         <div class="collapsible-content">
@@ -77,10 +77,10 @@
     {{#if pending}}
     <div class="card-buttons">
         <button type="button" data-action="acceptPurchase" data-visibility="gm">
-            <i class="fas fa-check" inert></i> <span>{{ localize "SIMPLE_SHOP_CRAFT_5E.PurchaseCard.Accept" }}</span>
+            <i class="fas fa-check" inert></i> <span>{{ localize "SIMPLE_SHOP_CRAFT_5E.Accept" }}</span>
         </button>
         <button type="button" data-action="rejectPurchase" data-visibility="gm">
-            <i class="fas fa-xmark" inert></i> <span>{{ localize "SIMPLE_SHOP_CRAFT_5E.PurchaseCard.Reject" }}</span>
+            <i class="fas fa-xmark" inert></i> <span>{{ localize "SIMPLE_SHOP_CRAFT_5E.Reject" }}</span>
         </button>
     </div>
     {{/if}}

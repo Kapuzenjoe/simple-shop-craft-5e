@@ -1,4 +1,4 @@
-<div class="recipe-content">
+<section class="tab active recipe-content">
 <fieldset>
     <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.TargetItem" }}</legend>
     {{#if targetItem}}
@@ -28,13 +28,13 @@
 
 {{#if targetItem}}
 <fieldset>
-    <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.Recipe" }}</legend>
+    <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.Recipe" }}</legend>
     {{> "dnd5e.fieldlist" identityFields}}
 </fieldset>
 
 <fieldset>
     <legend>
-        {{ localize "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.Materials" }}
+        {{ localize "DND5E.Materials" }}
         <button type="button" class="unbutton control-button" data-action="addMaterial"
                 data-tooltip aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.RecipeEditor.AddMaterial' }}">
             <i class="fas fa-plus" inert></i>
@@ -51,7 +51,7 @@
 </fieldset>
 
 <fieldset>
-    <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.Tool" }}</legend>
+    <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.Tool" }}</legend>
     {{> "dnd5e.fieldlist" toolFields}}
 </fieldset>
 
@@ -65,4 +65,4 @@
     {{> "dnd5e.fieldlist" unlockFields}}
 </fieldset>
 {{/if}}
-</div>
+</section>

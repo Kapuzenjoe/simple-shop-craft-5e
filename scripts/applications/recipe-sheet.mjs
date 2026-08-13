@@ -182,7 +182,7 @@ export default class RecipeSheet extends Application5e {
 
   /** @override */
   get title() {
-    return this.recipe?.name || _loc("SIMPLE_SHOP_CRAFT_5E.RecipeEditor.NewRecipePlaceholder");
+    return this.recipe?.name || _loc("SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder");
   }
 
   /* -------------------------------------------- */
@@ -244,7 +244,7 @@ export default class RecipeSheet extends Application5e {
     context.identityFields = [
       {
         field: fields.name, name: "name", value: recipe.name,
-        placeholder: targetResolved.item?.name || _loc("SIMPLE_SHOP_CRAFT_5E.RecipeEditor.NewRecipePlaceholder")
+        placeholder: targetResolved.item?.name || _loc("SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder")
       }
     ];
     context.materialFields = [

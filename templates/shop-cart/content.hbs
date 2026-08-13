@@ -1,7 +1,7 @@
 <section>
     {{#if buyRows.length}}
     <fieldset class="card-tray">
-        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopCart.Buying" }}</legend>
+        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.Buying" }}</legend>
         <ol class="targets unlist">
             {{#each buyRows}}
             <li class="target">
@@ -19,7 +19,7 @@
 
     {{#if sellRows.length}}
     <fieldset class="card-tray">
-        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopCart.Selling" }}</legend>
+        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.Selling" }}</legend>
         <ol class="targets unlist">
             {{#each sellRows}}
             <li class="target">
@@ -53,6 +53,6 @@
     {{else}}
     <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopCart.Empty" }}</p>
     {{/if}}
-    {{#unless actor}}<p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopCart.NoActor" }}</p>{{/unless}}
+    {{#unless actor}}<p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.NoActorSelectedHint" }}</p>{{/unless}}
     {{#if noActiveGM}}<p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopCart.NoActiveGM" }}</p>{{/if}}
 </section>

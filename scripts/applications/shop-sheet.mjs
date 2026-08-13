@@ -4,7 +4,7 @@ import { resolveDefaultPrice, resolveGoldPoolRows } from "../shop/currency.mjs";
 import { entryKey, resolveShopItems } from "../shop/entry-resolver.mjs";
 import { isHagglingLocked } from "../shop/haggling.mjs";
 import {
-  groupByType, groupSellItems, needsDefaultPrice, resolvePlayerOverride, summarizeCart
+  groupByType, groupSellItems, needsDefaultPrice, resolvePlayerOverride
 } from "../shop/pricing.mjs";
 
 import { openGenerateItemDialog } from "./generate-item-dialog.mjs";
@@ -154,9 +154,8 @@ export default class ShopSheet extends Application5e {
       template: "modules/simple-shop-craft-5e/templates/shop-sheet/description.hbs",
       scrollable: [""]
     },
-    cart: {
-      template: "modules/simple-shop-craft-5e/templates/shop-sheet/cart.hbs",
-      templates: ["modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs"]
+    footer: {
+      template: "templates/generic/form-footer.hbs"
     }
   };
 
@@ -839,7 +838,6 @@ export default class ShopSheet extends Application5e {
     });
     this.#lastSellGroups = context.sellGroups;
 
-    context.cart = summarizeCart(context.groups, context.sellGroups);
     context.goldPoolDisplay = resolveGoldPoolRows(context.shop.goldPool, { namePrefix: "currentGold." });
     context.settlementCapDisplay = context.shop.settlementCap.value != null
       ? `${context.shop.settlementCap.value} ${context.shop.settlementCap.denomination.toUpperCase()}`
@@ -853,6 +851,12 @@ export default class ShopSheet extends Application5e {
   async _preparePartContext(partId, context, options) {
     context = await super._preparePartContext(partId, context, options);
     context.tab = context.tabs?.[partId];
+    if ( partId === "footer" ) {
+      context.buttons = [{
+        type: "button", action: "openCart", icon: "fas fa-basket-shopping",
+        label: "SIMPLE_SHOP_CRAFT_5E.ShopCart.ViewCart", cssClass: "always-interactive"
+      }];
+    }
     if ( partId === "buy" ) {
       context.tabId = "buy";
       context.table = ShopSheet.#buildItemTable({
@@ -863,7 +867,7 @@ export default class ShopSheet extends Application5e {
     if ( partId === "sell" ) {
       context.tabId = "sell";
       context.showNoActor = !context.actor;
-      context.noActorLabel = "SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoActorForSell";
+      context.noActorLabel = "SIMPLE_SHOP_CRAFT_5E.NoActorSelectedHint";
       context.table = ShopSheet.#buildItemTable({
         groups: context.sellGroups, emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoSellableItems",
         columns: SELL_COLUMNS, rowTemplate: "modules/simple-shop-craft-5e/templates/shop-sheet/sell-row.hbs"

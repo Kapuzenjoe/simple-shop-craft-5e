@@ -13,7 +13,7 @@
     <div class="card-tray materials-tray collapsible">
         <label class="roboto-upper">
             <i class="fa-solid fa-mortar-pestle" inert></i>
-            <span>{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftCard.Materials" }} ({{ materialLines.length }})</span>
+            <span>{{ localize "DND5E.Materials" }} ({{ materialLines.length }})</span>
             <i class="fa-solid fa-caret-down" inert></i>
         </label>
         <div class="collapsible-content">
@@ -39,7 +39,7 @@
         <ul class="targets unlist">
             <li class="target">
                 <div class="name-stacked">
-                    <span class="title">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftCard.GoldFilled" }}</span>
+                    <span class="title">{{ localize "SIMPLE_SHOP_CRAFT_5E.GoldFilled" }}</span>
                 </div>
                 {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=goldParts }}
             </li>
@@ -52,10 +52,10 @@
     {{#if pending}}
     <div class="card-buttons">
         <button type="button" data-action="acceptCraft" data-visibility="gm">
-            <i class="fas fa-check" inert></i> <span>{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftCard.Accept" }}</span>
+            <i class="fas fa-check" inert></i> <span>{{ localize "SIMPLE_SHOP_CRAFT_5E.Accept" }}</span>
         </button>
         <button type="button" data-action="rejectCraft" data-visibility="gm">
-            <i class="fas fa-xmark" inert></i> <span>{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftCard.Reject" }}</span>
+            <i class="fas fa-xmark" inert></i> <span>{{ localize "SIMPLE_SHOP_CRAFT_5E.Reject" }}</span>
         </button>
     </div>
     {{/if}}

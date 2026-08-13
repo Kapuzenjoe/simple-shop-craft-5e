@@ -201,7 +201,7 @@ export function resolveDiscountSources({
     const sources = [{ label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.FixedValueItem"), value: "0%", type: "override" }];
     return { percent: 0, sources };
   }
-  const sources = [additiveSource(_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.ShopDefault"), shopModifier)];
+  const sources = [additiveSource(_loc("SIMPLE_SHOP_CRAFT_5E.Shop"), shopModifier)];
   let percent = shopModifier;
   if ( playerModifier ) {
     sources.push(additiveSource(actorName, playerModifier));
@@ -237,19 +237,6 @@ export function resolveWeight(itemSystem, targetUnit) {
     value: game.dnd5e.utils.convertWeight(itemSystem.weight.value, itemSystem.weight.units || "lb", targetUnit),
     unit: targetUnit
   };
-}
-
-/* -------------------------------------------- */
-
-/**
- * Summarize a set of Buy/Sell groups into a single net total. Buying costs money (negative), selling
- * earns money (positive).
- * @param {{ items: object[] }[]} buyGroups   Rows returned by {@link groupByType}.
- * @param {{ items: object[] }[]} sellGroups  Rows returned by {@link groupSellItems}.
- * @returns {{ count: number, netCP: number, parts: { denomination: string, value: number }[] }}
- */
-export function summarizeCart(buyGroups, sellGroups) {
-  return summarizeNet(buyGroups.flatMap(g => g.items), sellGroups.flatMap(g => g.items));
 }
 
 /* -------------------------------------------- */

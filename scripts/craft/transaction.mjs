@@ -1,4 +1,5 @@
 import { MODULE_ID } from "../config.mjs";
+import { applyProgressDescription, createProgressActivity } from "./progress.mjs";
 
 /**
  * Validate and apply an accepted craft start: consume the contributed materials and gold, then create
@@ -32,13 +33,23 @@ export async function applyCraftStart(craft) {
   if ( itemUpdates.length ) await actor.updateEmbeddedDocuments("Item", itemUpdates);
   if ( itemsToDelete.length ) await actor.deleteEmbeddedDocuments("Item", itemsToDelete);
 
-  await actor.createEmbeddedDocuments("Item", [{
+  const activityId = foundry.utils.randomID();
+  const initialCraft = {
+    recipeId: craft.recipeId, targetItem: craft.targetItem,
+    activityId, totalHours: craft.totalHours, progress: 0
+  };
+  const [item] = await actor.createEmbeddedDocuments("Item", [{
     name: game.i18n.format("SIMPLE_SHOP_CRAFT_5E.Craft.InProgressName", { name: craft.targetName }),
-    type: "loot",
+    type: "consumable",
     img: craft.targetImg,
-    system: { quantity: 1, price: { value: 0, denomination: "gp" } },
-    flags: { [MODULE_ID]: { craft: { recipeId: craft.recipeId, targetItem: craft.targetItem } } }
+    system: {
+      quantity: 1, price: craft.halfPrice ?? { value: 0, denomination: "gp" },
+      weight: craft.weight ?? { value: 0, units: "lb" }, uses: { max: "1" },
+      description: { value: applyProgressDescription("", initialCraft) }
+    },
+    flags: { [MODULE_ID]: { craft: initialCraft } }
   }]);
+  await createProgressActivity(item, activityId, initialCraft);
 
   return { ok: true };
 }

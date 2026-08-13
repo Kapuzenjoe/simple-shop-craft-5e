@@ -72,20 +72,14 @@
     },
     "ShopManager": {
       "Title": "Shop & Craft",
-      "Action": {
-        "Open": "Shop & Craft"
-      },
       "Tabs": {
         "Shops": "Shops",
         "Recipes": "Craft"
       },
       "Shops": {
-        "Shop": "Shop",
         "Active": "Active",
         "Inactive": "Inactive",
         "Status": "Status",
-        "Owner": "Owner",
-        "Location": "Location",
         "Activate": "Activate Shop",
         "Deactivate": "Deactivate Shop",
         "StarterPack": "Starter Pack",
@@ -97,8 +91,6 @@
         "DeleteConfirm": "Delete this shop? This cannot be undone."
       },
       "Recipes": {
-        "Recipe": "Recipe",
-        "NewRecipePlaceholder": "New Recipe",
         "None": "No recipes yet.",
         "Create": "New Recipe",
         "Delete": "Delete Recipe",
@@ -109,17 +101,12 @@
       }
     },
     "RecipeEditor": {
-      "Recipe": "Recipe",
-      "NewRecipePlaceholder": "New Recipe",
       "TargetItem": "Target Item",
       "PickTargetItem": "Choose Target Item",
       "RemoveTargetItem": "Remove Target Item",
-      "Materials": "Materials",
       "MaterialsNone": "No materials yet. Use the <i class=\"fas fa-plus\"></i> button above to add one.",
       "AddMaterial": "Add Material",
       "DropMaterialHint": "Drop an item here to add it as a material.",
-      "RemoveMaterial": "Remove Material",
-      "Tool": "Tool",
       "Duration": "Duration",
       "Unlock": "Unlock"
     },
@@ -129,6 +116,7 @@
       "GenerateItem": "Generate Item",
       "GenerateItemType": "Item Type",
       "GenerateItemRarity": "Rarity",
+      "GenerateItemMundane": "Mundane",
       "GenerateItemSubtype": "Subtype",
       "GenerateItemRoll": "Generate",
       "GenerateItemNone": "No matching items found.",
@@ -141,7 +129,6 @@
       },
       "Location": "Location",
       "ActingAs": "Acting As",
-      "Shop": "Shop",
       "Player": "Player",
       "Haggling": "Haggle",
       "HagglingSkill": "Skill",
@@ -160,25 +147,18 @@
       "SpotlightNoTargets": "No other players are currently connected.",
       "SpotlightSuccess": "Shop shown to all connected players.",
       "NoActorSelected": "— None —",
-      "ShopName": "Shop Name",
       "LocationPlaceholder": "e.g. Baldur's Gate",
       "SettlementCap": "Settlement Cap",
       "NoCap": "No Cap",
       "Village": "Village",
       "Town": "Town",
       "City": "City",
-      "Custom": "Custom",
-      "SettlementCapValue": "Custom",
       "GoldPool": "Shop Money",
       "GoldPoolMax": "Max. Shop Money",
       "GoldPoolMaxHint": "Restored to this amount when the shop is restocked.",
-      "GoldPoolUnlimited": "Unlimited",
       "ResetRestock": "Reset Stock & Shop Money",
       "NoRestock": "Exclude from Restock",
       "NoRestockHint": "This item stays depleted after being bought out — Reset won't restock it.",
-      "Owner": "Owner",
-      "OwnerDescription": "Owner Description",
-      "OpenNpcSheet": "Open NPC Sheet",
       "PriceTooltip": "Edit Price",
       "PriceOverrideHint": "Override this item's default price for this shop.",
       "BundleSize": "Bundle Size",
@@ -187,7 +167,6 @@
       "Discount": "Discount",
       "DiscountTooltip": "Edit Price Modifier",
       "DiscountOverrideHint": "Override the shop's price modifier for this item specifically.",
-      "ShopDefault": "Shop",
       "ItemOverride": "Item Override",
       "FixedValueItem": "Fixed-Value Item",
       "Stock": "Stock",
@@ -200,7 +179,6 @@
       "IncreaseQuantity": "Increase Quantity",
       "DecreaseQuantity": "Decrease Quantity",
       "NoSellableItems": "Nothing to sell.",
-      "NoActorForSell": "No character selected — pick one under \"Acting As\" first.",
       "SuppressedStock": "Out of Stock",
       "SuppressedCap": "Exceeds Settlement Cap",
       "SuppressedNotFound": "Item not found in active compendiums — check the identifier or enabled rulebooks",
@@ -209,69 +187,64 @@
     "ShopCart": {
       "Title": "Shopping Cart",
       "ViewCart": "View Cart",
-      "Buying": "Buying",
-      "Selling": "Selling",
       "Empty": "No items selected yet.",
       "Total": "Total",
       "Balance": "Balance",
       "InsufficientFunds": "Insufficient funds",
-      "NoActor": "No character selected — pick one under \"Acting As\" first.",
       "NoActiveGM": "No GM is currently online — purchases can only be completed while a GM is connected.",
-      "Confirm": "Confirm",
       "PurchaseRequested": "Purchase request sent — waiting for GM confirmation."
     },
     "PurchaseCard": {
       "Buyer": "Buyer",
-      "Buying": "Buying",
-      "Selling": "Selling",
-      "Accept": "Accept",
-      "Reject": "Reject",
       "InsufficientStock": "Not enough stock left for one or more items — purchase not completed.",
       "InsufficientSellQuantity": "The seller no longer has enough of one or more items — sale not completed.",
       "InsufficientShopGold": "The shop doesn't have enough gold to buy these items — sale not completed.",
       "MissingActor": "The buying character could no longer be found.",
       "MissingShop": "The shop this purchase belongs to could no longer be found.",
-      "MissingItem": "One of the purchased items could no longer be resolved.",
-      "Status": {
-        "Pending": "Pending GM confirmation…",
-        "Accepted": "Accepted",
-        "Rejected": "Rejected"
-      }
+      "MissingItem": "One of the purchased items could no longer be resolved."
     },
     "CraftStart": {
       "NoActor": "Select a character above to continue.",
-      "Tool": "Tool",
       "NotProficient": "You are not proficient with this tool.",
       "ToolMissing": "You don't own this tool.",
       "WorkshopAccess": "Workshop Access",
-      "Materials": "Materials",
       "MaterialMissing": "Not in your inventory",
       "DropMaterialHint": "Drop an item here to use it as a material.",
-      "RemoveMaterial": "Remove Material",
       "MustOwnMaterial": "You can only use your own items as materials.",
       "Supplied": "Supplied",
       "Threshold": "Required",
       "FillWithGold": "Fill with Gold",
-      "GoldFilled": "From Gold",
       "Start": "Start Craft",
       "Requested": "Craft request sent — waiting for GM confirmation."
     },
     "CraftCard": {
       "Crafter": "Crafter",
-      "Materials": "Materials",
-      "GoldFilled": "From Gold",
-      "Accept": "Accept",
-      "Reject": "Reject",
       "MissingActor": "The crafting character could no longer be found.",
-      "MissingMaterial": "One of the contributed materials could no longer be found — craft not started.",
-      "Status": {
-        "Pending": "Pending GM confirmation…",
-        "Accepted": "Accepted",
-        "Rejected": "Rejected"
-      }
+      "MissingMaterial": "One of the contributed materials could no longer be found — craft not started."
     },
     "Craft": {
-      "InProgressName": "Crafting: {name}"
-    }
+      "InProgressName": "Crafting: {name}",
+      "ProgressActivityName": "Progress Craft",
+      "ProgressActivityFlavor": "The crafting progresses ({completed}/{total} workdays).",
+      "CompleteMessage": "{name} is finished and has been added to {actor}'s inventory."
+    },
+    "Shop": "Shop",
+    "Owner": "Owner",
+    "Recipe": "Recipe",
+    "NewRecipePlaceholder": "New Recipe",
+    "RemoveMaterial": "Remove Material",
+    "Tool": "Tool",
+    "Buying": "Buying",
+    "Selling": "Selling",
+    "Accept": "Accept",
+    "Reject": "Reject",
+    "Status": {
+      "Pending": "Pending GM confirmation…",
+      "Accepted": "Accepted",
+      "Rejected": "Rejected"
+    },
+    "GoldFilled": "From Gold",
+    "NoActorSelectedHint": "No character selected — pick one under \"Acting As\" first.",
+    "Custom": "Custom"
   }
 }

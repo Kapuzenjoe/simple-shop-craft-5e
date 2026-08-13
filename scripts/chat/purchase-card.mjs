@@ -12,9 +12,9 @@ const TEMPLATE = "modules/simple-shop-craft-5e/templates/chat/purchase-card.hbs"
  * @type {Record<string, string>}
  */
 const STATUS_LABELS = {
-  pending: "SIMPLE_SHOP_CRAFT_5E.PurchaseCard.Status.Pending",
-  accepted: "SIMPLE_SHOP_CRAFT_5E.PurchaseCard.Status.Accepted",
-  rejected: "SIMPLE_SHOP_CRAFT_5E.PurchaseCard.Status.Rejected"
+  pending: "SIMPLE_SHOP_CRAFT_5E.Status.Pending",
+  accepted: "SIMPLE_SHOP_CRAFT_5E.Status.Accepted",
+  rejected: "SIMPLE_SHOP_CRAFT_5E.Status.Rejected"
 };
 
 /**

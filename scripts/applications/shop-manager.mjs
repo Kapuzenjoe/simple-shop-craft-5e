@@ -100,7 +100,7 @@ export default class ShopManager extends Application5e {
         },
         {
           field: new foundry.data.fields.StringField(), name: "name",
-          label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Shop")
+          label: _loc("SIMPLE_SHOP_CRAFT_5E.Shop")
         }
       ],
       buttons: [
@@ -195,7 +195,7 @@ export default class ShopManager extends Application5e {
   static #settlementCapLabel(shop) {
     const preset = Object.entries(SETTLEMENT_CAPS).find(([, v]) => v.value === shop.settlementCap.value)?.[0];
     if ( preset ) return _loc(SETTLEMENT_CAPS[preset].label);
-    return shop.settlementCap.value != null ? _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.Custom") : "";
+    return shop.settlementCap.value != null ? _loc("SIMPLE_SHOP_CRAFT_5E.Custom") : "";
   }
 
   /* -------------------------------------------- */
@@ -223,7 +223,7 @@ export default class ShopManager extends Application5e {
     const button = document.createElement("button");
     button.type = "button";
     button.classList.add("open-shop-manager");
-    button.innerHTML = `<i class="fas fa-store" inert></i> ${_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Action.Open")}`;
+    button.innerHTML = `<i class="fas fa-store" inert></i> ${_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Title")}`;
     button.addEventListener("click", () => (new ShopManager()).render({ force: true }));
     html.querySelector(".header-actions").append(button);
   }
@@ -324,7 +324,7 @@ export default class ShopManager extends Application5e {
     }));
     const columns = [
       { id: "name" },
-      { id: "npc", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Owner" },
+      { id: "npc", label: "SIMPLE_SHOP_CRAFT_5E.Owner" },
       { id: "active", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Status" },
       { id: "controls" }
     ];
@@ -333,7 +333,7 @@ export default class ShopManager extends Application5e {
         { label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Active", columns, rows: rows.filter(r => r.shop.active) },
         { label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Inactive", columns, rows: rows.filter(r => !r.shop.active) }
       ].filter(s => s.rows.length)
-      : [{ label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Shop", columns, rows }];
+      : [{ label: "SIMPLE_SHOP_CRAFT_5E.Shop", columns, rows }];
     context.table = {
       hasRows: rows.length > 0,
       emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.None",
@@ -345,7 +345,7 @@ export default class ShopManager extends Application5e {
       .map((recipe, index) => ({
         recipe,
         displayName: recipe.name || targetResolved[index]?.item?.name
-          || _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.NewRecipePlaceholder"),
+          || _loc("SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder"),
         unlockedLabel: recipe.openToAll
           ? _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.UnlockedAll")
           : (recipe.unlockedFor.size ? String(recipe.unlockedFor.size) : ""),
@@ -357,7 +357,7 @@ export default class ShopManager extends Application5e {
       emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.None",
       sections: recipeRows.length
         ? [{
-          label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Recipe",
+          label: "SIMPLE_SHOP_CRAFT_5E.Recipe",
           columns: [{ id: "name" }, { id: "unlocked", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Unlocked" }, { id: "controls" }],
           rows: recipeRows
         }]

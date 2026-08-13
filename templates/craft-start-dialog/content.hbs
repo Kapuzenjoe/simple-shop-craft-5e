@@ -1,4 +1,4 @@
-<div class="craft-start-content standard-form">
+<section class="tab active craft-start-content">
 
 <fieldset>
     <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Player" }}</legend>
@@ -14,7 +14,7 @@
 {{else}}
 
 <fieldset class="card-tray">
-    <legend>{{ recipe.name }}</legend>
+    <legend>{{ displayName }}</legend>
     <ol class="targets unlist">
         <li class="target">
             <img class="gold-icon" src="{{ targetItem.img }}" alt="{{ targetItem.name }}">
@@ -27,7 +27,7 @@
 
 {{#if chosenToolKey}}
 <fieldset>
-    <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.Tool" }}</legend>
+    <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.Tool" }}</legend>
     {{#if toolField}}
     {{> "dnd5e.fieldlist" toolField}}
     {{else}}
@@ -36,18 +36,17 @@
     {{#unless toolProficient}}
     <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.NotProficient" }}</p>
     {{/unless}}
-    {{#if workshopField}}
-    {{> "dnd5e.fieldlist" workshopField}}
-    {{else if toolProficient}}
     {{#unless toolOwned}}
     <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.ToolMissing" }}</p>
     {{/unless}}
+    {{#if workshopField}}
+    {{> "dnd5e.fieldlist" workshopField}}
     {{/if}}
 </fieldset>
 {{/if}}
 
 <fieldset class="card-tray">
-    <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.Materials" }}</legend>
+    <legend>{{ localize "DND5E.Materials" }}</legend>
     <ol class="targets unlist">
         {{#each fixedMaterials}}
         <li class="target">
@@ -68,7 +67,7 @@
             </div>
             <button type="button" class="unbutton config-button item-control" data-action="removeFreeformMaterial"
                     data-item-id="{{ this.id }}" data-tooltip
-                    aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.CraftStart.RemoveMaterial' }}">
+                    aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.RemoveMaterial' }}">
                 <i class="fa-solid fa-xmark" inert></i>
             </button>
         </li>
@@ -100,7 +99,7 @@
     {{> "dnd5e.fieldlist" goldField}}
     {{#if fillWithGold}}
     <p class="hint">
-        {{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.GoldFilled" }}:
+        {{ localize "SIMPLE_SHOP_CRAFT_5E.GoldFilled" }}:
         {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=goldParts }}
     </p>
     {{#if goldInsufficient}}
@@ -111,4 +110,4 @@
 </fieldset>
 
 {{/if}}
-</div>
+</section>

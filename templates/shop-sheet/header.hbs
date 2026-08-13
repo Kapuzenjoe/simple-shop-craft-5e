@@ -1,11 +1,11 @@
 <header class="sheet-header">
     <div class="header-top">
-        <fieldset class="card shop-summary">
-            <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Shop" }}</legend>
+        <fieldset class="shop-summary">
+            <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.Shop" }}</legend>
             <div class="shop-summary-body">
                 <img class="document-image" src="{{ shop.img }}" alt="{{ shop.name }}"
                      {{#if (and isGM isEditMode)}}data-action="editImage" data-edit="img"{{/if}}>
-                <div class="shop-summary-info">
+                <div class="shop-summary-info card">
                     <div class="info">
                         {{#if isGM}}
                         <div>
@@ -21,10 +21,10 @@
                         </div>
                         {{/if}}
                         <div>
-                            <span class="label">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Owner" }}</span>
+                            <span class="label">{{ localize "SIMPLE_SHOP_CRAFT_5E.Owner" }}</span>
                             {{#if (and isGM isEditMode)}}
                             <button type="button" class="unbutton config-button item-control item-action" data-action="editOwner"
-                                    data-tooltip aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.Owner' }}">
+                                    data-tooltip aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.Owner' }}">
                                 <i class="fas fa-cog" inert></i>
                             </button>
                             {{else}}
@@ -84,7 +84,7 @@
                 </div>
             </div>
         </fieldset>
-        <fieldset class="card player-area">
+        <fieldset class="player-area">
             <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Player" }}</legend>
             <select name="selectedActor" class="uninput always-interactive" data-tooltip="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.ActingAs' }}">
                 {{#each actorOptions}}

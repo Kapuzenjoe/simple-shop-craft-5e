@@ -16,7 +16,7 @@ export async function openGenerateItemDialog(shopSheet, onGenerated) {
     .filter(type => CONFIG.Item.dataModels[type]?.inventorySection)
     .map(type => ({ value: type, label: _loc(`TYPES.Item.${type}Pl`) }));
   const rarityOptions = [
-    { value: "mundane", label: _loc("DND5E.ItemRarityMundane").capitalize() },
+    { value: "mundane", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemMundane") },
     ...Object.entries(CONFIG.DND5E.itemRarity)
       .filter(([value]) => value !== "artifact")
       .map(([value, label]) => ({ value, label: label.capitalize() }))

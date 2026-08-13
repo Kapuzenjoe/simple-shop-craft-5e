@@ -1,10 +1,17 @@
 import { createCraftMessage } from "../chat/craft-card.mjs";
+import { HOURS_PER_USE } from "../craft/progress.mjs";
 import { getRecipe } from "../data/recipe-store.mjs";
 import { resolveEntries } from "../item-resolver.mjs";
 import { breakdownCopper, resolveDefaultPrice, toCopper } from "../shop/currency.mjs";
 import { needsDefaultPrice } from "../shop/pricing.mjs";
 
 const { Dialog5e } = game.dnd5e.applications.api;
+
+/**
+ * Hours per duration unit, for converting a recipe's duration override to total progress hours.
+ * @type {Record<string, number>}
+ */
+const HOURS_PER_UNIT = { minute: 1 / 60, hour: 1, day: 8 };
 
 /**
  * Player-facing dialog to request starting a craft: tool/material selection against a recipe's
@@ -97,7 +104,7 @@ export default class CraftStartDialog extends Dialog5e {
 
   /** @override */
   get title() {
-    return this.recipe?.name || _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.NewRecipePlaceholder");
+    return this.recipe?.name || _loc("SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder");
   }
 
   /* -------------------------------------------- */
@@ -153,6 +160,8 @@ export default class CraftStartDialog extends Dialog5e {
     ].map(o => ({ ...o, selected: o.value === this.selectedActorUuid }));
     context.recipe = state.recipe;
     context.targetItem = state.targetItem;
+    context.displayName = state.recipe.name || state.targetItem?.name
+      || _loc("SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder");
     context.noActor = !state.actor;
     context.fixedMaterials = state.fixedLines;
     context.freeformItems = state.freeformItems.map(item => ({ id: item.id, name: item.name, img: item.img }));
@@ -178,7 +187,7 @@ export default class CraftStartDialog extends Dialog5e {
       }
     }
 
-    context.workshopField = (state.chosenToolKey && state.proficient && !state.toolOwned && state.recipe.allowWorkshopOverride)
+    context.workshopField = (state.chosenToolKey && state.recipe.allowWorkshopOverride)
       ? [{
         field: new foundry.data.fields.BooleanField(), name: "workshopClaimed", value: this.#workshopClaimed,
         label: _loc("SIMPLE_SHOP_CRAFT_5E.CraftStart.WorkshopAccess")
@@ -222,9 +231,15 @@ export default class CraftStartDialog extends Dialog5e {
     const [targetResolved] = await resolveEntries([recipe.targetItem]);
     const targetItem = targetResolved.item;
     let craftCost = null;
+    let weight = null;
+    let halfPrice = null;
     if ( targetItem?.uuid ) {
       const fullTargetItem = await fromUuid(targetItem.uuid);
       if ( fullTargetItem?.system?.getCraftCost ) craftCost = await fullTargetItem.system.getCraftCost();
+      if ( fullTargetItem ) {
+        weight = { ...fullTargetItem.system.weight };
+        halfPrice = { value: Math.floor(fullTargetItem.system.price.value / 2), denomination: fullTargetItem.system.price.denomination };
+      }
     }
 
     const materialsResolved = await resolveEntries(recipe.materials);
@@ -256,19 +271,20 @@ export default class CraftStartDialog extends Dialog5e {
     let toolOwned = true;
     if ( chosenToolKey ) {
       proficient = !!actor && ((actor.system.tools[chosenToolKey]?.value ?? 0) > 0);
-      const toolUuid = CONFIG.DND5E.tools[chosenToolKey];
-      const toolItem = toolUuid ? await fromUuid(toolUuid) : null;
-      const toolIdentifier = toolItem?.system?.identifier;
-      toolOwned = toolIdentifier ? !!actor?.items.some(i => i.system.identifier === toolIdentifier) : true;
+      toolOwned = !!actor?.items.some(i => (i.type === "tool") && (i.system.type?.baseItem === chosenToolKey));
     }
     const toolEligible = !chosenToolKey || (proficient && (toolOwned || (recipe.allowWorkshopOverride && this.#workshopClaimed)));
 
     const canStart = !!actor && !!targetItem && toolEligible && (materialsMet || (this.#fillWithGold && !goldInsufficient));
 
+    const totalHours = recipe.durationOverride.value != null
+      ? recipe.durationOverride.value * HOURS_PER_UNIT[recipe.durationOverride.units]
+      : (craftCost?.days ?? 0) * HOURS_PER_USE;
+
     return {
       recipe, actor, targetItem, craftCost, fixedLines, freeformItems,
       suppliedCP, thresholdCP, shortfallCP, materialsMet, goldCP, goldInsufficient,
-      toolKeys, chosenToolKey, proficient, toolOwned, toolEligible, canStart
+      toolKeys, chosenToolKey, proficient, toolOwned, toolEligible, canStart, totalHours, weight, halfPrice
     };
   }
 
@@ -332,7 +348,8 @@ export default class CraftStartDialog extends Dialog5e {
     await createCraftMessage({
       actor: state.actor, recipe: state.recipe, targetItem: state.targetItem,
       materialLines: [...state.fixedLines.filter(l => l.item), ...state.freeformItems.map(item => ({ item }))],
-      goldCP: state.goldCP, toolKey: state.chosenToolKey
+      goldCP: state.goldCP, toolKey: state.chosenToolKey, totalHours: state.totalHours,
+      weight: state.weight, halfPrice: state.halfPrice
     });
     ui.notifications.info(_loc("SIMPLE_SHOP_CRAFT_5E.CraftStart.Requested"));
     this.close();
