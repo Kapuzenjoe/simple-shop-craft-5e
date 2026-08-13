@@ -8,6 +8,3 @@ __MACOSX/
 **/.DS_Store
 *.lock
 BACKLOG.md
-C*.md
-.c*/
-*.pdf
