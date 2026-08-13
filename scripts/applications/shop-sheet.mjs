@@ -4,7 +4,7 @@ import { resolveDefaultPrice, resolveGoldPoolRows } from "../shop/currency.mjs";
 import { entryKey, resolveShopItems } from "../shop/entry-resolver.mjs";
 import { isHagglingLocked } from "../shop/haggling.mjs";
 import {
-  groupByType, groupSellItems, needsDefaultPrice, resolvePlayerOverride
+  buildItemTableSections, groupByType, groupSellItems, needsDefaultPrice, resolvePlayerOverride
 } from "../shop/pricing.mjs";
 
 import { openGenerateItemDialog } from "./generate-item-dialog.mjs";
@@ -230,26 +230,6 @@ export default class ShopSheet extends Application5e {
     else this.sellCart.set(itemId, next);
     await this.render();
     if ( this.#cartApp?.rendered ) this.#cartApp.render();
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Build the `item-table.hbs` context for a set of item-type groups.
-   * @param {object} options
-   * @param {{ label: string, items: object[] }[]} options.groups
-   * @param {string} options.emptyLabel
-   * @param {object[]} options.columns
-   * @param {string} options.rowTemplate
-   * @returns {{ hasRows: boolean, emptyLabel: string, sections: object[] }}
-   */
-  static #buildItemTable({ groups, emptyLabel, columns, rowTemplate }) {
-    const sections = groups.map(group => ({
-      label: group.label,
-      columns,
-      rows: group.items.map(row => ({ ...row, template: rowTemplate }))
-    }));
-    return { hasRows: sections.some(s => s.rows.length > 0), emptyLabel, sections };
   }
 
   /* -------------------------------------------- */
@@ -859,7 +839,7 @@ export default class ShopSheet extends Application5e {
     }
     if ( partId === "buy" ) {
       context.tabId = "buy";
-      context.table = ShopSheet.#buildItemTable({
+      context.table = buildItemTableSections({
         groups: context.groups, emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.None", columns: BUY_COLUMNS,
         rowTemplate: "modules/simple-shop-craft-5e/templates/shop-sheet/buy-row.hbs"
       });
@@ -868,7 +848,7 @@ export default class ShopSheet extends Application5e {
       context.tabId = "sell";
       context.showNoActor = !context.actor;
       context.noActorLabel = "SIMPLE_SHOP_CRAFT_5E.NoActorSelectedHint";
-      context.table = ShopSheet.#buildItemTable({
+      context.table = buildItemTableSections({
         groups: context.sellGroups, emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoSellableItems",
         columns: SELL_COLUMNS, rowTemplate: "modules/simple-shop-craft-5e/templates/shop-sheet/sell-row.hbs"
       });

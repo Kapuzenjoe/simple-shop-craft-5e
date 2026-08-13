@@ -32,9 +32,8 @@ export async function applyPurchase(purchase) {
     }
   }
 
-  const sellTotalCP = purchase.sellLines.reduce((sum, line) => sum + (line.priceCP * line.quantity), 0);
   const effectiveGoldCurrent = effectiveGoldPool(shop.goldPool);
-  if ( (effectiveGoldCurrent !== null) && (effectiveGoldCurrent < sellTotalCP) ) {
+  if ( (effectiveGoldCurrent !== null) && (purchase.netCP > 0) && (effectiveGoldCurrent < purchase.netCP) ) {
     return { ok: false, error: "SIMPLE_SHOP_CRAFT_5E.PurchaseCard.InsufficientShopGold" };
   }
 

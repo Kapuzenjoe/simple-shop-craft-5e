@@ -110,10 +110,13 @@ async function handleDecision(message, purchase, decision) {
  * @param {HTMLElement} html     Root element of the rendered message.
  */
 function onRenderPurchaseCard(message, html) {
-  if ( !game.user.isGM ) return;
-
   const purchase = message.getFlag(MODULE_ID, "purchase");
   if ( !purchase || (purchase.status !== "pending") ) return;
+
+  if ( !game.user.isGM ) {
+    html.querySelector(".card-buttons")?.remove();
+    return;
+  }
 
   html.querySelector('[data-action="acceptPurchase"]')?.addEventListener("click", () => handleDecision(message, purchase, "accepted"));
   html.querySelector('[data-action="rejectPurchase"]')?.addEventListener("click", () => handleDecision(message, purchase, "rejected"));

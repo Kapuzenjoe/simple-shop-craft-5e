@@ -100,10 +100,13 @@ async function handleDecision(message, craft, decision) {
  * @param {HTMLElement} html     Root element of the rendered message.
  */
 function onRenderCraftCard(message, html) {
-  if ( !game.user.isGM ) return;
-
   const craft = message.getFlag(MODULE_ID, "craft");
   if ( !craft || (craft.status !== "pending") ) return;
+
+  if ( !game.user.isGM ) {
+    html.querySelector(".card-buttons")?.remove();
+    return;
+  }
 
   html.querySelector('[data-action="acceptCraft"]')?.addEventListener("click", () => handleDecision(message, craft, "accepted"));
   html.querySelector('[data-action="rejectCraft"]')?.addEventListener("click", () => handleDecision(message, craft, "rejected"));

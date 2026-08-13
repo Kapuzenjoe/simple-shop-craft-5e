@@ -3,6 +3,7 @@ import { createRecipe, deleteRecipe, getRecipe, getRecipes } from "../data/recip
 import { createShop, deleteShop, getShop, getShops, updateShop } from "../data/shop-store.mjs";
 import { getStarterItems, getStarterPackOptions } from "../data/starter-packs.mjs";
 import { resolveEntries } from "../item-resolver.mjs";
+import { buildItemTableSections, finalizeGroups } from "../shop/pricing.mjs";
 
 import BasePromptDialog from "./base-prompt-dialog.mjs";
 import CraftStartDialog from "./craft-start-dialog.mjs";
@@ -340,8 +341,12 @@ export default class ShopManager extends Application5e {
       sections
     };
     const recipes = getRecipes();
-    const targetResolved = await resolveEntries(recipes.map(r => r.targetItem));
-    const recipeRows = recipes
+    const actor = game.user.character;
+    const visibleRecipes = context.isGM
+      ? recipes
+      : recipes.filter(r => r.openToAll || (actor && r.unlockedFor.has(actor.uuid)));
+    const targetResolved = await resolveEntries(visibleRecipes.map(r => r.targetItem));
+    const recipeRows = visibleRecipes
       .map((recipe, index) => ({
         recipe,
         displayName: recipe.name || targetResolved[index]?.item?.name
@@ -349,20 +354,20 @@ export default class ShopManager extends Application5e {
         unlockedLabel: recipe.openToAll
           ? _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.UnlockedAll")
           : (recipe.unlockedFor.size ? String(recipe.unlockedFor.size) : ""),
-        template: "modules/simple-shop-craft-5e/templates/shop-manager/recipe-row.hbs"
+        type: targetResolved[index]?.item?.type ?? "unknown"
       }))
       .toSorted((a, b) => a.displayName.localeCompare(b.displayName));
-    context.recipeTable = {
-      hasRows: recipeRows.length > 0,
+    const recipeGroups = new Map();
+    for ( const row of recipeRows ) {
+      if ( !recipeGroups.has(row.type) ) recipeGroups.set(row.type, []);
+      recipeGroups.get(row.type).push(row);
+    }
+    context.recipeTable = buildItemTableSections({
+      groups: finalizeGroups(recipeGroups),
       emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.None",
-      sections: recipeRows.length
-        ? [{
-          label: "SIMPLE_SHOP_CRAFT_5E.Recipe",
-          columns: [{ id: "name" }, { id: "unlocked", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Unlocked" }, { id: "controls" }],
-          rows: recipeRows
-        }]
-        : []
-    };
+      columns: [{ id: "name" }, { id: "unlocked", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Unlocked" }, { id: "controls" }],
+      rowTemplate: "modules/simple-shop-craft-5e/templates/shop-manager/recipe-row.hbs"
+    });
     return context;
   }
 

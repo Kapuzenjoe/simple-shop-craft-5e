@@ -49,7 +49,7 @@ export class Recipe extends foundry.abstract.DataModel {
       img: new FilePathField({ categories: ["IMAGE"], initial: () => Recipe.DEFAULT_ICON }),
       targetItem: new SchemaField(itemRefSchema()),
       materials: new ArrayField(new EmbeddedDataField(RecipeMaterial)),
-      allowFreeformMaterials: new BooleanField({ initial: false }),
+      allowFreeformMaterials: new BooleanField({ initial: true }),
       unlockedFor: new SetField(new DocumentUUIDField({ type: "Actor" })),
       openToAll: new BooleanField({ initial: false }),
       materialPrice: new ObjectField({ initial: {} }),

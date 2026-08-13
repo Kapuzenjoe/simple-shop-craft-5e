@@ -161,6 +161,14 @@ export default class RecipeSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
+   * Name of the resolved target item, cached as a title fallback once known.
+   * @type {string|null}
+   */
+  #targetItemName = null;
+
+  /* -------------------------------------------- */
+
+  /**
    * Can the current user edit this recipe at all? GM-only.
    * @type {boolean}
    */
@@ -182,7 +190,7 @@ export default class RecipeSheet extends Application5e {
 
   /** @override */
   get title() {
-    return this.recipe?.name || _loc("SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder");
+    return this.recipe?.name || this.#targetItemName || _loc("SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder");
   }
 
   /* -------------------------------------------- */
@@ -190,6 +198,7 @@ export default class RecipeSheet extends Application5e {
   /** @inheritDoc */
   async _onRender(context, options) {
     await super._onRender(context, options);
+    if ( this.hasFrame ) this.window.title.innerText = this.title;
     if ( !this.isEditable ) this._disableFields();
 
     const dropArea = this.element.querySelector("[data-drop-area]");
@@ -213,6 +222,7 @@ export default class RecipeSheet extends Application5e {
 
     const [targetResolved] = await resolveEntries([recipe.targetItem]);
     context.targetItem = targetResolved.item;
+    this.#targetItemName = targetResolved.item?.name ?? null;
     context.craftCost = null;
     if ( targetResolved.item?.uuid ) {
       try {

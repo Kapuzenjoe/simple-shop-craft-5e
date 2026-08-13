@@ -80,6 +80,12 @@ export default class CraftStartDialog extends Dialog5e {
    */
   #fillWithGold = false;
 
+  /**
+   * Name of the resolved target item, cached as a title fallback once known.
+   * @type {string|null}
+   */
+  #targetItemName = null;
+
   /* -------------------------------------------- */
 
   /**
@@ -104,7 +110,7 @@ export default class CraftStartDialog extends Dialog5e {
 
   /** @override */
   get title() {
-    return this.recipe?.name || _loc("SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder");
+    return this.recipe?.name || this.#targetItemName || _loc("SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder");
   }
 
   /* -------------------------------------------- */
@@ -112,6 +118,7 @@ export default class CraftStartDialog extends Dialog5e {
   /** @inheritDoc */
   async _onRender(context, options) {
     await super._onRender(context, options);
+    if ( this.hasFrame ) this.window.title.innerText = this.title;
 
     this.element.addEventListener("change", event => {
       if ( event.target.name === "selectedActor" ) {
@@ -144,6 +151,7 @@ export default class CraftStartDialog extends Dialog5e {
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
     context.state = await this.#computeState();
+    this.#targetItemName = context.state.targetItem?.name ?? null;
     return context;
   }
 
