@@ -1,4 +1,4 @@
-import { entryKey as resolveEntryKey, resolveIdentifierIndex } from "../item-resolver.mjs";
+import { itemRefKey, resolveIdentifierIndex } from "../utils.mjs";
 
 import { synthesizeEnchantedItem } from "./enchantment.mjs";
 
@@ -11,7 +11,7 @@ import { synthesizeEnchantedItem } from "./enchantment.mjs";
 export function entryKey(entry) {
   if ( entry.generated ) return [entry.generated.baseItemUuid, entry.generated.enchantItemUuid, entry.generated.effectId].join("|");
   if ( entry.spellScroll ) return entry.spellScroll.spellUuid;
-  return resolveEntryKey(entry);
+  return itemRefKey(entry);
 }
 
 /* -------------------------------------------- */
@@ -55,10 +55,16 @@ async function resolveGeneratedItem({ baseItemUuid, enchantItemUuid, effectId })
 /* -------------------------------------------- */
 
 /**
- * Resolve a spell scroll shop entry's recipe into a synthesized, non-persisted Item.
+ * Resolve a spell scroll shop entry's recipe into a synthesized, non-persisted Item — with a unique
+ * per-level, per-spell `system.identifier` in place of the template's shared generic one.
  * @param {{ spellUuid: string }} spellScroll
  * @returns {Promise<Item5e|null>}
  */
 async function resolveSpellScrollItem({ spellUuid }) {
-  return Item.implementation.createScrollFromCompendiumSpell(spellUuid, { dialog: false }) ?? null;
+  const scroll = await Item.implementation.createScrollFromCompendiumSpell(spellUuid, { dialog: false });
+  if ( !scroll ) return null;
+  const level = scroll.system.activities?.find(a => a.type === "cast")?.spell?.level ?? 0;
+  const spell = await fromUuid(spellUuid);
+  scroll.updateSource({ "system.identifier": `spell-scroll-${level}-${spell?.system.identifier ?? spell?.id}` });
+  return scroll;
 }

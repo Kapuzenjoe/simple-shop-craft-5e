@@ -1,8 +1,8 @@
 import { MODULE_ID } from "../config.mjs";
 import { Recipe } from "../data/recipe-data.mjs";
 import { getRecipe, updateRecipe } from "../data/recipe-store.mjs";
-import { entryKey, resolveEntries } from "../item-resolver.mjs";
-import { breakdownCopper, currencyRows, goldPoolCurrencies, toCopper } from "../shop/currency.mjs";
+import { breakdownCopper, currencyRows, effectiveCraftCost, goldPoolCurrencies, toCopper } from "../shop/currency.mjs";
+import { itemRefKey, resolveEntries } from "../utils.mjs";
 
 const { Application5e } = game.dnd5e.applications.api;
 
@@ -14,6 +14,8 @@ export default class RecipeSheet extends Application5e {
     super(options);
     this.recipeId = options.recipeId;
   }
+
+  /* -------------------------------------------- */
 
   /** @override */
   static DEFAULT_OPTIONS = {
@@ -35,6 +37,8 @@ export default class RecipeSheet extends Application5e {
     }
   };
 
+  /* -------------------------------------------- */
+
   /** @override */
   static PARTS = {
     content: {
@@ -43,6 +47,154 @@ export default class RecipeSheet extends Application5e {
     }
   };
 
+  /* -------------------------------------------- */
+  /*  Properties                                   */
+  /* -------------------------------------------- */
+
+  /**
+   * Id of the recipe being edited.
+   * @type {string}
+   */
+  recipeId;
+
+  /* -------------------------------------------- */
+
+  /**
+   * Name of the resolved target item, cached as a title fallback once known.
+   * @type {string|null}
+   */
+  #targetItemName = null;
+
+  /* -------------------------------------------- */
+
+  /**
+   * Can the current user edit this recipe at all? GM-only.
+   * @type {boolean}
+   */
+  get isEditable() {
+    return game.user.isGM;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * The recipe currently being edited.
+   * @type {Recipe}
+   */
+  get recipe() {
+    return getRecipe(this.recipeId);
+  }
+
+  /* -------------------------------------------- */
+
+  /** @override */
+  get title() {
+    return this.recipe?.name || this.#targetItemName || _loc("SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder");
+  }
+
+  /* -------------------------------------------- */
+  /*  Rendering                                    */
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  async _prepareContext(options) {
+    const context = await super._prepareContext(options);
+    const recipe = this.recipe;
+    context.recipe = recipe;
+    const fields = Recipe.schema.fields;
+
+    const [targetResolved] = await resolveEntries([recipe.targetItem]);
+    context.targetItem = targetResolved.item;
+    this.#targetItemName = targetResolved.item?.name ?? null;
+    context.craftCost = null;
+    if ( targetResolved.item?.uuid ) {
+      try {
+        const fullItem = await fromUuid(targetResolved.item.uuid);
+        if ( fullItem?.system?.getCraftCost ) context.craftCost = await effectiveCraftCost(fullItem);
+      } catch ( err ) {
+        console.warn(`${MODULE_ID} | Failed to compute craft cost for ${targetResolved.item.name}:`, err);
+      }
+    }
+    const craftCostBreakdown = Object.fromEntries(goldPoolCurrencies().map(d => [d, 0]));
+    if ( context.craftCost ) {
+      for ( const part of breakdownCopper(toCopper(context.craftCost.gold, "gp")) ) craftCostBreakdown[part.denomination] = part.value;
+    }
+
+    const materialsResolved = await resolveEntries(recipe.materials);
+    const materialRows = materialsResolved.filter(r => r.item).map(r => ({
+      key: itemRefKey(r.entry), img: r.item.img, name: r.item.name,
+      template: "modules/simple-shop-craft-5e/templates/recipe-sheet/material-row.hbs"
+    }));
+    context.materialsTable = {
+      hasRows: materialRows.length > 0,
+      emptyLabel: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.MaterialsNone",
+      sections: materialRows.length ? [{ label: "", columns: [{ id: "name" }, { id: "controls" }], rows: materialRows }] : []
+    };
+
+    context.targetItemUuidField = [
+      { field: fields.targetItem.fields.uuid, name: "targetItem.uuid", value: recipe.targetItem.uuid }
+    ];
+    context.identityFields = [
+      {
+        field: fields.name, name: "name", value: recipe.name,
+        placeholder: targetResolved.item?.name || _loc("SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder")
+      }
+    ];
+    context.materialFields = [
+      {
+        field: fields.allowFreeformMaterials, name: "allowFreeformMaterials", value: recipe.allowFreeformMaterials
+      }
+    ];
+    context.materialPriceRows = currencyRows(recipe.materialPrice, "materialPrice.", craftCostBreakdown);
+    context.unlockFields = [
+      { field: fields.unlockedFor, name: "unlockedFor", value: Array.from(recipe.unlockedFor) },
+      { field: fields.openToAll, name: "openToAll", value: recipe.openToAll }
+    ];
+    context.toolFields = [
+      {
+        field: fields.toolProficiencies, name: "toolProficiencies", value: Array.from(recipe.toolProficiencies),
+        options: await toolOptions()
+      },
+      { field: fields.allowWorkshopOverride, name: "allowWorkshopOverride", value: recipe.allowWorkshopOverride }
+    ];
+    context.durationFields = [
+      {
+        field: fields.durationOverride.fields.value, name: "durationOverride.value", value: recipe.durationOverride.value,
+        input: (field, config) => foundry.applications.fields.createNumberInput(config),
+        placeholder: context.craftCost ? String(context.craftCost.days) : undefined
+      },
+      {
+        field: fields.durationOverride.fields.units, name: "durationOverride.units", value: recipe.durationOverride.units,
+        label: _loc("DND5E.Unit"),
+        options: ["minute", "hour", "day"].map(value => ({ value, label: CONFIG.DND5E.timeUnits[value].label }))
+      }
+    ];
+
+    return context;
+  }
+
+  /* -------------------------------------------- */
+  /*  Life-Cycle Handlers                          */
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  async _onRender(context, options) {
+    await super._onRender(context, options);
+    if ( this.hasFrame ) this.window.title.innerText = this.title;
+    if ( !this.isEditable ) this._disableFields();
+
+    const dropArea = this.element.querySelector("[data-drop-area]");
+    dropArea?.addEventListener("dragover", event => event.preventDefault());
+    dropArea?.addEventListener("dragenter", () => dropArea.classList.add("is-dragover"));
+    dropArea?.addEventListener("dragleave", event => {
+      if ( event.currentTarget.contains(event.relatedTarget) ) return;
+      dropArea.classList.remove("is-dragover");
+    });
+    dropArea?.addEventListener("drop", event => this.#onDropItem(event));
+  }
+
+  /* -------------------------------------------- */
+  /*  Event Listeners and Handlers                 */
   /* -------------------------------------------- */
 
   /**
@@ -61,10 +213,10 @@ export default class RecipeSheet extends Application5e {
     if ( !newEntries.length ) return;
 
     const recipe = this.recipe;
-    const existingKeys = new Set(recipe.materials.map(m => entryKey(m)));
+    const existingKeys = new Set(recipe.materials.map(m => itemRefKey(m)));
     const materials = [
       ...recipe.materials.map(m => m.toObject()),
-      ...newEntries.filter(e => !existingKeys.has(entryKey(e)))
+      ...newEntries.filter(e => !existingKeys.has(itemRefKey(e)))
     ];
     await updateRecipe(this.recipeId, { materials });
     this.render();
@@ -133,7 +285,7 @@ export default class RecipeSheet extends Application5e {
    */
   static async #removeMaterial(event, target) {
     const key = target.dataset.key;
-    const materials = this.recipe.materials.filter(m => entryKey(m) !== key).map(m => m.toObject());
+    const materials = this.recipe.materials.filter(m => itemRefKey(m) !== key).map(m => m.toObject());
     await updateRecipe(this.recipeId, { materials });
     this.render();
   }
@@ -151,144 +303,7 @@ export default class RecipeSheet extends Application5e {
   }
 
   /* -------------------------------------------- */
-
-  /**
-   * Id of the recipe being edited.
-   * @type {string}
-   */
-  recipeId;
-
-  /* -------------------------------------------- */
-
-  /**
-   * Name of the resolved target item, cached as a title fallback once known.
-   * @type {string|null}
-   */
-  #targetItemName = null;
-
-  /* -------------------------------------------- */
-
-  /**
-   * Can the current user edit this recipe at all? GM-only.
-   * @type {boolean}
-   */
-  get isEditable() {
-    return game.user.isGM;
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * The recipe currently being edited.
-   * @type {Recipe}
-   */
-  get recipe() {
-    return getRecipe(this.recipeId);
-  }
-
-  /* -------------------------------------------- */
-
-  /** @override */
-  get title() {
-    return this.recipe?.name || this.#targetItemName || _loc("SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder");
-  }
-
-  /* -------------------------------------------- */
-
-  /** @inheritDoc */
-  async _onRender(context, options) {
-    await super._onRender(context, options);
-    if ( this.hasFrame ) this.window.title.innerText = this.title;
-    if ( !this.isEditable ) this._disableFields();
-
-    const dropArea = this.element.querySelector("[data-drop-area]");
-    dropArea?.addEventListener("dragover", event => event.preventDefault());
-    dropArea?.addEventListener("dragenter", () => dropArea.classList.add("is-dragover"));
-    dropArea?.addEventListener("dragleave", event => {
-      if ( event.currentTarget.contains(event.relatedTarget) ) return;
-      dropArea.classList.remove("is-dragover");
-    });
-    dropArea?.addEventListener("drop", event => this.#onDropItem(event));
-  }
-
-  /* -------------------------------------------- */
-
-  /** @inheritDoc */
-  async _prepareContext(options) {
-    const context = await super._prepareContext(options);
-    const recipe = this.recipe;
-    context.recipe = recipe;
-    const fields = Recipe.schema.fields;
-
-    const [targetResolved] = await resolveEntries([recipe.targetItem]);
-    context.targetItem = targetResolved.item;
-    this.#targetItemName = targetResolved.item?.name ?? null;
-    context.craftCost = null;
-    if ( targetResolved.item?.uuid ) {
-      try {
-        const fullItem = await fromUuid(targetResolved.item.uuid);
-        if ( fullItem?.system?.getCraftCost ) context.craftCost = await fullItem.system.getCraftCost();
-      } catch ( err ) {
-        console.warn(`${MODULE_ID} | Failed to compute craft cost for ${targetResolved.item.name}:`, err);
-      }
-    }
-    const craftCostBreakdown = Object.fromEntries(goldPoolCurrencies().map(d => [d, 0]));
-    if ( context.craftCost ) {
-      for ( const part of breakdownCopper(toCopper(context.craftCost.gold, "gp")) ) craftCostBreakdown[part.denomination] = part.value;
-    }
-
-    const materialsResolved = await resolveEntries(recipe.materials);
-    const materialRows = materialsResolved.filter(r => r.item).map(r => ({
-      key: entryKey(r.entry), img: r.item.img, name: r.item.name,
-      template: "modules/simple-shop-craft-5e/templates/recipe-sheet/material-row.hbs"
-    }));
-    context.materialsTable = {
-      hasRows: materialRows.length > 0,
-      emptyLabel: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.MaterialsNone",
-      sections: materialRows.length ? [{ label: "", columns: [{ id: "name" }, { id: "controls" }], rows: materialRows }] : []
-    };
-
-    context.targetItemUuidField = [
-      { field: fields.targetItem.fields.uuid, name: "targetItem.uuid", value: recipe.targetItem.uuid }
-    ];
-    context.identityFields = [
-      {
-        field: fields.name, name: "name", value: recipe.name,
-        placeholder: targetResolved.item?.name || _loc("SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder")
-      }
-    ];
-    context.materialFields = [
-      {
-        field: fields.allowFreeformMaterials, name: "allowFreeformMaterials", value: recipe.allowFreeformMaterials
-      }
-    ];
-    context.materialPriceRows = currencyRows(recipe.materialPrice, "materialPrice.", craftCostBreakdown);
-    context.unlockFields = [
-      { field: fields.unlockedFor, name: "unlockedFor", value: Array.from(recipe.unlockedFor) },
-      { field: fields.openToAll, name: "openToAll", value: recipe.openToAll }
-    ];
-    context.toolFields = [
-      {
-        field: fields.toolProficiencies, name: "toolProficiencies", value: Array.from(recipe.toolProficiencies),
-        options: await toolOptions()
-      },
-      { field: fields.allowWorkshopOverride, name: "allowWorkshopOverride", value: recipe.allowWorkshopOverride }
-    ];
-    context.durationFields = [
-      {
-        field: fields.durationOverride.fields.value, name: "durationOverride.value", value: recipe.durationOverride.value,
-        input: (field, config) => foundry.applications.fields.createNumberInput(config),
-        placeholder: context.craftCost ? String(context.craftCost.days) : undefined
-      },
-      {
-        field: fields.durationOverride.fields.units, name: "durationOverride.units", value: recipe.durationOverride.units,
-        options: ["minute", "hour", "day"].map(value => ({ value, label: CONFIG.DND5E.timeUnits[value].label }))
-      }
-    ];
-
-    return context;
-  }
-
+  /*  Helpers                                      */
   /* -------------------------------------------- */
 
   /**
@@ -306,7 +321,7 @@ export default class RecipeSheet extends Application5e {
 
     const recipe = this.recipe;
     const entry = itemEntryRef(item);
-    if ( recipe.materials.some(m => entryKey(m) === entryKey(entry)) ) return;
+    if ( recipe.materials.some(m => itemRefKey(m) === itemRefKey(entry)) ) return;
 
     await updateRecipe(this.recipeId, { materials: [...recipe.materials.map(m => m.toObject()), entry] });
     this.render();
@@ -328,13 +343,16 @@ function itemEntryRef(item) {
 /* -------------------------------------------- */
 
 /**
- * Build the tool proficiency select options, limited to Artisan's Tools.
+ * Build the tool proficiency select options: Artisan's Tools plus the Herbalism Kit and Poisoner's Kit,
+ * the two specialty kits with a defined crafting role (Potions, poisons).
  * @returns {Promise<{ value: string, label: string }[]>}
  */
 async function toolOptions() {
   const categories = await game.dnd5e.documents.Trait.categories("tool");
   const artisanTools = categories.art?.children ?? {};
-  return Object.entries(artisanTools)
+  const specialtyKits = { herb: categories.herb, pois: categories.pois };
+  return Object.entries({ ...artisanTools, ...specialtyKits })
+    .filter(([, data]) => data)
     .map(([value, { label }]) => ({ value, label }))
     .sort((a, b) => a.label.localeCompare(b.label));
 }

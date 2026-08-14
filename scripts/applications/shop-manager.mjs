@@ -2,8 +2,7 @@ import { SETTLEMENT_CAPS, GOLD_POOL_DEFAULT } from "../config.mjs";
 import { createRecipe, deleteRecipe, getRecipe, getRecipes } from "../data/recipe-store.mjs";
 import { createShop, deleteShop, getShop, getShops, updateShop } from "../data/shop-store.mjs";
 import { getStarterItems, getStarterPackOptions } from "../data/starter-packs.mjs";
-import { resolveEntries } from "../item-resolver.mjs";
-import { buildItemTableSections, finalizeGroups } from "../shop/pricing.mjs";
+import { buildItemTableSections, finalizeGroups, resolveEntries } from "../utils.mjs";
 
 import BasePromptDialog from "./base-prompt-dialog.mjs";
 import CraftStartDialog from "./craft-start-dialog.mjs";
@@ -39,6 +38,8 @@ export default class ShopManager extends Application5e {
     }
   };
 
+  /* -------------------------------------------- */
+
   /** @override */
   static PARTS = {
     tabs: { template: "templates/generic/tab-navigation.hbs" },
@@ -52,6 +53,8 @@ export default class ShopManager extends Application5e {
     }
   };
 
+  /* -------------------------------------------- */
+
   /** @override */
   static TABS = {
     primary: {
@@ -64,7 +67,114 @@ export default class ShopManager extends Application5e {
   };
 
   /* -------------------------------------------- */
-  /*  Creation                                     */
+  /*  Rendering                                    */
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  async _prepareContext(options) {
+    const context = await super._prepareContext(options);
+    context.isGM = game.user.isGM;
+    const shops = getShops().filter(s => context.isGM || s.active);
+    const rows = shops.toSorted((a, b) => a.name.localeCompare(b.name)).map(shop => ({
+      shop,
+      npc: shop.npc ? fromUuidSync(shop.npc) : null,
+      subtitle: [shop.location || null, ShopManager.#settlementCapLabel(shop) || null].filter(Boolean).join(" · "),
+      template: "modules/simple-shop-craft-5e/templates/shop-manager/shop-row.hbs"
+    }));
+    const columns = [
+      { id: "name" },
+      { id: "npc", label: "SIMPLE_SHOP_CRAFT_5E.Owner" },
+      { id: "active", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Status" },
+      { id: "controls" }
+    ];
+    const sections = context.isGM
+      ? [
+        { label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Active", columns, rows: rows.filter(r => r.shop.active) },
+        { label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Inactive", columns, rows: rows.filter(r => !r.shop.active) }
+      ].filter(s => s.rows.length)
+      : [{ label: "SIMPLE_SHOP_CRAFT_5E.Shop", columns, rows }];
+    context.table = {
+      hasRows: rows.length > 0,
+      emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.None",
+      sections
+    };
+    const recipes = getRecipes();
+    const actor = game.user.character;
+    const visibleRecipes = context.isGM
+      ? recipes
+      : recipes.filter(r => r.openToAll || (actor && r.unlockedFor.has(actor.uuid)));
+    const targetResolved = await resolveEntries(visibleRecipes.map(r => r.targetItem));
+    const recipeRows = visibleRecipes
+      .map((recipe, index) => ({
+        recipe,
+        displayName: recipe.name || targetResolved[index]?.item?.name
+          || _loc("SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder"),
+        unlockedLabel: recipe.openToAll
+          ? _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.UnlockedAll")
+          : (recipe.unlockedFor.size ? String(recipe.unlockedFor.size) : ""),
+        type: targetResolved[index]?.item?.type ?? "unknown"
+      }))
+      .toSorted((a, b) => a.displayName.localeCompare(b.displayName));
+    const recipeGroups = new Map();
+    for ( const row of recipeRows ) {
+      if ( !recipeGroups.has(row.type) ) recipeGroups.set(row.type, []);
+      recipeGroups.get(row.type).push(row);
+    }
+    context.recipeTable = buildItemTableSections({
+      groups: finalizeGroups(recipeGroups),
+      emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.None",
+      columns: [{ id: "name" }, { id: "unlocked", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Unlocked" }, { id: "controls" }],
+      rowTemplate: "modules/simple-shop-craft-5e/templates/shop-manager/recipe-row.hbs"
+    });
+    return context;
+  }
+
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  async _preparePartContext(partId, context, options) {
+    context = await super._preparePartContext(partId, context, options);
+    context.tab = context.tabs?.[partId];
+    return context;
+  }
+
+  /* -------------------------------------------- */
+  /*  Life-Cycle Handlers                          */
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  async _onFirstRender(context, options) {
+    await super._onFirstRender(context, options);
+    new game.dnd5e.applications.ContextMenu5e(this.element, "[data-shop-id]", [], {
+      onOpen: element => {
+        const shop = getShop(element.dataset.shopId);
+        ui.context.menuItems = this._getShopContextOptions(shop);
+      },
+      jQuery: false
+    });
+    new game.dnd5e.applications.ContextMenu5e(this.element, "[data-recipe-id]", [], {
+      onOpen: element => {
+        const recipe = getRecipe(element.dataset.recipeId);
+        ui.context.menuItems = this._getRecipeContextOptions(recipe);
+      },
+      jQuery: false
+    });
+  }
+
+  /* -------------------------------------------- */
+  /*  Event Listeners and Handlers                 */
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  _attachPartListeners(partId, htmlElement, options) {
+    super._attachPartListeners(partId, htmlElement, options);
+    if ( ["shops", "recipes"].includes(partId) ) {
+      htmlElement.querySelectorAll("[data-context-menu]").forEach(control => {
+        return control.addEventListener("click", game.dnd5e.applications.ContextMenu5e.triggerEvent);
+      });
+    }
+  }
+
   /* -------------------------------------------- */
 
   /**
@@ -143,7 +253,6 @@ export default class ShopManager extends Application5e {
    * @this {ShopManager}
    * @param {Event} event         Triggering click event.
    * @param {HTMLElement} target  Button that was clicked.
-   * @returns {void}
    */
   static #editRecipe(event, target) {
     new RecipeSheet({ recipeId: target.dataset.recipeId }).render({ force: true });
@@ -156,7 +265,6 @@ export default class ShopManager extends Application5e {
    * @this {ShopManager}
    * @param {Event} event         Triggering click event.
    * @param {HTMLElement} target  Button that was clicked.
-   * @returns {void}
    */
   static #editShop(event, target) {
     new ShopSheet({ shopId: target.dataset.shopId }).render({ force: true });
@@ -169,7 +277,6 @@ export default class ShopManager extends Application5e {
    * @this {ShopManager}
    * @param {Event} event         Triggering click event.
    * @param {HTMLElement} target  Element that was clicked.
-   * @returns {void}
    */
   static #startCraft(event, target) {
     const recipe = getRecipe(target.dataset.recipeId);
@@ -178,25 +285,11 @@ export default class ShopManager extends Application5e {
       const actor = game.user.character;
       const allowed = recipe.openToAll || (actor && recipe.unlockedFor.has(actor.uuid));
       if ( !allowed ) {
-        ui.notifications.warn(_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Locked"));
+        ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Locked");
         return;
       }
     }
     new CraftStartDialog({ recipeId: recipe._id }).render({ force: true });
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Determine the display label for a shop's settlement cap: the matching preset name, "Custom" for a
-   * non-preset value, or an empty string when uncapped.
-   * @param {Shop} shop
-   * @returns {string}
-   */
-  static #settlementCapLabel(shop) {
-    const preset = Object.entries(SETTLEMENT_CAPS).find(([, v]) => v.value === shop.settlementCap.value)?.[0];
-    if ( preset ) return _loc(SETTLEMENT_CAPS[preset].label);
-    return shop.settlementCap.value != null ? _loc("SIMPLE_SHOP_CRAFT_5E.Custom") : "";
   }
 
   /* -------------------------------------------- */
@@ -214,11 +307,26 @@ export default class ShopManager extends Application5e {
   }
 
   /* -------------------------------------------- */
+  /*  Helpers                                      */
+  /* -------------------------------------------- */
+
+  /**
+   * Determine the display label for a shop's settlement cap: the matching preset name, "Custom" for a
+   * non-preset value, or an empty string when uncapped.
+   * @param {Shop} shop
+   * @returns {string}
+   */
+  static #settlementCapLabel(shop) {
+    const preset = Object.entries(SETTLEMENT_CAPS).find(([, v]) => v.value === shop.settlementCap.value)?.[0];
+    if ( preset ) return _loc(SETTLEMENT_CAPS[preset].label);
+    return shop.settlementCap.value != null ? _loc("SIMPLE_SHOP_CRAFT_5E.Custom") : "";
+  }
+
+  /* -------------------------------------------- */
 
   /**
    * Add a button to the Item Directory sidebar header to open this application.
    * @param {HTMLElement} html  Rendered Item Directory element.
-   * @returns {void}
    */
   static injectSidebarButton(html) {
     const button = document.createElement("button");
@@ -227,18 +335,6 @@ export default class ShopManager extends Application5e {
     button.innerHTML = `<i class="fas fa-store" inert></i> ${_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Title")}`;
     button.addEventListener("click", () => (new ShopManager()).render({ force: true }));
     html.querySelector(".header-actions").append(button);
-  }
-
-  /* -------------------------------------------- */
-
-  /** @inheritDoc */
-  _attachPartListeners(partId, htmlElement, options) {
-    super._attachPartListeners(partId, htmlElement, options);
-    if ( ["shops", "recipes"].includes(partId) ) {
-      htmlElement.querySelectorAll("[data-context-menu]").forEach(control => {
-        return control.addEventListener("click", game.dnd5e.applications.ContextMenu5e.triggerEvent);
-      });
-    }
   }
 
   /* -------------------------------------------- */
@@ -291,97 +387,6 @@ export default class ShopManager extends Application5e {
 
   /* -------------------------------------------- */
 
-  /** @inheritDoc */
-  async _onFirstRender(context, options) {
-    await super._onFirstRender(context, options);
-    new game.dnd5e.applications.ContextMenu5e(this.element, "[data-shop-id]", [], {
-      onOpen: element => {
-        const shop = getShop(element.dataset.shopId);
-        ui.context.menuItems = this._getShopContextOptions(shop);
-      },
-      jQuery: false
-    });
-    new game.dnd5e.applications.ContextMenu5e(this.element, "[data-recipe-id]", [], {
-      onOpen: element => {
-        const recipe = getRecipe(element.dataset.recipeId);
-        ui.context.menuItems = this._getRecipeContextOptions(recipe);
-      },
-      jQuery: false
-    });
-  }
-
-  /* -------------------------------------------- */
-
-  /** @inheritDoc */
-  async _prepareContext(options) {
-    const context = await super._prepareContext(options);
-    context.isGM = game.user.isGM;
-    const shops = getShops().filter(s => context.isGM || s.active);
-    const rows = shops.toSorted((a, b) => a.name.localeCompare(b.name)).map(shop => ({
-      shop,
-      npc: shop.npc ? fromUuidSync(shop.npc) : null,
-      subtitle: [shop.location || null, ShopManager.#settlementCapLabel(shop) || null].filter(Boolean).join(" · "),
-      template: "modules/simple-shop-craft-5e/templates/shop-manager/shop-row.hbs"
-    }));
-    const columns = [
-      { id: "name" },
-      { id: "npc", label: "SIMPLE_SHOP_CRAFT_5E.Owner" },
-      { id: "active", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Status" },
-      { id: "controls" }
-    ];
-    const sections = context.isGM
-      ? [
-        { label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Active", columns, rows: rows.filter(r => r.shop.active) },
-        { label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Inactive", columns, rows: rows.filter(r => !r.shop.active) }
-      ].filter(s => s.rows.length)
-      : [{ label: "SIMPLE_SHOP_CRAFT_5E.Shop", columns, rows }];
-    context.table = {
-      hasRows: rows.length > 0,
-      emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.None",
-      sections
-    };
-    const recipes = getRecipes();
-    const actor = game.user.character;
-    const visibleRecipes = context.isGM
-      ? recipes
-      : recipes.filter(r => r.openToAll || (actor && r.unlockedFor.has(actor.uuid)));
-    const targetResolved = await resolveEntries(visibleRecipes.map(r => r.targetItem));
-    const recipeRows = visibleRecipes
-      .map((recipe, index) => ({
-        recipe,
-        displayName: recipe.name || targetResolved[index]?.item?.name
-          || _loc("SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder"),
-        unlockedLabel: recipe.openToAll
-          ? _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.UnlockedAll")
-          : (recipe.unlockedFor.size ? String(recipe.unlockedFor.size) : ""),
-        type: targetResolved[index]?.item?.type ?? "unknown"
-      }))
-      .toSorted((a, b) => a.displayName.localeCompare(b.displayName));
-    const recipeGroups = new Map();
-    for ( const row of recipeRows ) {
-      if ( !recipeGroups.has(row.type) ) recipeGroups.set(row.type, []);
-      recipeGroups.get(row.type).push(row);
-    }
-    context.recipeTable = buildItemTableSections({
-      groups: finalizeGroups(recipeGroups),
-      emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.None",
-      columns: [{ id: "name" }, { id: "unlocked", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Unlocked" }, { id: "controls" }],
-      rowTemplate: "modules/simple-shop-craft-5e/templates/shop-manager/recipe-row.hbs"
-    });
-    return context;
-  }
-
-  /* -------------------------------------------- */
-
-  /** @inheritDoc */
-  async _preparePartContext(partId, context, options) {
-    context = await super._preparePartContext(partId, context, options);
-    context.tab = context.tabs?.[partId];
-    return context;
-  }
-
-  /* -------------------------------------------- */
-
   /**
    * Handle deleting an existing recipe, after confirmation.
    * @param {Recipe} recipe
@@ -424,7 +429,7 @@ export default class ShopManager extends Application5e {
   async #duplicateShop(shop) {
     const clone = shop.toObject();
     delete clone._id;
-    clone.name = game.i18n.format("DOCUMENT.CopyOf", { name: shop.name });
+    clone.name = _loc("DOCUMENT.CopyOf", { name: shop.name });
     await createShop(clone);
     this.render();
   }

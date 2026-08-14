@@ -43,7 +43,8 @@ export default [
   },
   {
     rules: {
-      "foundry/sort-object-keys": "off"
+      "foundry/sort-object-keys": "off",
+      "perfectionist/sort-classes": "off"
     }
   }
 ];

@@ -21,6 +21,8 @@ export default class GenerateItemDialog extends Dialog5e {
     this.onGenerated = onGenerated;
   }
 
+  /* -------------------------------------------- */
+
   /** @override */
   static DEFAULT_OPTIONS = {
     id: "generate-item-dialog-{id}",
@@ -40,6 +42,8 @@ export default class GenerateItemDialog extends Dialog5e {
     }
   };
 
+  /* -------------------------------------------- */
+
   /** @override */
   static PARTS = {
     ...super.PARTS,
@@ -54,11 +58,15 @@ export default class GenerateItemDialog extends Dialog5e {
    */
   shopSheet;
 
+  /* -------------------------------------------- */
+
   /**
    * Callback receiving the generated entries.
    * @type {(entries: ShopItemEntryData[]) => Promise<void>}
    */
   onGenerated;
+
+  /* -------------------------------------------- */
 
   /**
    * Selected item types.
@@ -66,11 +74,15 @@ export default class GenerateItemDialog extends Dialog5e {
    */
   #types = new Set();
 
+  /* -------------------------------------------- */
+
   /**
    * Selected subtypes per type. An empty (or absent) Set for a type means "Any" — no restriction.
    * @type {Map<string, Set<string>>}
    */
   #subtypesByType = new Map();
+
+  /* -------------------------------------------- */
 
   /**
    * Selected rarities; empty means "Any".
@@ -78,11 +90,15 @@ export default class GenerateItemDialog extends Dialog5e {
    */
   #rarities = new Set();
 
+  /* -------------------------------------------- */
+
   /**
    * Magic/Mundane filter.
    * @type {"any"|"magic"|"mundane"}
    */
   #magic = ANY_VALUE;
+
+  /* -------------------------------------------- */
 
   /**
    * Selected spell schools for scroll generation; empty means "Any".
@@ -90,11 +106,15 @@ export default class GenerateItemDialog extends Dialog5e {
    */
   #schools = new Set();
 
+  /* -------------------------------------------- */
+
   /**
    * Whether to restrict scroll generation to rituals only.
    * @type {boolean}
    */
   #ritualOnly = false;
+
+  /* -------------------------------------------- */
 
   /**
    * Selected spellcasting classes for scroll generation; empty means "Any".
@@ -102,11 +122,15 @@ export default class GenerateItemDialog extends Dialog5e {
    */
   #classes = new Set();
 
+  /* -------------------------------------------- */
+
   /**
    * Selected spell levels for scroll generation; empty means "Any".
    * @type {Set<number>}
    */
   #levels = new Set();
+
+  /* -------------------------------------------- */
 
   /**
    * Number of items to generate in this batch.
@@ -199,7 +223,7 @@ export default class GenerateItemDialog extends Dialog5e {
     context.globalFields = [
       {
         field: new foundry.data.fields.SetField(new foundry.data.fields.StringField()), name: "rarities",
-        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemRarity"),
+        label: _loc("DND5E.Rarity"),
         value: this.#rarities.size ? Array.from(this.#rarities).map(r => r === "" ? "mundane" : r) : [ANY_VALUE],
         options: [
           { value: ANY_VALUE, label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemAny") },
@@ -289,12 +313,12 @@ export default class GenerateItemDialog extends Dialog5e {
     }
 
     await this.onGenerated(rolled.map(r => r.entry));
-    const message = (rolled.length === 1)
-      ? game.i18n.format("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemResult", { name: rolled[0].label })
+    const [key, format] = (rolled.length === 1)
+      ? ["SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemResult", { name: rolled[0].label }]
       : (rolled.length === this.#count)
-        ? game.i18n.format("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemResultMultiple", { count: rolled.length })
-        : game.i18n.format("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemPartial", { count: rolled.length, total: this.#count });
-    ui.notifications.info(message);
+        ? ["SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemResultMultiple", { count: rolled.length }]
+        : ["SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemPartial", { count: rolled.length, total: this.#count }];
+    ui.notifications.info(key, { format });
   }
 }
 

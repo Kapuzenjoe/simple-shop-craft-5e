@@ -30,7 +30,7 @@ export async function openHaggleDialog(shopSheet, onPatchPlayerDiscount) {
     fields: [
       {
         field: new foundry.data.fields.StringField(), name: "skill",
-        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.HagglingSkill"),
+        label: _loc("DND5E.Skill"),
         options: chaSkills.map(([value, s]) => ({ value, label: s.label }))
       },
       {

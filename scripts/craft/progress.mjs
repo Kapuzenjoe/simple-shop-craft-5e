@@ -1,11 +1,5 @@
-import { MODULE_ID } from "../config.mjs";
-import { resolveEntries } from "../item-resolver.mjs";
-
-/**
- * Hours of progress granted per use of the "Progress Craft" activity (one downtime workday).
- * @type {number}
- */
-export const HOURS_PER_USE = 8;
+import { HOURS_PER_USE, MODULE_ID } from "../config.mjs";
+import { resolveEntries } from "../utils.mjs";
 
 /**
  * Activity type used for the "Progress Craft" activity — generic, no combat mechanics.
@@ -20,30 +14,6 @@ const ACTIVITY_TYPE = "utility";
 const PROGRESS_BLOCK_REGEX = /<div class="simple-shop-craft-5e craft-progress">[\s\S]*?<\/div>/;
 
 /**
- * Register hooks driving craft progress: activity usage and self-healing on sheet render.
- * @returns {void}
- */
-export function registerCraftProgress() {
-  Hooks.on("dnd5e.postUseActivity", onPostUseActivity);
-  Hooks.on("renderCharacterActorSheet", onRenderCharacterActorSheet);
-}
-
-/* -------------------------------------------- */
-
-/**
- * Format a craft's progress as a localized workdays label, e.g. "2/5".
- * @param {object} craft  Craft flag data.
- * @returns {string}
- */
-function progressLabel(craft) {
-  const completed = craft.progress / HOURS_PER_USE;
-  const total = Math.ceil(craft.totalHours / HOURS_PER_USE);
-  return game.i18n.format("SIMPLE_SHOP_CRAFT_5E.Craft.ProgressActivityFlavor", { completed, total });
-}
-
-/* -------------------------------------------- */
-
-/**
  * Insert or replace the progress status block within an item's description, preserving the rest of it.
  * @param {string} description  Current description HTML.
  * @param {object} craft        Craft flag data.
@@ -51,7 +21,9 @@ function progressLabel(craft) {
  */
 export function applyProgressDescription(description, craft) {
   const block = `<div class="simple-shop-craft-5e craft-progress"><p>${progressLabel(craft)}</p></div>`;
-  return PROGRESS_BLOCK_REGEX.test(description) ? description.replace(PROGRESS_BLOCK_REGEX, block) : description + block;
+  return PROGRESS_BLOCK_REGEX.test(description)
+    ? description.replace(PROGRESS_BLOCK_REGEX, block)
+    : description + block;
 }
 
 /* -------------------------------------------- */
@@ -71,6 +43,59 @@ export async function createProgressActivity(item, activityId, craft) {
     activation: { type: "hour", value: HOURS_PER_USE },
     consumption: { targets: [{ type: "itemUses", target: "", value: "1" }] }
   }, { renderSheet: false });
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Register hooks driving craft progress: activity usage and self-healing on sheet render.
+ */
+export function registerCraftProgress() {
+  Hooks.on("dnd5e.postUseActivity", onPostUseActivity);
+  Hooks.on("renderCharacterActorSheet", onRenderCharacterActorSheet);
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Finish a craft: replace the in-progress item with the real target item — merged into an existing
+ * matching item if the actor already has one, otherwise created — and post an info message.
+ * @param {Item5e} item    The in-progress craft item.
+ * @param {object} craft   The item's craft flag data.
+ * @returns {Promise<void>}
+ */
+async function completeCraft(item, craft) {
+  const actor = item.actor;
+  if ( !actor ) return;
+
+  const [resolved] = await resolveEntries([craft.targetItem]);
+  const fullItem = resolved.item?.uuid ? await fromUuid(resolved.item.uuid) : null;
+  if ( !fullItem ) {
+    ui.notifications.error("SIMPLE_SHOP_CRAFT_5E.CraftCard.MissingItem");
+    return;
+  }
+
+  const itemData = fullItem.toObject();
+  delete itemData._id;
+
+  const existing = (fullItem.type !== "container") && fullItem.system.identifier
+    ? actor.items.find(i => (i.id !== item.id) && (i.system.identifier === fullItem.system.identifier))
+    : null;
+
+  await item.delete();
+  if ( existing ) {
+    await actor.updateEmbeddedDocuments("Item", [
+      { _id: existing.id, "system.quantity": existing.system.quantity + itemData.system.quantity }
+    ]);
+  } else {
+    await actor.createEmbeddedDocuments("Item", [itemData]);
+  }
+
+  await ChatMessage.create({
+    content: `<p>${_loc("SIMPLE_SHOP_CRAFT_5E.Craft.CompleteMessage", { name: fullItem.name, actor: actor.name })}</p>`,
+    speaker: ChatMessage.getSpeaker({ actor }),
+    whisper: game.users.filter(u => actor.testUserPermission(u, "OWNER"))
+  });
 }
 
 /* -------------------------------------------- */
@@ -102,49 +127,6 @@ async function onPostUseActivity(activity) {
 /* -------------------------------------------- */
 
 /**
- * Finish a craft: replace the in-progress item with the real target item — merged into an existing
- * matching item if the actor already has one, otherwise created — and post an info message.
- * @param {Item5e} item    The in-progress craft item.
- * @param {object} craft   The item's craft flag data.
- * @returns {Promise<void>}
- */
-async function completeCraft(item, craft) {
-  const actor = item.actor;
-  if ( !actor ) return;
-
-  const [resolved] = await resolveEntries([craft.targetItem]);
-  const fullItem = resolved.item?.uuid ? await fromUuid(resolved.item.uuid) : null;
-  if ( !fullItem ) {
-    ui.notifications.error(_loc("SIMPLE_SHOP_CRAFT_5E.CraftCard.MissingItem"));
-    return;
-  }
-
-  const itemData = fullItem.toObject();
-  delete itemData._id;
-
-  const existing = (fullItem.type !== "container") && fullItem.system.identifier
-    ? actor.items.find(i => (i.id !== item.id) && (i.system.identifier === fullItem.system.identifier))
-    : null;
-
-  await item.delete();
-  if ( existing ) {
-    await actor.updateEmbeddedDocuments("Item", [
-      { _id: existing.id, "system.quantity": existing.system.quantity + itemData.system.quantity }
-    ]);
-  } else {
-    await actor.createEmbeddedDocuments("Item", [itemData]);
-  }
-
-  await ChatMessage.create({
-    content: `<p>${game.i18n.format("SIMPLE_SHOP_CRAFT_5E.Craft.CompleteMessage", { name: fullItem.name, actor: actor.name })}</p>`,
-    speaker: ChatMessage.getSpeaker({ actor }),
-    whisper: game.users.filter(u => actor.testUserPermission(u, "OWNER"))
-  });
-}
-
-/* -------------------------------------------- */
-
-/**
  * Self-healing: on every character sheet render, recreate a deleted "Progress Craft" activity and
  * refresh a missing or stale progress block in the description of any in-progress craft item.
  * @param {Application5e} app
@@ -164,4 +146,17 @@ async function onRenderCharacterActorSheet(app) {
     const updated = applyProgressDescription(description, craft);
     if ( updated !== description ) await item.update({ "system.description.value": updated });
   }
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Format a craft's progress as a localized workdays label, e.g. "2/5".
+ * @param {object} craft  Craft flag data.
+ * @returns {string}
+ */
+function progressLabel(craft) {
+  const completed = craft.progress / HOURS_PER_USE;
+  const total = Math.ceil(craft.totalHours / HOURS_PER_USE);
+  return _loc("SIMPLE_SHOP_CRAFT_5E.Craft.ProgressActivityFlavor", { completed, total });
 }

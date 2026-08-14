@@ -1,3 +1,5 @@
+import { finalizeGroups } from "../utils.mjs";
+
 import { breakdownCopper, resolveDefaultPrice, toCopper } from "./currency.mjs";
 import { entryKey, resolveShopItems } from "./entry-resolver.mjs";
 
@@ -14,45 +16,6 @@ import { entryKey, resolveShopItems } from "./entry-resolver.mjs";
  */
 export function additiveSource(label, value) {
   return { label, value: `${Math.abs(value)}%`, type: (value < 0) ? "subtract" : "add" };
-}
-
-/* -------------------------------------------- */
-
-/**
- * Turn a Map of type → rows into the sorted, labeled group array used by both Buy and Sell tables.
- * @param {Map<string, object[]>} groups
- * @returns {{ type: string, label: string, items: object[] }[]}
- */
-export function finalizeGroups(groups) {
-  return Array.from(groups, ([type, items]) => ({
-    type,
-    label: (type === "unknown") ? _loc("SIMPLE_SHOP_CRAFT_5E.Unknown") : _loc(`TYPES.Item.${type}Pl`),
-    items
-  })).sort((a, b) => {
-    return (CONFIG.Item.dataModels[a.type]?.inventorySection?.order ?? Infinity)
-    - (CONFIG.Item.dataModels[b.type]?.inventorySection?.order ?? Infinity);
-  }
-  );
-}
-
-/* -------------------------------------------- */
-
-/**
- * Build `item-table.hbs` context (hasRows/emptyLabel/sections) from finalized type groups.
- * @param {object} options
- * @param {{ label: string, items: object[] }[]} options.groups
- * @param {string} options.emptyLabel
- * @param {object[]} options.columns
- * @param {string} options.rowTemplate
- * @returns {{ hasRows: boolean, emptyLabel: string, sections: object[] }}
- */
-export function buildItemTableSections({ groups, emptyLabel, columns, rowTemplate }) {
-  const sections = groups.map(group => ({
-    label: group.label,
-    columns,
-    rows: group.items.map(row => ({ ...row, template: rowTemplate }))
-  }));
-  return { hasRows: sections.some(s => s.rows.length > 0), emptyLabel, sections };
 }
 
 /* -------------------------------------------- */

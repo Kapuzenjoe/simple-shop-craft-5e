@@ -49,6 +49,12 @@ export default class BaseConfigDialog extends Application5e {
 
   /* -------------------------------------------- */
 
+  set formState(value) {
+    this.#formState = value;
+  }
+
+  /* -------------------------------------------- */
+
   /** @inheritDoc */
   _onChangeForm(formConfig, event) {
     super._onChangeForm(formConfig, event);
@@ -78,11 +84,5 @@ export default class BaseConfigDialog extends Application5e {
     context.extraContent = (this.options.extraContent instanceof Function)
       ? await this.options.extraContent(this.#formState) : (this.options.extraContent ?? "");
     return context;
-  }
-
-  /* -------------------------------------------- */
-
-  set formState(value) {
-    this.#formState = value;
   }
 }

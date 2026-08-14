@@ -57,8 +57,7 @@
           "value": {
             "label": "Duration Override",
             "hint": "Leave empty to use the rules-based duration for the target item."
-          },
-          "units": { "label": "Unit" }
+          }
         }
       }
     },
@@ -107,7 +106,6 @@
       "MaterialsNone": "No materials yet. Use the <i class=\"fas fa-plus\"></i> button above to add one.",
       "AddMaterial": "Add Material",
       "DropMaterialHint": "Drop an item here to add it as a material.",
-      "Duration": "Duration",
       "Unlock": "Unlock"
     },
     "ShopEditor": {
@@ -115,7 +113,6 @@
       "AddItems": "Add Items",
       "GenerateItem": "Generate Item",
       "GenerateItemType": "Item Type",
-      "GenerateItemRarity": "Rarity",
       "GenerateItemMundane": "Mundane",
       "GenerateItemSubtype": "Subtype",
       "GenerateItemRoll": "Generate",
@@ -133,14 +130,12 @@
       "Tabs": {
         "Buy": "Buy",
         "Sell": "Sell",
-        "Description": "Description",
         "Players": "Players"
       },
       "Location": "Location",
       "ActingAs": "Acting As",
       "Player": "Player",
       "Haggling": "Haggle",
-      "HagglingSkill": "Skill",
       "HagglingAttitude": "Attitude",
       "HagglingCurrent": "Current Discount",
       "HagglingRoll": "Roll",

@@ -35,10 +35,7 @@ export class Recipe extends foundry.abstract.DataModel {
    */
   static DEFAULT_ICON = "icons/svg/book.svg";
 
-  /**
-   * Localization prefixes used to auto-localize this schema's field labels/hints.
-   * @type {string[]}
-   */
+  /** @override */
   static LOCALIZATION_PREFIXES = ["SIMPLE_SHOP_CRAFT_5E.RECIPE"];
 
   /** @override */
@@ -67,7 +64,6 @@ export class Recipe extends foundry.abstract.DataModel {
 
 /**
  * Register this module's localization for the Recipe data model.
- * @returns {void}
  */
 export function registerRecipeLocalization() {
   foundry.helpers.Localization.localizeDataModel(Recipe);

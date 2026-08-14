@@ -61,7 +61,6 @@ export async function createCraftMessage({
 
 /**
  * Register hooks needed to handle craft chat cards.
- * @returns {void}
  */
 export function registerCraftCard() {
   Hooks.on("dnd5e.renderChatMessage", onRenderCraftCard);

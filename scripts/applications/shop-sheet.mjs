@@ -4,8 +4,9 @@ import { resolveDefaultPrice, resolveGoldPoolRows } from "../shop/currency.mjs";
 import { entryKey, resolveShopItems } from "../shop/entry-resolver.mjs";
 import { isHagglingLocked } from "../shop/haggling.mjs";
 import {
-  buildItemTableSections, groupByType, groupSellItems, needsDefaultPrice, resolvePlayerOverride
+  groupByType, groupSellItems, needsDefaultPrice, resolvePlayerOverride
 } from "../shop/pricing.mjs";
+import { buildItemTableSections, loadingTooltip, selectableActors } from "../utils.mjs";
 
 import { openGenerateItemDialog } from "./generate-item-dialog.mjs";
 import { openHaggleDialog } from "./haggle-dialog.mjs";
@@ -83,29 +84,31 @@ export default class ShopSheet extends Application5e {
     },
     actions: {
       addItems: ShopSheet.#addItems,
-      removeItem: ShopSheet.#removeItem,
-      editImage: ShopSheet.#editImage,
-      editPrice: ShopSheet.#editPrice,
-      editDiscount: ShopSheet.#editDiscount,
       adjustCartQuantity: ShopSheet.#adjustCartQuantity,
       adjustSellQuantity: ShopSheet.#adjustSellQuantity,
-      openCart: ShopSheet.#openCart,
-      resetShop: ShopSheet.#resetShop,
-      editMaxStock: ShopSheet.#editMaxStock,
-      openItemSheet: ShopSheet.#openItemSheet,
-      haggle: ShopSheet.#haggle,
-      editPlayers: ShopSheet.#editPlayers,
-      generateItem: ShopSheet.#generateItem,
-      toggleActive: ShopSheet.#toggleActive,
-      spotlight: ShopSheet.#spotlight,
       changeMode: ShopSheet.#changeMode,
-      editModifiers: ShopSheet.#editModifiers,
-      editSettlementCap: ShopSheet.#editSettlementCap,
+      editDiscount: ShopSheet.#editDiscount,
       editGoldPool: ShopSheet.#editGoldPool,
+      editImage: ShopSheet.#editImage,
+      editMaxStock: ShopSheet.#editMaxStock,
+      editModifiers: ShopSheet.#editModifiers,
       editOwner: ShopSheet.#editOwner,
-      renameShop: ShopSheet.#renameShop
+      editPlayers: ShopSheet.#editPlayers,
+      editPrice: ShopSheet.#editPrice,
+      editSettlementCap: ShopSheet.#editSettlementCap,
+      generateItem: ShopSheet.#generateItem,
+      haggle: ShopSheet.#haggle,
+      openCart: ShopSheet.#openCart,
+      openItemSheet: ShopSheet.#openItemSheet,
+      removeItem: ShopSheet.#removeItem,
+      renameShop: ShopSheet.#renameShop,
+      resetShop: ShopSheet.#resetShop,
+      spotlight: ShopSheet.#spotlight,
+      toggleActive: ShopSheet.#toggleActive
     }
   };
+
+  /* -------------------------------------------- */
 
   /**
    * Available sheet modes.
@@ -159,17 +162,351 @@ export default class ShopSheet extends Application5e {
     }
   };
 
+  /* -------------------------------------------- */
+
   /** @override */
   static TABS = {
     primary: {
       tabs: [
         { id: "buy", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Buy", icon: "fas fa-cart-shopping" },
         { id: "sell", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Sell", icon: "fas fa-hand-holding-dollar" },
-        { id: "description", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Description", icon: "fas fa-book-open" }
+        { id: "description", label: "DND5E.Description", icon: "fas fa-book-open" }
       ],
       initial: "buy"
     }
   };
+
+  /* -------------------------------------------- */
+  /*  Properties                                   */
+  /* -------------------------------------------- */
+
+  /**
+   * The mode the sheet is currently in. GM-only — players always effectively view in Play mode.
+   * @type {ShopSheet.MODES|null}
+   * @protected
+   */
+  _mode = null;
+
+  /* -------------------------------------------- */
+
+  /**
+   * Selected buy quantities, keyed by {@link entryKey}. Per-user, not persisted across sessions.
+   * @type {Map<string, number>}
+   */
+  cart = new Map();
+
+  /* -------------------------------------------- */
+
+  /**
+   * UUID of the actor (or party) currently selected for buy/sell. Per-user, not persisted across sessions.
+   * @type {string|null|undefined}
+   */
+  selectedActorUuid = undefined;
+
+  /* -------------------------------------------- */
+
+  /**
+   * Selected sell quantities, keyed by the actor-owned item's id. Per-user, not persisted across sessions.
+   * @type {Map<string, number>}
+   */
+  sellCart = new Map();
+
+  /* -------------------------------------------- */
+
+  /**
+   * The shopping cart window, opened on demand and reused across renders.
+   * @type {ShopCart|null}
+   */
+  #cartApp = null;
+
+  /* -------------------------------------------- */
+
+  /**
+   * Buy-side item groups from the last render, used to resolve cart lines.
+   * @type {{ type: string, label: string, items: object[] }[]}
+   */
+  #lastGroups = [];
+
+  /* -------------------------------------------- */
+
+  /**
+   * Sell-side item groups from the last render, used to resolve sell lines.
+   * @type {{ type: string, label: string, items: object[] }[]}
+   */
+  #lastSellGroups = [];
+
+  /* -------------------------------------------- */
+
+  /**
+   * Rows currently selected in the shopping cart, resolved from the last render.
+   * @type {object[]}
+   */
+  get cartLines() {
+    return (this.#lastGroups ?? []).flatMap(group => group.items).filter(row => row.cartQuantity > 0);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Can the current user edit this sheet at all? GM-only.
+   * @type {boolean}
+   */
+  get isEditable() {
+    return game.user.isGM;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Is the sheet in edit mode?
+   * @type {boolean}
+   */
+  get isEditMode() {
+    return this._mode === this.constructor.MODES.EDIT;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Rows currently selected to sell, resolved from the last render.
+   * @type {object[]}
+   */
+  get sellLines() {
+    return (this.#lastSellGroups ?? []).flatMap(group => group.items).filter(row => row.sellQuantity > 0);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * The shop currently being edited.
+   * @type {Shop}
+   */
+  get shop() {
+    return getShop(this.shopId);
+  }
+
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  get title() {
+    return this.shop?.name ?? super.title;
+  }
+
+  /* -------------------------------------------- */
+  /*  Rendering                                    */
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  _configureRenderOptions(options) {
+    super._configureRenderOptions(options);
+    this._mode = options.mode ?? this._mode ?? this.constructor.MODES.PLAY;
+  }
+
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  _getHeaderControls() {
+    const controls = super._getHeaderControls();
+    if ( !this.isEditable ) return controls;
+    return [
+      ...controls,
+      { icon: "fa-solid fa-pen", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.RenameShop", action: "renameShop" },
+      {
+        icon: this.shop.active ? "fa-solid fa-toggle-on" : "fa-solid fa-toggle-off",
+        label: this.shop.active
+          ? "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Deactivate" : "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Activate",
+        action: "toggleActive"
+      },
+      { icon: "fa-solid fa-bullhorn", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Spotlight", action: "spotlight" }
+    ];
+  }
+
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  async _prepareContext(options) {
+    const context = await super._prepareContext(options);
+    context.shop = this.shop;
+    context.config = CONFIG.DND5E;
+    context.isGM = game.user.isGM;
+    context.editable = this.isEditable;
+    context.isEditMode = this.isEditMode;
+    const { characters, party } = selectableActors({ includeParty: true });
+    if ( this.selectedActorUuid === undefined ) {
+      this.selectedActorUuid = game.user.character?.type === "character" ? game.user.character.uuid : "";
+    }
+    context.actorOptions = [
+      { value: "", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoActorSelected") },
+      ...(party ? [{ value: party.uuid, label: party.name }] : []),
+      ...characters.map(a => ({ value: a.uuid, label: a.name }))
+    ].map(o => ({ ...o, selected: o.value === this.selectedActorUuid }));
+    context.actor = this.selectedActorUuid ? fromUuidSync(this.selectedActorUuid) : null;
+    context.hagglingLocked = isHagglingLocked(context.shop.playerDiscounts, this.selectedActorUuid);
+    const playerOverride = resolvePlayerOverride(context.shop.playerDiscounts, this.selectedActorUuid);
+    const renderDiscountTooltip = (sources, total) => ShopSheet.#renderAttribution(sources, total);
+
+    const resolved = await resolveShopItems(context.shop.items);
+    context.groups = await groupByType({
+      rows: resolved, settlementCap: context.shop.settlementCap, buyModifier: context.shop.buyModifier,
+      cart: this.cart, fixedValueLootTypes: context.shop.fixedValueLootTypes, playerBuyModifier: playerOverride.buy,
+      actorName: context.actor?.name, renderDiscountTooltip
+    });
+    this.#lastGroups = context.groups;
+
+    context.sellGroups = await groupSellItems({
+      items: context.actor?.items ?? [], sellModifier: context.shop.sellModifier, sellCart: this.sellCart,
+      fixedValueLootTypes: context.shop.fixedValueLootTypes, playerSellModifier: playerOverride.sell,
+      actorName: context.actor?.name, renderDiscountTooltip
+    });
+    this.#lastSellGroups = context.sellGroups;
+
+    context.goldPoolDisplay = resolveGoldPoolRows(context.shop.goldPool, { namePrefix: "currentGold." });
+    context.settlementCapDisplay = context.shop.settlementCap.value != null
+      ? `${context.shop.settlementCap.value} ${context.shop.settlementCap.denomination.toUpperCase()}`
+      : "∞";
+    return context;
+  }
+
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  async _preparePartContext(partId, context, options) {
+    context = await super._preparePartContext(partId, context, options);
+    context.tab = context.tabs?.[partId];
+    if ( partId === "footer" ) {
+      context.buttons = [{
+        type: "button", action: "openCart", icon: "fas fa-basket-shopping",
+        label: "SIMPLE_SHOP_CRAFT_5E.ShopCart.ViewCart", cssClass: "always-interactive"
+      }];
+    }
+    if ( partId === "buy" ) {
+      context.tabId = "buy";
+      context.table = buildItemTableSections({
+        groups: context.groups, emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.None", columns: BUY_COLUMNS,
+        rowTemplate: "modules/simple-shop-craft-5e/templates/shop-sheet/buy-row.hbs"
+      });
+    }
+    if ( partId === "sell" ) {
+      context.tabId = "sell";
+      context.showNoActor = !context.actor;
+      context.noActorLabel = "SIMPLE_SHOP_CRAFT_5E.NoActorSelectedHint";
+      context.table = buildItemTableSections({
+        groups: context.sellGroups, emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoSellableItems",
+        columns: SELL_COLUMNS, rowTemplate: "modules/simple-shop-craft-5e/templates/shop-sheet/sell-row.hbs"
+      });
+    }
+    return context;
+  }
+
+  /* -------------------------------------------- */
+  /*  Life-Cycle Handlers                          */
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  async _onFirstRender(context, options) {
+    await super._onFirstRender(context, options);
+
+    const actions = document.createElement("div");
+    actions.classList.add("window-content-actions");
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.tooltip = "SIMPLE_SHOP_CRAFT_5E.ShopEditor.AddItems";
+    button.ariaLabel = _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.AddItems");
+    button.classList.add("gold-button", "always-interactive");
+    button.dataset.action = "addItems";
+    button.innerHTML = '<i class="fas fa-plus" inert></i>';
+
+    const generateButton = document.createElement("button");
+    generateButton.type = "button";
+    generateButton.dataset.tooltip = "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItem";
+    generateButton.ariaLabel = _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItem");
+    generateButton.classList.add("gold-button", "always-interactive");
+    generateButton.dataset.action = "generateItem";
+    generateButton.innerHTML = '<i class="fas fa-wand-magic-sparkles" inert></i>';
+
+    actions.append(button, generateButton);
+    this.element.querySelector(".window-content").append(actions);
+  }
+
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  async _onRender(context, options) {
+    await super._onRender(context, options);
+
+    this._renderModeToggle();
+    if ( this._mode === this.constructor.MODES.PLAY ) this._disableFields();
+
+    const actions = this.element.querySelector(".window-content-actions");
+    if ( actions ) actions.hidden = !context.editable || !this.isEditMode || !context.tabs?.buy?.active;
+  }
+
+  /* -------------------------------------------- */
+  /*  Event Listeners and Handlers                 */
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  _attachPartListeners(partId, htmlElement, options) {
+    super._attachPartListeners(partId, htmlElement, options);
+    const editable = this.isEditable;
+
+    if ( partId === "header" ) {
+      htmlElement.querySelector('select[name="selectedActor"]')?.addEventListener("change", async event => {
+        event.stopPropagation();
+        this.selectedActorUuid = event.target.value;
+        this.sellCart.clear();
+        await this.render();
+        if ( this.#cartApp?.rendered ) this.#cartApp.render();
+      });
+    }
+
+    if ( (partId === "buy") || (partId === "sell") ) {
+      htmlElement.querySelectorAll(".item-tooltip[data-uuid]").forEach(el => {
+        const uuid = el.dataset.uuid;
+        if ( !uuid ) return;
+        if ( (partId === "buy") && needsDefaultPrice(this.#findRowItem(el.dataset.key)) ) return;
+        el.dataset.tooltip = loadingTooltip(uuid);
+        el.dataset.tooltipClass = "dnd5e2 dnd5e-tooltip item-tooltip themed theme-light";
+        el.dataset.tooltipDirection ??= "LEFT";
+      });
+    }
+
+    if ( partId === "buy" ) {
+      htmlElement.querySelectorAll(".item-tooltip[data-key]").forEach(el => {
+        const item = this.#findRowItem(el.dataset.key);
+        if ( !item ) return;
+        const defaultPrice = needsDefaultPrice(item) ? resolveDefaultPrice(item) : null;
+        if ( !defaultPrice && el.dataset.uuid ) return;
+        const resolved = (typeof item.clone === "function") ? Promise.resolve(item) : fromUuid(item.uuid);
+        resolved
+          .then(fullItem => defaultPrice ? fullItem?.clone({ system: { price: defaultPrice } }) : fullItem)
+          .then(tooltipItem => tooltipItem?.richTooltip())
+          .then(result => {
+            if ( !result ) return;
+            el.dataset.tooltip = result.content;
+            el.dataset.tooltipClass = result.classes.join(" ");
+            el.dataset.tooltipDirection ??= "LEFT";
+          });
+      });
+    }
+
+    if ( partId === "buy" ) {
+      const buyTab = htmlElement.matches('.tab[data-tab="buy"]') ? htmlElement : htmlElement.querySelector('.tab[data-tab="buy"]');
+      if ( editable && buyTab ) {
+        buyTab.addEventListener("dragover", event => event.preventDefault());
+        buyTab.addEventListener("drop", async event => {
+          const data = foundry.applications.ux.TextEditor.implementation.getDragEventData(event);
+          if ( data.type !== "Item" ) return;
+          const item = await fromUuid(data.uuid);
+          if ( !item || !CONFIG.Item.dataModels[item.type]?.inventorySection ) return;
+          await this.#mergeItemEntries([
+            { uuid: data.uuid, stock: { max: null, current: null } }
+          ]);
+        });
+      }
+    }
+  }
 
   /* -------------------------------------------- */
 
@@ -360,21 +697,6 @@ export default class ShopSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
-   * Determine which actors/party the current user may act as for buy/sell — player characters and the party actor only.
-   * @returns {{ characters: Actor5e[], party: Actor5e|null }}
-   */
-  static #getSelectableActors() {
-    const isGM = game.user.isGM;
-    const characters = game.actors.filter(a => (a.type === "character") && (isGM || a.isOwner));
-    const party = game.actors.party;
-    const partySelectable = party && (isGM
-      || (game.user.character && party.system.playerCharacters.includes(game.user.character) && party.isOwner));
-    return { characters, party: partySelectable ? party : null };
-  }
-
-  /* -------------------------------------------- */
-
-  /**
    * Handle opening a dialog to pick a Charisma skill and the NPC's attitude, then roll it against the
    * shop NPC's DC for the acting actor.
    * @this {ShopSheet}
@@ -474,20 +796,6 @@ export default class ShopSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
-   * Render dnd5e's property-attribution table markup for use as a hover tooltip.
-   * @param {object[]} sources
-   * @param {string} total
-   * @returns {Promise<string>}
-   */
-  static async #renderAttribution(sources, total) {
-    return foundry.applications.handlebars.renderTemplate("systems/dnd5e/templates/apps/property-attribution.hbs", {
-      caption: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.PriceModifier"), sources, total
-    });
-  }
-
-  /* -------------------------------------------- */
-
-  /**
    * Handle resetting this shop's stock (to each item's configured max, skipping items excluded via
    * `noRestock`) and gold pool (to its max, falling back to the default gold pool unless unlimited).
    * @this {ShopSheet}
@@ -531,329 +839,19 @@ export default class ShopSheet extends Application5e {
   }
 
   /* -------------------------------------------- */
-  /*  Properties                                   */
+  /*  Helpers                                      */
   /* -------------------------------------------- */
 
   /**
-   * The mode the sheet is currently in. GM-only — players always effectively view in Play mode.
-   * @type {ShopSheet.MODES|null}
-   * @protected
+   * Render dnd5e's property-attribution table markup for use as a hover tooltip.
+   * @param {object[]} sources
+   * @param {string} total
+   * @returns {Promise<string>}
    */
-  _mode = null;
-
-  /* -------------------------------------------- */
-
-  /**
-   * Selected buy quantities, keyed by {@link entryKey}. Per-user, not persisted across sessions.
-   * @type {Map<string, number>}
-   */
-  cart = new Map();
-
-  /* -------------------------------------------- */
-
-  /**
-   * UUID of the actor (or party) currently selected for buy/sell. Per-user, not persisted across sessions.
-   * @type {string|null|undefined}
-   */
-  selectedActorUuid = undefined;
-
-  /* -------------------------------------------- */
-
-  /**
-   * Selected sell quantities, keyed by the actor-owned item's id. Per-user, not persisted across sessions.
-   * @type {Map<string, number>}
-   */
-  sellCart = new Map();
-
-  /* -------------------------------------------- */
-
-  /**
-   * The shopping cart window, opened on demand and reused across renders.
-   * @type {ShopCart|null}
-   */
-  #cartApp = null;
-
-  /* -------------------------------------------- */
-
-  /**
-   * Buy-side item groups from the last render, used to resolve cart lines.
-   * @type {{ type: string, label: string, items: object[] }[]}
-   */
-  #lastGroups = [];
-
-  /* -------------------------------------------- */
-
-  /**
-   * Sell-side item groups from the last render, used to resolve sell lines.
-   * @type {{ type: string, label: string, items: object[] }[]}
-   */
-  #lastSellGroups = [];
-
-  /* -------------------------------------------- */
-
-  /**
-   * Rows currently selected in the shopping cart, resolved from the last render.
-   * @type {object[]}
-   */
-  get cartLines() {
-    return (this.#lastGroups ?? []).flatMap(group => group.items).filter(row => row.cartQuantity > 0);
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Can the current user edit this sheet at all? GM-only.
-   * @type {boolean}
-   */
-  get isEditable() {
-    return game.user.isGM;
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Is the sheet in edit mode?
-   * @type {boolean}
-   */
-  get isEditMode() {
-    return this._mode === this.constructor.MODES.EDIT;
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Rows currently selected to sell, resolved from the last render.
-   * @type {object[]}
-   */
-  get sellLines() {
-    return (this.#lastSellGroups ?? []).flatMap(group => group.items).filter(row => row.sellQuantity > 0);
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * The shop currently being edited.
-   * @type {Shop}
-   */
-  get shop() {
-    return getShop(this.shopId);
-  }
-
-  /* -------------------------------------------- */
-
-  /** @inheritDoc */
-  get title() {
-    return this.shop?.name ?? super.title;
-  }
-
-  /* -------------------------------------------- */
-
-  /** @inheritDoc */
-  _attachPartListeners(partId, htmlElement, options) {
-    super._attachPartListeners(partId, htmlElement, options);
-    const editable = this.isEditable;
-
-    if ( partId === "header" ) {
-      htmlElement.querySelector('select[name="selectedActor"]')?.addEventListener("change", async event => {
-        event.stopPropagation();
-        this.selectedActorUuid = event.target.value;
-        this.sellCart.clear();
-        await this.render();
-        if ( this.#cartApp?.rendered ) this.#cartApp.render();
-      });
-    }
-
-    if ( (partId === "buy") || (partId === "sell") ) {
-      htmlElement.querySelectorAll(".item-tooltip[data-uuid]").forEach(el => {
-        const uuid = el.dataset.uuid;
-        if ( !uuid ) return;
-        if ( (partId === "buy") && needsDefaultPrice(this.#findRowItem(el.dataset.key)) ) return;
-        el.dataset.tooltip = `<section class="loading" data-uuid="${uuid}"><i class="fas fa-spinner fa-spin-pulse"></i></section>`;
-        el.dataset.tooltipClass = "dnd5e2 dnd5e-tooltip item-tooltip themed theme-light";
-        el.dataset.tooltipDirection ??= "LEFT";
-      });
-    }
-
-    if ( partId === "buy" ) {
-      htmlElement.querySelectorAll(".item-tooltip[data-key]").forEach(el => {
-        const item = this.#findRowItem(el.dataset.key);
-        if ( !item ) return;
-        const defaultPrice = needsDefaultPrice(item) ? resolveDefaultPrice(item) : null;
-        if ( !defaultPrice && el.dataset.uuid ) return;
-        const resolved = (typeof item.clone === "function") ? Promise.resolve(item) : fromUuid(item.uuid);
-        resolved
-          .then(fullItem => defaultPrice ? fullItem?.clone({ system: { price: defaultPrice } }) : fullItem)
-          .then(tooltipItem => tooltipItem?.richTooltip())
-          .then(result => {
-            if ( !result ) return;
-            el.dataset.tooltip = result.content;
-            el.dataset.tooltipClass = result.classes.join(" ");
-            el.dataset.tooltipDirection ??= "LEFT";
-          });
-      });
-    }
-
-    if ( partId === "buy" ) {
-      const buyTab = htmlElement.matches('.tab[data-tab="buy"]') ? htmlElement : htmlElement.querySelector('.tab[data-tab="buy"]');
-      if ( editable && buyTab ) {
-        buyTab.addEventListener("dragover", event => event.preventDefault());
-        buyTab.addEventListener("drop", async event => {
-          const data = foundry.applications.ux.TextEditor.implementation.getDragEventData(event);
-          if ( data.type !== "Item" ) return;
-          const item = await fromUuid(data.uuid);
-          if ( !item || !CONFIG.Item.dataModels[item.type]?.inventorySection ) return;
-          await this.#mergeItemEntries([
-            { identifier: item.system.identifier ?? "", uuid: data.uuid, stock: { max: null, current: null } }
-          ]);
-        });
-      }
-    }
-  }
-
-  /* -------------------------------------------- */
-
-  /** @inheritDoc */
-  _configureRenderOptions(options) {
-    super._configureRenderOptions(options);
-    this._mode = options.mode ?? this._mode ?? this.constructor.MODES.PLAY;
-  }
-
-  /* -------------------------------------------- */
-
-  /** @inheritDoc */
-  _getHeaderControls() {
-    const controls = super._getHeaderControls();
-    if ( !this.isEditable ) return controls;
-    return [
-      ...controls,
-      { icon: "fa-solid fa-pen", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.RenameShop", action: "renameShop" },
-      {
-        icon: this.shop.active ? "fa-solid fa-toggle-on" : "fa-solid fa-toggle-off",
-        label: this.shop.active
-          ? "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Deactivate" : "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Activate",
-        action: "toggleActive"
-      },
-      { icon: "fa-solid fa-bullhorn", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Spotlight", action: "spotlight" }
-    ];
-  }
-
-  /* -------------------------------------------- */
-
-  /** @inheritDoc */
-  async _onFirstRender(context, options) {
-    await super._onFirstRender(context, options);
-
-    const actions = document.createElement("div");
-    actions.classList.add("window-content-actions");
-
-    const button = document.createElement("button");
-    button.type = "button";
-    button.dataset.tooltip = "SIMPLE_SHOP_CRAFT_5E.ShopEditor.AddItems";
-    button.ariaLabel = _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.AddItems");
-    button.classList.add("gold-button", "always-interactive");
-    button.dataset.action = "addItems";
-    button.innerHTML = '<i class="fas fa-plus" inert></i>';
-
-    const generateButton = document.createElement("button");
-    generateButton.type = "button";
-    generateButton.dataset.tooltip = "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItem";
-    generateButton.ariaLabel = _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItem");
-    generateButton.classList.add("gold-button", "always-interactive");
-    generateButton.dataset.action = "generateItem";
-    generateButton.innerHTML = '<i class="fas fa-wand-magic-sparkles" inert></i>';
-
-    actions.append(button, generateButton);
-    this.element.querySelector(".window-content").append(actions);
-  }
-
-  /* -------------------------------------------- */
-
-  /** @inheritDoc */
-  async _onRender(context, options) {
-    await super._onRender(context, options);
-
-    this._renderModeToggle();
-    if ( this._mode === this.constructor.MODES.PLAY ) this._disableFields();
-
-    const actions = this.element.querySelector(".window-content-actions");
-    if ( actions ) actions.hidden = !context.editable || !this.isEditMode || !context.tabs?.buy?.active;
-  }
-
-  /* -------------------------------------------- */
-
-  /** @inheritDoc */
-  async _prepareContext(options) {
-    const context = await super._prepareContext(options);
-    context.shop = this.shop;
-    context.config = CONFIG.DND5E;
-    context.isGM = game.user.isGM;
-    context.editable = this.isEditable;
-    context.isEditMode = this.isEditMode;
-    const { characters, party } = ShopSheet.#getSelectableActors();
-    if ( this.selectedActorUuid === undefined ) {
-      this.selectedActorUuid = game.user.character?.type === "character" ? game.user.character.uuid : "";
-    }
-    context.actorOptions = [
-      { value: "", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoActorSelected") },
-      ...(party ? [{ value: party.uuid, label: party.name }] : []),
-      ...characters.map(a => ({ value: a.uuid, label: a.name }))
-    ].map(o => ({ ...o, selected: o.value === this.selectedActorUuid }));
-    context.actor = this.selectedActorUuid ? fromUuidSync(this.selectedActorUuid) : null;
-    context.hagglingLocked = isHagglingLocked(context.shop.playerDiscounts, this.selectedActorUuid);
-    const playerOverride = resolvePlayerOverride(context.shop.playerDiscounts, this.selectedActorUuid);
-    const renderDiscountTooltip = (sources, total) => ShopSheet.#renderAttribution(sources, total);
-
-    const resolved = await resolveShopItems(context.shop.items);
-    context.groups = await groupByType({
-      rows: resolved, settlementCap: context.shop.settlementCap, buyModifier: context.shop.buyModifier,
-      cart: this.cart, fixedValueLootTypes: context.shop.fixedValueLootTypes, playerBuyModifier: playerOverride.buy,
-      actorName: context.actor?.name, renderDiscountTooltip
+  static async #renderAttribution(sources, total) {
+    return foundry.applications.handlebars.renderTemplate("systems/dnd5e/templates/apps/property-attribution.hbs", {
+      caption: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.PriceModifier"), sources, total
     });
-    this.#lastGroups = context.groups;
-
-    context.sellGroups = await groupSellItems({
-      items: context.actor?.items ?? [], sellModifier: context.shop.sellModifier, sellCart: this.sellCart,
-      fixedValueLootTypes: context.shop.fixedValueLootTypes, playerSellModifier: playerOverride.sell,
-      actorName: context.actor?.name, renderDiscountTooltip
-    });
-    this.#lastSellGroups = context.sellGroups;
-
-    context.goldPoolDisplay = resolveGoldPoolRows(context.shop.goldPool, { namePrefix: "currentGold." });
-    context.settlementCapDisplay = context.shop.settlementCap.value != null
-      ? `${context.shop.settlementCap.value} ${context.shop.settlementCap.denomination.toUpperCase()}`
-      : "∞";
-    return context;
-  }
-
-  /* -------------------------------------------- */
-
-  /** @inheritDoc */
-  async _preparePartContext(partId, context, options) {
-    context = await super._preparePartContext(partId, context, options);
-    context.tab = context.tabs?.[partId];
-    if ( partId === "footer" ) {
-      context.buttons = [{
-        type: "button", action: "openCart", icon: "fas fa-basket-shopping",
-        label: "SIMPLE_SHOP_CRAFT_5E.ShopCart.ViewCart", cssClass: "always-interactive"
-      }];
-    }
-    if ( partId === "buy" ) {
-      context.tabId = "buy";
-      context.table = buildItemTableSections({
-        groups: context.groups, emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.None", columns: BUY_COLUMNS,
-        rowTemplate: "modules/simple-shop-craft-5e/templates/shop-sheet/buy-row.hbs"
-      });
-    }
-    if ( partId === "sell" ) {
-      context.tabId = "sell";
-      context.showNoActor = !context.actor;
-      context.noActorLabel = "SIMPLE_SHOP_CRAFT_5E.NoActorSelectedHint";
-      context.table = buildItemTableSections({
-        groups: context.sellGroups, emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoSellableItems",
-        columns: SELL_COLUMNS, rowTemplate: "modules/simple-shop-craft-5e/templates/shop-sheet/sell-row.hbs"
-      });
-    }
-    return context;
   }
 
   /* -------------------------------------------- */

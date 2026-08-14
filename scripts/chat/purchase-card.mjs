@@ -71,7 +71,6 @@ export async function createPurchaseMessage(shopSheet, actor, buyLines, sellLine
 
 /**
  * Register hooks needed to handle purchase chat cards.
- * @returns {void}
  */
 export function registerPurchaseCard() {
   Hooks.on("dnd5e.renderChatMessage", onRenderPurchaseCard);

@@ -1,4 +1,4 @@
-<div class="item-detail item-weight{{#unless weight}} empty{{/unless}}">
+<div class="item-detail item-weight {{#unless weight}}empty{{/unless}}" data-column-id="weight">
     {{#if weight}}
     <i class="fa-solid fa-weight-hanging" inert></i> {{ dnd5e-formatWeight weight.value unit=weight.unit }}
     {{/if}}

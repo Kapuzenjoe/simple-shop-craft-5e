@@ -1,14 +1,4 @@
-/**
- * Default gp price per rarity.
- * @type {Record<string, { durable: number, consumable: number }>}
- */
-const RARITY_DEFAULT_PRICES = {
-  common: { durable: 100, consumable: 50 },
-  uncommon: { durable: 400, consumable: 200 },
-  rare: { durable: 4000, consumable: 2000 },
-  veryRare: { durable: 40000, consumable: 20000 },
-  legendary: { durable: 200000, consumable: 100000 }
-};
+import { RARITY_DEFAULT_PRICES } from "../config.mjs";
 
 /**
  * Break a copper amount down into whole-unit denominations, largest to smallest.
@@ -53,6 +43,24 @@ export function currencyRows(amounts={}, namePrefix="", placeholders={}) {
     label: CONFIG.DND5E.currencies[denomination].label, icon: CONFIG.DND5E.currencies[denomination].icon,
     placeholder: placeholders[denomination]
   }));
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Resolve an item's crafting cost — `CONFIG.DND5E.crafting.exceptions`/`.scrolls` for Potion of Healing
+ * and Spell Scrolls, otherwise `item.system.getCraftCost()`.
+ * @param {Item5e} item
+ * @returns {Promise<{ days: number, gold: number }>}
+ */
+export async function effectiveCraftCost(item) {
+  const { scrolls, exceptions } = CONFIG.DND5E.crafting;
+  if ( exceptions[item.system.identifier] ) return exceptions[item.system.identifier];
+  if ( item.system.type?.value === "scroll" ) {
+    const level = item.system.activities?.find(a => a.type === "cast")?.spell?.level;
+    if ( (level != null) && scrolls[level] ) return scrolls[level];
+  }
+  return item.system.getCraftCost();
 }
 
 /* -------------------------------------------- */

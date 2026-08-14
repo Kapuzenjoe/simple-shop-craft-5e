@@ -1,9 +1,9 @@
 import { createCraftMessage } from "../chat/craft-card.mjs";
-import { HOURS_PER_USE } from "../craft/progress.mjs";
+import { HOURS_PER_USE } from "../config.mjs";
 import { getRecipe } from "../data/recipe-store.mjs";
-import { resolveEntries } from "../item-resolver.mjs";
-import { breakdownCopper, resolveDefaultPrice, toCopper } from "../shop/currency.mjs";
+import { breakdownCopper, effectiveCraftCost, resolveDefaultPrice, toCopper } from "../shop/currency.mjs";
 import { needsDefaultPrice } from "../shop/pricing.mjs";
+import { resolveEntries, selectableActors } from "../utils.mjs";
 
 const { Dialog5e } = game.dnd5e.applications.api;
 
@@ -11,7 +11,7 @@ const { Dialog5e } = game.dnd5e.applications.api;
  * Hours per duration unit, for converting a recipe's duration override to total progress hours.
  * @type {Record<string, number>}
  */
-const HOURS_PER_UNIT = { minute: 1 / 60, hour: 1, day: 8 };
+const HOURS_PER_UNIT = { minute: 1 / 60, hour: 1, day: HOURS_PER_USE };
 
 /**
  * Player-facing dialog to request starting a craft: tool/material selection against a recipe's
@@ -24,6 +24,8 @@ export default class CraftStartDialog extends Dialog5e {
     this.selectedActorUuid = game.user.character?.type === "character" ? game.user.character.uuid : "";
   }
 
+  /* -------------------------------------------- */
+
   /** @override */
   static DEFAULT_OPTIONS = {
     id: "craft-start-dialog-{id}",
@@ -35,6 +37,8 @@ export default class CraftStartDialog extends Dialog5e {
       startCraft: CraftStartDialog.#startCraft
     }
   };
+
+  /* -------------------------------------------- */
 
   /** @override */
   static PARTS = {
@@ -164,7 +168,7 @@ export default class CraftStartDialog extends Dialog5e {
 
     context.actorOptions = [
       { value: "", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoActorSelected") },
-      ...CraftStartDialog.#selectableActors().map(a => ({ value: a.uuid, label: a.name }))
+      ...selectableActors().map(a => ({ value: a.uuid, label: a.name }))
     ].map(o => ({ ...o, selected: o.value === this.selectedActorUuid }));
     context.recipe = state.recipe;
     context.targetItem = state.targetItem;
@@ -188,10 +192,13 @@ export default class CraftStartDialog extends Dialog5e {
         context.toolField = [{
           field: new foundry.data.fields.StringField(), name: "toolKey", value: state.chosenToolKey,
           label: _loc("SIMPLE_SHOP_CRAFT_5E.RECIPE.FIELDS.toolProficiencies.label"),
-          options: state.toolKeys.map(key => ({ value: key, label: categories.art?.children?.[key]?.label ?? key }))
+          options: state.toolKeys.map(key => ({
+            value: key, label: categories.art?.children?.[key]?.label ?? categories[key]?.label ?? key
+          }))
         }];
       } else {
-        context.toolLabel = categories.art?.children?.[state.chosenToolKey]?.label ?? state.chosenToolKey;
+        context.toolLabel = categories.art?.children?.[state.chosenToolKey]?.label
+          ?? categories[state.chosenToolKey]?.label ?? state.chosenToolKey;
       }
     }
 
@@ -243,16 +250,21 @@ export default class CraftStartDialog extends Dialog5e {
     let halfPrice = null;
     if ( targetItem?.uuid ) {
       const fullTargetItem = await fromUuid(targetItem.uuid);
-      if ( fullTargetItem?.system?.getCraftCost ) craftCost = await fullTargetItem.system.getCraftCost();
+      if ( fullTargetItem?.system?.getCraftCost ) craftCost = await effectiveCraftCost(fullTargetItem);
       if ( fullTargetItem ) {
         weight = { ...fullTargetItem.system.weight };
-        halfPrice = { value: Math.floor(fullTargetItem.system.price.value / 2), denomination: fullTargetItem.system.price.denomination };
+        halfPrice = {
+          value: Math.floor(fullTargetItem.system.price.value / 2),
+          denomination: fullTargetItem.system.price.denomination
+        };
       }
     }
 
     const materialsResolved = await resolveEntries(recipe.materials);
     const fixedLines = materialsResolved.map(({ entry, item }) => {
-      const owned = (actor && entry.identifier) ? actor.items.find(i => i.system.identifier === entry.identifier) : null;
+      const owned = (actor && entry.identifier)
+        ? actor.items.find(i => i.system.identifier === entry.identifier)
+        : null;
       return { name: item?.name ?? entry.identifier ?? entry.uuid, img: item?.img, item: owned };
     });
 
@@ -281,9 +293,11 @@ export default class CraftStartDialog extends Dialog5e {
       proficient = !!actor && ((actor.system.tools[chosenToolKey]?.value ?? 0) > 0);
       toolOwned = !!actor?.items.some(i => (i.type === "tool") && (i.system.type?.baseItem === chosenToolKey));
     }
-    const toolEligible = !chosenToolKey || (proficient && (toolOwned || (recipe.allowWorkshopOverride && this.#workshopClaimed)));
+    const toolEligible = !chosenToolKey
+      || (proficient && (toolOwned || (recipe.allowWorkshopOverride && this.#workshopClaimed)));
 
-    const canStart = !!actor && !!targetItem && toolEligible && (materialsMet || (this.#fillWithGold && !goldInsufficient));
+    const canStart = !!actor && !!targetItem && toolEligible
+      && (materialsMet || (this.#fillWithGold && !goldInsufficient));
 
     const totalHours = recipe.durationOverride.value != null
       ? recipe.durationOverride.value * HOURS_PER_UNIT[recipe.durationOverride.units]
@@ -310,7 +324,7 @@ export default class CraftStartDialog extends Dialog5e {
     if ( data?.type !== "Item" ) return;
     const item = await Item.implementation.fromDropData(data);
     if ( !item || (item.parent !== this.actor) ) {
-      ui.notifications.warn(_loc("SIMPLE_SHOP_CRAFT_5E.CraftStart.MustOwnMaterial"));
+      ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.CraftStart.MustOwnMaterial");
       return;
     }
     this.#freeformIds.add(item.id);
@@ -324,22 +338,10 @@ export default class CraftStartDialog extends Dialog5e {
    * @this {CraftStartDialog}
    * @param {Event} event         Triggering click event.
    * @param {HTMLElement} target  Button that was clicked.
-   * @returns {void}
    */
   static #removeFreeformMaterial(event, target) {
     this.#freeformIds.delete(target.dataset.itemId);
     this.render({ parts: ["content", "footer"] });
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Actors selectable as the crafting character: all "character"-type actors, owned ones only unless GM.
-   * @returns {Actor5e[]}
-   */
-  static #selectableActors() {
-    const isGM = game.user.isGM;
-    return game.actors.filter(a => (a.type === "character") && (isGM || a.isOwner));
   }
 
   /* -------------------------------------------- */
@@ -359,22 +361,9 @@ export default class CraftStartDialog extends Dialog5e {
       goldCP: state.goldCP, toolKey: state.chosenToolKey, totalHours: state.totalHours,
       weight: state.weight, halfPrice: state.halfPrice
     });
-    ui.notifications.info(_loc("SIMPLE_SHOP_CRAFT_5E.CraftStart.Requested"));
+    ui.notifications.info("SIMPLE_SHOP_CRAFT_5E.CraftStart.Requested");
     this.close();
   }
-}
-
-/* -------------------------------------------- */
-
-/**
- * Resolve an owned item's contributed value in copper, via its own price or the rarity-based fallback.
- * @param {Item5e} item
- * @returns {number}
- */
-function materialValueCP(item) {
-  const price = needsDefaultPrice(item) ? resolveDefaultPrice(item) : item.system.price;
-  if ( !price?.value ) return 0;
-  return toCopper(price.value, price.denomination);
 }
 
 /* -------------------------------------------- */
@@ -391,4 +380,17 @@ function craftThresholdCP(recipe, craftCost) {
     .reduce((sum, [denom, value]) => sum + toCopper(value ?? 0, denom), 0);
   if ( explicit > 0 ) return explicit;
   return craftCost ? toCopper(craftCost.gold, "gp") : 0;
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Resolve an owned item's contributed value in copper, via its own price or the rarity-based fallback.
+ * @param {Item5e} item
+ * @returns {number}
+ */
+function materialValueCP(item) {
+  const price = needsDefaultPrice(item) ? resolveDefaultPrice(item) : item.system.price;
+  if ( !price?.value ) return 0;
+  return toCopper(price.value, price.denomination);
 }

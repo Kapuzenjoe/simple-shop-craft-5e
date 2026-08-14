@@ -1,4 +1,5 @@
 import { MODULE_ID } from "../config.mjs";
+
 import { applyProgressDescription, createProgressActivity } from "./progress.mjs";
 
 /**
@@ -39,12 +40,13 @@ export async function applyCraftStart(craft) {
     activityId, totalHours: craft.totalHours, progress: 0
   };
   const [item] = await actor.createEmbeddedDocuments("Item", [{
-    name: game.i18n.format("SIMPLE_SHOP_CRAFT_5E.Craft.InProgressName", { name: craft.targetName }),
+    name: _loc("SIMPLE_SHOP_CRAFT_5E.Craft.InProgressName", { name: craft.targetName }),
     type: "consumable",
     img: craft.targetImg,
     system: {
       quantity: 1, price: craft.halfPrice ?? { value: 0, denomination: "gp" },
-      weight: craft.weight ?? { value: 0, units: "lb" }, uses: { max: "1" },
+      weight: craft.weight ?? { value: 0, units: "lb" },
+      uses: { max: "1", recovery: [{ period: "lr", type: "recoverAll" }] },
       description: { value: applyProgressDescription("", initialCraft) }
     },
     flags: { [MODULE_ID]: { craft: initialCraft } }

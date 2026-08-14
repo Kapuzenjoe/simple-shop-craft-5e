@@ -29,8 +29,6 @@ const SETTINGS = [
 
 /**
  * Register all module settings.
- *
- * @returns {void}
  */
 export function registerSettings() {
   for ( const { key, ...data } of SETTINGS ) {
@@ -43,7 +41,6 @@ export function registerSettings() {
 /**
  * Register the sidebar button that opens the Shop Manager from the Item Directory. Loads
  * {@link ShopManager} lazily so it isn't pulled in until the button is actually rendered.
- * @returns {void}
  */
 export function registerSidebarButton() {
   Hooks.on("renderItemDirectory", async (app, html) => {
@@ -57,7 +54,6 @@ export function registerSidebarButton() {
 /**
  * Register the GM query used to open a shop on every connected client. Loads {@link ShopSheet}
  * lazily so it isn't pulled in until a spotlight is actually received.
- * @returns {void}
  */
 export function registerSpotlightQuery() {
   CONFIG.queries[`${MODULE_ID}.spotlight`] = async ({ shopId }) => {

@@ -1,4 +1,15 @@
-import { excludeFilter } from "../utils.mjs";
+import { excludeFilter, isShopPackSource } from "../utils.mjs";
+
+/**
+ * `CONFIG.DND5E` base-item registries per item type, restricting enchant base-item search to real
+ * catalog items instead of anything merely tagged with a matching `system.type.value`.
+ * @type {Record<string, () => Record<string, string>>}
+ */
+const BASE_ITEM_REGISTRIES = {
+  weapon: () => CONFIG.DND5E.weaponIds,
+  consumable: () => CONFIG.DND5E.ammoIds,
+  equipment: () => ({ ...CONFIG.DND5E.armorIds, ...CONFIG.DND5E.shieldIds })
+};
 
 /**
  * Find a random base item eligible for the given enchant Activity, searched across all active compendium
@@ -6,7 +17,7 @@ import { excludeFilter } from "../utils.mjs";
  * from the enchant item's description header is preferred when present, then a category filter parsed
  * from the same header, then the Activity's own restrictions as a last resort.
  * @param {EnchantActivity} activity
- * @param {string[]|null} [wantedSubtypes]  Restrict to these `system.type.value` subtypes, when given.
+ * @param {Set<string>|null} [wantedSubtypes]  Restrict to these `system.type.value` subtypes, when given.
  * @returns {Promise<Item5e|null>}
  */
 export async function findEnchantableBaseItem(activity, wantedSubtypes=null) {
@@ -17,24 +28,30 @@ export async function findEnchantableBaseItem(activity, wantedSubtypes=null) {
       const [uuid] = pool.splice(Math.floor(Math.random() * pool.length), 1);
       const candidate = await fromUuid(uuid);
       if ( !candidate ) continue;
-      if ( wantedSubtypes && !wantedSubtypes.includes(candidate.system.type?.value) ) continue;
+      if ( wantedSubtypes && !wantedSubtypes.has(candidate.system.type?.value) ) continue;
       if ( activity.canEnchant(candidate) === true ) return candidate;
     }
     return null;
   }
 
-  const types = new Set([activity.restrictions.type || activity.item.type]);
+  const itemType = activity.restrictions.type || activity.item.type;
+  const types = new Set([itemType]);
   const rules = game.dnd5e.settings.rulesVersion === "modern" ? "2024" : "2014";
+  const categoryFilters = parseRestrictionCategory(activity.item);
   const results = await game.dnd5e.applications.CompendiumBrowser.fetch(Item, {
     types, filters: [
       { k: "system.source.rules", o: "in", v: [rules, null, undefined] },
       excludeFilter("system.type.value", ["natural"]),
-      ...parseRestrictionCategory(activity.item),
+      ...categoryFilters,
       ...(wantedSubtypes ? [{ k: "system.type.value", o: "in", v: wantedSubtypes }] : [])
     ]
   });
 
-  const pool = [...results];
+  const fromShopPack = results.filter(index => isShopPackSource(index.uuid));
+  const registry = BASE_ITEM_REGISTRIES[itemType];
+  const baseItemUuids = (registry && ((itemType !== "equipment") || categoryFilters.length))
+    ? new Set(Object.values(registry())) : null;
+  const pool = baseItemUuids ? fromShopPack.filter(index => baseItemUuids.has(index.uuid)) : fromShopPack;
   while ( pool.length ) {
     const [candidate] = pool.splice(Math.floor(Math.random() * pool.length), 1);
     const fullCandidate = await fromUuid(candidate.uuid);
