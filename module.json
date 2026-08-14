@@ -54,5 +54,5 @@
   "url": "https://github.com/Kapuzenjoe/simple-shop-craft-5e",
   "manifest": "https://github.com/Kapuzenjoe/simple-shop-craft-5e/releases/latest/download/module.json",
   "download": "https://github.com/Kapuzenjoe/simple-shop-craft-5e/releases/download/0.0.1/module.zip",
-  "description": "Simple Shop & Craft 5e."
+  "description": "Shops and Downtime Crafting for the dnd5e system. GMs stock the shelves and write the recipes; players buy, sell, haggle, and craft straight from their own character sheet — every transaction goes out as a GM-confirmation chat card first."
 }
