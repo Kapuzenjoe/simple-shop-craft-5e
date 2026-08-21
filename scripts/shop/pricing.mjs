@@ -1,6 +1,6 @@
 import { finalizeGroups } from "../utils.mjs";
 
-import { breakdownCopper, resolveDefaultPrice, toCopper } from "./currency.mjs";
+import { breakdownCopper, resolveItemPrice, toCopper } from "./currency.mjs";
 import { entryKey, resolveShopItems } from "./entry-resolver.mjs";
 
 /**
@@ -43,9 +43,7 @@ export async function groupByType({
   const groups = new Map();
   for ( const row of rows ) {
     row.key = entryKey(row.entry);
-    const itemPrice = row.item?.system?.price?.value
-      ? { value: row.item.system.price.value, denomination: row.item.system.price.denomination }
-      : (row.item ? resolveDefaultPrice(row.item) : null);
+    const itemPrice = resolveItemPrice(row.item);
     const basePrice = row.entry.price?.value ?? itemPrice?.value ?? 0;
     const denomination = (row.entry.price?.value != null)
       ? row.entry.price.denomination

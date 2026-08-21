@@ -1,6 +1,7 @@
 import { SPELL_SCROLL_LEVELS } from "../config.mjs";
 import { excludeFilter, isShopPackSource } from "../utils.mjs";
 
+import { resolveItemPrice, toCopper } from "./currency.mjs";
 import { findEnchantableBaseItem, getEnchantmentProfiles, resolveProfileRarity } from "./enchantment.mjs";
 import { entryKey } from "./entry-resolver.mjs";
 
@@ -36,7 +37,7 @@ export async function buildCandidatePool({ typeConfigs, rarities, spellFilter })
       { k: "system.source.rules", o: "in", v: [rules, null, undefined] },
       excludeFilter("system.type.value", ["natural"]),
       excludeFilter("system.rarity", ["artifact"]),
-      excludeFilter("system.identifier", ["spell-scroll"])
+      excludeFilter("system.identifier", ["spell-scroll", "enspelled-staff"])
     ];
     const results = await game.dnd5e.applications.CompendiumBrowser.fetch(Item, {
       types: new Set([type]), filters
@@ -87,14 +88,17 @@ export async function buildCandidatePool({ typeConfigs, rarities, spellFilter })
  * @param {SpellFilter|null} options.spellFilter
  * @param {number} options.count
  * @param {Set<string>} options.existingKeys  Entry keys already present in the shop, to skip duplicates.
+ * @param {{ value: number|null, denomination: string }} [options.settlementCap]  Skip plain-item candidates
+ *   or enchant-generated items whose resolved price exceeds this. Spell scrolls are unaffected.
  * @returns {Promise<{ entry: ShopItemEntryData, label: string }[]>}
  */
-export async function rollShopItems({ typeConfigs, rarities, magic, spellFilter, count, existingKeys }) {
+export async function rollShopItems({ typeConfigs, rarities, magic, spellFilter, count, existingKeys, settlementCap }) {
   const candidatePool = await buildCandidatePool({ typeConfigs, rarities, spellFilter });
+  const capCP = settlementCap?.value != null ? toCopper(settlementCap.value, settlementCap.denomination) : null;
   const keys = new Set(existingKeys);
   const rolled = [];
   for ( let i = 0; i < count; i++ ) {
-    const result = await drawFromPool(candidatePool, typeConfigs, { rarities, magic, existingKeys: keys });
+    const result = await drawFromPool(candidatePool, typeConfigs, { rarities, magic, existingKeys: keys, capCP });
     if ( !result ) break;
     keys.add(entryKey(result.entry));
     rolled.push(result);
@@ -114,9 +118,10 @@ export async function rollShopItems({ typeConfigs, rarities, magic, spellFilter,
  * @param {Set<string>|null} options.rarities
  * @param {"any"|"magic"|"mundane"} options.magic
  * @param {Set<string>} options.existingKeys
+ * @param {number|null} options.capCP  Settlement cap in copper pieces, or `null` if unset.
  * @returns {Promise<{ entry: ShopItemEntryData, label: string }|null>}
  */
-async function drawFromPool(candidatePool, typeConfigs, { rarities, magic, existingKeys }) {
+async function drawFromPool(candidatePool, typeConfigs, { rarities, magic, existingKeys, capCP }) {
   const pool = [...candidatePool];
   while ( pool.length ) {
     const [candidate] = pool.splice(Math.floor(Math.random() * pool.length), 1);
@@ -138,6 +143,10 @@ async function drawFromPool(candidatePool, typeConfigs, { rarities, magic, exist
       if ( rarities && !rarities.has(candidateItem.system.rarity || "") ) continue;
       const wantedSubtypes = typeConfigs.get(candidateItem.type);
       if ( wantedSubtypes && !wantedSubtypes.has(candidateItem.system.type?.value) ) continue;
+      if ( capCP != null ) {
+        const price = resolveItemPrice(candidateItem);
+        if ( price && (toCopper(price.value, price.denomination) > capCP) ) continue;
+      }
       const entry = candidateItem.system.identifier
         ? { identifier: candidateItem.system.identifier } : { uuid: candidateItem.uuid };
       if ( existingKeys.has(entryKey(entry)) ) continue;
@@ -153,6 +162,13 @@ async function drawFromPool(candidatePool, typeConfigs, { rarities, magic, exist
     const baseType = chosen.activity.restrictions.type || chosen.activity.item.type;
     const baseItem = await findEnchantableBaseItem(chosen.activity, typeConfigs.get(baseType) ?? null);
     if ( !baseItem ) continue;
+    if ( capCP != null ) {
+      const price = resolveItemPrice(candidateItem, {
+        rarity: resolveProfileRarity(candidateItem, chosen.effect),
+        isAmmo: baseItem.system.type?.value === "ammo", isConsumable: baseItem.type === "consumable"
+      });
+      if ( price && (toCopper(price.value, price.denomination) > capCP) ) continue;
+    }
 
     const generated = {
       baseItemUuid: baseItem.uuid, enchantItemUuid: candidateItem.uuid, effectId: chosen.effect.id

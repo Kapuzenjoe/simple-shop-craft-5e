@@ -90,18 +90,14 @@ export function goldPoolCurrencies() {
 /* -------------------------------------------- */
 
 /**
- * Resolve a default gp price for an item with no price of its own, based on its rarity. Ammunition is
- * priced per single piece, a tenth of the consumable default, per the DMG 2024 guidance that ten pieces
- * equal one potion of the same rarity in value.
+ * Resolve a default gp price for an item with no price of its own, based on its rarity.
  * @param {Item5e} item
  * @returns {{ value: number, denomination: string }|null}  Null if the item has no resolvable rarity.
  */
 export function resolveDefaultPrice(item) {
-  const row = RARITY_DEFAULT_PRICES[item.system.rarity];
-  if ( !row ) return null;
-  const isAmmo = item.system.type?.value === "ammo";
-  const value = isAmmo ? (row.consumable / 10) : (item.type === "consumable" ? row.consumable : row.durable);
-  return { value, denomination: "gp" };
+  return resolveRarityPrice(item.system.rarity, {
+    isAmmo: item.system.type?.value === "ammo", isConsumable: item.type === "consumable"
+  });
 }
 
 /* -------------------------------------------- */
@@ -116,6 +112,46 @@ export function resolveDefaultPrice(item) {
 export function resolveGoldPoolRows(goldPool, { namePrefix="" }={}) {
   if ( goldPool.unlimited ) return null;
   return currencyRows(goldPool.current, namePrefix);
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Resolve an item's effective price: its own price if set, otherwise the rarity-based fallback.
+ * @param {Item5e|object} [item]
+ * @param {object} [overrides]
+ * @param {string} [overrides.rarity]        Rarity to use instead of `item.system.rarity` — for enchant
+ *   profiles, whose effective rarity can differ from the enchant item's own.
+ * @param {boolean} [overrides.isAmmo]        Ammo trait to use instead of `item.system.type?.value`.
+ * @param {boolean} [overrides.isConsumable]  Consumable trait to use instead of `item.type`.
+ * @returns {{ value: number, denomination: string }|null}
+ */
+export function resolveItemPrice(item, { rarity, isAmmo, isConsumable }={}) {
+  if ( !item ) return null;
+  return item.system.price?.value
+    ? { value: item.system.price.value, denomination: item.system.price.denomination }
+    : resolveRarityPrice(rarity ?? item.system.rarity, {
+      isAmmo: isAmmo ?? (item.system.type?.value === "ammo"), isConsumable: isConsumable ?? (item.type === "consumable")
+    });
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Resolve the rarity-tier default price for a given rarity. Ammunition is priced per single piece, a
+ * tenth of the consumable default, per the DMG 2024 guidance that ten pieces equal one potion of the
+ * same rarity in value.
+ * @param {string} rarity
+ * @param {object} [options]
+ * @param {boolean} [options.isAmmo]
+ * @param {boolean} [options.isConsumable]
+ * @returns {{ value: number, denomination: string }|null}  Null if the rarity has no resolvable tier.
+ */
+export function resolveRarityPrice(rarity, { isAmmo=false, isConsumable=false }={}) {
+  const row = RARITY_DEFAULT_PRICES[rarity];
+  if ( !row ) return null;
+  const value = isAmmo ? (row.consumable / 10) : (isConsumable ? row.consumable : row.durable);
+  return { value, denomination: "gp" };
 }
 
 /* -------------------------------------------- */

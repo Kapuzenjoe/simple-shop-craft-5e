@@ -20,6 +20,7 @@
 - Changed selling to a shop so an item can't be sold for more than the shop's Settlement Cap, if set, matching the existing cap on what a shop offers to buy from players.
   - Added a checkbox next to the Settlement Cap to turn this off (on by default).
 - Fixed the buy/sell quantity counters ignoring the Settlement Cap, letting items exceeding it be added to the cart despite the warning shown.
+- Fixed the item generator ignoring the Settlement Cap, letting generated items over it silently land in the shop as unbuyable.
 
 
 ## 0.0.1

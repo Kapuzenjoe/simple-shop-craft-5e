@@ -243,4 +243,3 @@ for themselves.
 
 - Non-item services: spellcasting, hirelings, food & lodging
 - Search and filtering for the recipe browser
-- Calender-based Restock (dnd5e 6.0.0)

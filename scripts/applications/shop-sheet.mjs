@@ -765,9 +765,9 @@ export default class ShopSheet extends Application5e {
     const patch = { items };
     if ( data.img !== undefined ) patch.img = data.img;
     if ( data.location !== undefined ) patch.location = data.location;
-    if ( data.openHour !== undefined ) patch.openHour = (data.openHour === "") ? null : Number(data.openHour);
+    if ( data.openHour !== undefined ) patch.openHour = data.openHour;
     if ( data.openMinute !== undefined ) patch.openMinute = Math.clamp(Math.round(data.openMinute ?? 0), 0, 59);
-    if ( data.closeHour !== undefined ) patch.closeHour = (data.closeHour === "") ? null : Number(data.closeHour);
+    if ( data.closeHour !== undefined ) patch.closeHour = data.closeHour;
     if ( data.closeMinute !== undefined ) patch.closeMinute = Math.clamp(Math.round(data.closeMinute ?? 0), 0, 59);
     if ( data.restockWeekdays !== undefined ) patch.restockWeekdays = data.restockWeekdays;
     if ( data.closedWeekdays !== undefined ) patch.closedWeekdays = data.closedWeekdays;
