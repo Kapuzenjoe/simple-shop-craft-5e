@@ -1,17 +1,99 @@
 <section class="tab {{ tab.cssClass }}" data-tab="description" data-group="{{ tab.group }}">
-    <div class="info-block">
-        <div>
-            <div class="label">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Location" }}</div>
-            <div class="value">
-                {{#if (and isGM isEditMode)}}
-                <input type="text" name="location" value="{{ shop.location }}" class="uninput"
-                       placeholder="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.LocationPlaceholder' }}">
-                {{else}}
-                {{#if shop.location}}{{ shop.location }}{{else}}—{{/if}}
-                {{/if}}
+    <fieldset>
+        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Location" }}</legend>
+        {{#if (and isGM isEditMode)}}
+        {{ formInput shopFields.location value=shop.location
+                     placeholder=(localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.LocationPlaceholder") }}
+        {{else}}
+        <span class="value">{{#if shop.location}}{{ shop.location }}{{else}}—{{/if}}</span>
+        {{/if}}
+    </fieldset>
+    <fieldset>
+        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.OpeningHours" }}</legend>
+        {{#if (and isGM isEditMode)}}
+        <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.OpeningHoursHint" }}</p>
+        <div class="form-group slim">
+            <label>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.StatusOverride" }}</label>
+            <div class="form-fields">
+                {{ formInput shopFields.statusOverride value=shop.statusOverride options=statusOverrideOptions }}
             </div>
         </div>
-    </div>
+        <div class="form-group slim">
+            <label>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.OpeningHoursFrom" }}</label>
+            <div class="form-fields">
+                <label for="{{ concat "openHour-" shop._id }}">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.OpeningHoursHour" }}</label>
+                {{ formInput shopFields.openHour value=shop.openHour type="number"
+                             id=(concat "openHour-" shop._id) placeholder="—" }}
+                <label for="{{ concat "openMinute-" shop._id }}">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.OpeningHoursMinute" }}</label>
+                {{ formInput shopFields.openMinute value=shop.openMinute type="number"
+                             id=(concat "openMinute-" shop._id) }}
+            </div>
+        </div>
+        <div class="form-group slim">
+            <label>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.OpeningHoursTo" }}</label>
+            <div class="form-fields">
+                <label for="{{ concat "closeHour-" shop._id }}">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.OpeningHoursHour" }}</label>
+                {{ formInput shopFields.closeHour value=shop.closeHour type="number"
+                             id=(concat "closeHour-" shop._id) placeholder="—" }}
+                <label for="{{ concat "closeMinute-" shop._id }}">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.OpeningHoursMinute" }}</label>
+                {{ formInput shopFields.closeMinute value=shop.closeMinute type="number"
+                             id=(concat "closeMinute-" shop._id) }}
+            </div>
+        </div>
+        <div class="form-group slim">
+            <label>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.ClosedWeekdays" }}</label>
+            <div class="form-fields">
+                {{ formInput shopFields.closedWeekdays value=closedWeekdays options=restockWeekdayOptions classes="full-width" }}
+            </div>
+        </div>
+        {{#if festivalOptions}}
+        <div class="form-group slim">
+            <label>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.ClosedFestivals" }}</label>
+            <div class="form-fields">
+                {{ formInput shopFields.closedFestivals value=closedFestivals options=festivalOptions classes="full-width" }}
+            </div>
+        </div>
+        {{/if}}
+        {{else}}
+        {{#if shop.statusOverride}}
+        <div class="form-group slim">
+            <label>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.StatusOverride" }}</label>
+            <span class="value">
+                {{#if (eq shop.statusOverride "open")}}{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.StatusOverrideOpen" }}
+                {{else}}{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.StatusOverrideClosed" }}{{/if}}
+            </span>
+        </div>
+        {{/if}}
+        <div class="form-group slim">
+            <label>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.OpeningHours" }}</label>
+            <span class="value">{{ openingHoursDisplay }}</span>
+        </div>
+        {{#if closedWeekdaysDisplay}}
+        <div class="form-group slim">
+            <label>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.ClosedWeekdays" }}</label>
+            <span class="value">{{ closedWeekdaysDisplay }}</span>
+        </div>
+        {{/if}}
+        {{#if closedFestivalsDisplay}}
+        <div class="form-group slim">
+            <label>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.ClosedFestivals" }}</label>
+            <span class="value">{{ closedFestivalsDisplay }}</span>
+        </div>
+        {{/if}}
+        {{/if}}
+    </fieldset>
+    <fieldset>
+        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.RestockDays" }}</legend>
+        {{#if (and isGM isEditMode)}}
+        <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.RestockDaysHint" }}</p>
+        {{#unless restockCalendarActive}}
+        <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.AutoRestockNoCalendarHint" }}</p>
+        {{/unless}}
+        {{ formInput shopFields.restockWeekdays value=restockWeekdays options=restockWeekdayOptions classes="full-width" }}
+        {{else}}
+        <span class="value">{{ restockWeekdaysDisplay }}</span>
+        {{/if}}
+    </fieldset>
     {{#if (and isGM isEditMode)}}
     <prose-mirror name="description" value="{{ shop.description }}"></prose-mirror>
     {{else}}

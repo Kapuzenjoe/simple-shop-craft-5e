@@ -173,6 +173,17 @@ export async function resolveIdentifierIndex(identifiers) {
 /* -------------------------------------------- */
 
 /**
+ * Seconds in a full day-night cycle on the active calendar.
+ * @returns {number}
+ */
+export function secondsPerDay() {
+  const days = game.time.calendar?.days ?? {};
+  return (days.hoursPerDay ?? 24) * (days.minutesPerHour ?? 60) * (days.secondsPerMinute ?? 60);
+}
+
+/* -------------------------------------------- */
+
+/**
  * Actors selectable as a shop/craft acting character: all "character"-type actors, owned ones only unless
  * GM. Optionally includes the party actor, if the current user may act as it.
  * @param {object} [options]

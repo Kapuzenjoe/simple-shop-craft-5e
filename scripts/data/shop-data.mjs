@@ -95,16 +95,24 @@ export class Shop extends foundry.abstract.DataModel {
       playerDiscounts: new ArrayField(new EmbeddedDataField(ShopPlayerDiscount)),
       npc: new DocumentUUIDField({ type: "Actor", blank: true }),
       location: new StringField({ blank: true }),
+      openHour: new NumberField({ initial: null, nullable: true, integer: true, min: 0, max: 23 }),
+      openMinute: new NumberField({ required: true, initial: 0, integer: true, min: 0, max: 59 }),
+      closeHour: new NumberField({ initial: null, nullable: true, integer: true, min: 0, max: 23 }),
+      closeMinute: new NumberField({ required: true, initial: 0, integer: true, min: 0, max: 59 }),
       settlementCap: new SchemaField({
         value: new NumberField({ initial: null, nullable: true, min: 0 }),
-        denomination: new StringField({ initial: () => CONFIG.DND5E.defaultCurrency })
+        denomination: new StringField({ initial: () => CONFIG.DND5E.defaultCurrency }),
+        appliesToSell: new BooleanField({ initial: true })
       }),
       goldPool: new SchemaField({
         max: new ObjectField({ initial: {} }),
         current: new ObjectField({ initial: {} }),
         unlimited: new BooleanField({ initial: false })
       }),
-      lastRestock: new NumberField({ initial: null, nullable: true, integer: true }),
+      restockWeekdays: new SetField(new NumberField({ integer: true, min: 0 })),
+      closedWeekdays: new SetField(new NumberField({ integer: true, min: 0 })),
+      closedFestivals: new SetField(new StringField()),
+      statusOverride: new StringField({ initial: "", blank: true, choices: ["", "open", "closed"] }),
       description: new HTMLField(),
       items: new ArrayField(new EmbeddedDataField(ShopItemEntry))
     };

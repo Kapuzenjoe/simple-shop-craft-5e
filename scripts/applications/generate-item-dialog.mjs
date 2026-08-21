@@ -308,7 +308,7 @@ export default class GenerateItemDialog extends Dialog5e {
     });
 
     if ( !rolled.length ) {
-      ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemNone");
+      ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemNone", { localize: true });
       return;
     }
 

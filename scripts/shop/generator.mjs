@@ -132,7 +132,7 @@ async function drawFromPool(candidatePool, typeConfigs, { rarities, magic, exist
     if ( (magic === "magic") && !isMagic ) continue;
     if ( (magic === "mundane") && isMagic ) continue;
     const hasEnchant = candidateItem.system.activities?.some(a => a.type === "enchant");
-    if ( !hasEnchant && isMagic && !candidateItem.system.rarity && !candidateItem.system.price?.value ) continue;
+    if ( !hasEnchant && !candidateItem.system.price?.value && !(isMagic && candidateItem.system.rarity) ) continue;
 
     if ( !hasEnchant || candidateItem.system.type?.baseItem ) {
       if ( rarities && !rarities.has(candidateItem.system.rarity || "") ) continue;

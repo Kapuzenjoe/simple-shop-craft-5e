@@ -2,6 +2,7 @@ import { SETTLEMENT_CAPS, GOLD_POOL_DEFAULT } from "../config.mjs";
 import { createRecipe, deleteRecipe, getRecipe, getRecipes } from "../data/recipe-store.mjs";
 import { createShop, deleteShop, getShop, getShops, updateShop } from "../data/shop-store.mjs";
 import { getStarterItems, getStarterPackOptions } from "../data/starter-packs.mjs";
+import { isShopOpen, openingHoursDisplay } from "../shop/opening-hours.mjs";
 import { buildItemTableSections, finalizeGroups, resolveEntries } from "../utils.mjs";
 
 import BasePromptDialog from "./base-prompt-dialog.mjs";
@@ -78,12 +79,14 @@ export default class ShopManager extends Application5e {
     const rows = shops.toSorted((a, b) => a.name.localeCompare(b.name)).map(shop => ({
       shop,
       npc: shop.npc ? fromUuidSync(shop.npc) : null,
+      openingHours: openingHoursDisplay(shop),
       subtitle: [shop.location || null, ShopManager.#settlementCapLabel(shop) || null].filter(Boolean).join(" · "),
       template: "modules/simple-shop-craft-5e/templates/shop-manager/shop-row.hbs"
     }));
     const columns = [
       { id: "name" },
       { id: "npc", label: "SIMPLE_SHOP_CRAFT_5E.Owner" },
+      { id: "openingHours", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.OpeningHours" },
       { id: "active", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Status" },
       { id: "controls" }
     ];
@@ -267,7 +270,12 @@ export default class ShopManager extends Application5e {
    * @param {HTMLElement} target  Button that was clicked.
    */
   static #editShop(event, target) {
-    new ShopSheet({ shopId: target.dataset.shopId }).render({ force: true });
+    const shop = getShop(target.dataset.shopId);
+    if ( !game.user.isGM && !isShopOpen(shop) ) {
+      ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Closed", { localize: true });
+      return;
+    }
+    new ShopSheet({ shopId: shop._id }).render({ force: true });
   }
 
   /* -------------------------------------------- */
@@ -285,7 +293,7 @@ export default class ShopManager extends Application5e {
       const actor = game.user.character;
       const allowed = recipe.openToAll || (actor && recipe.unlockedFor.has(actor.uuid));
       if ( !allowed ) {
-        ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Locked");
+        ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Locked", { localize: true });
         return;
       }
     }

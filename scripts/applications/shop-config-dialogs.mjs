@@ -434,13 +434,18 @@ export async function openSettlementCapDialog(shopSheet, onUpdate) {
     window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SettlementCap" },
     state: {
       settlementCapPreset: preset, settlementCapValue: settlementCap.value,
-      settlementCapDenomination: settlementCap.denomination
+      settlementCapDenomination: settlementCap.denomination, appliesToSell: settlementCap.appliesToSell
     },
     fields: formState => {
       const fields = [
         {
           field: new foundry.data.fields.StringField(), name: "settlementCapPreset", value: formState.settlementCapPreset,
           label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SettlementCap"), options: presetOptions
+        },
+        {
+          field: capFields.appliesToSell, name: "appliesToSell", value: !!formState.appliesToSell,
+          label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SettlementCapAppliesToSell"),
+          hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SettlementCapAppliesToSellHint")
         }
       ];
       if ( formState.settlementCapPreset === "custom" ) {
@@ -464,7 +469,7 @@ export async function openSettlementCapDialog(shopSheet, onUpdate) {
           : (data.settlementCapPreset === "" ? null : SETTLEMENT_CAPS[data.settlementCapPreset].value);
         const denomination = (data.settlementCapPreset === "custom")
           ? (data.settlementCapDenomination || CONFIG.DND5E.defaultCurrency) : CONFIG.DND5E.defaultCurrency;
-        await onUpdate({ settlementCap: { value, denomination } });
+        await onUpdate({ settlementCap: { value, denomination, appliesToSell: !!data.appliesToSell } });
       }
     }
   });

@@ -324,7 +324,7 @@ export default class CraftStartDialog extends Dialog5e {
     if ( data?.type !== "Item" ) return;
     const item = await Item.implementation.fromDropData(data);
     if ( !item || (item.parent !== this.actor) ) {
-      ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.CraftStart.MustOwnMaterial");
+      ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.CraftStart.MustOwnMaterial", { localize: true });
       return;
     }
     this.#freeformIds.add(item.id);
@@ -361,7 +361,7 @@ export default class CraftStartDialog extends Dialog5e {
       goldCP: state.goldCP, toolKey: state.chosenToolKey, totalHours: state.totalHours,
       weight: state.weight, halfPrice: state.halfPrice
     });
-    ui.notifications.info("SIMPLE_SHOP_CRAFT_5E.CraftStart.Requested");
+    ui.notifications.info("SIMPLE_SHOP_CRAFT_5E.CraftStart.Requested", { localize: true });
     this.close();
   }
 }

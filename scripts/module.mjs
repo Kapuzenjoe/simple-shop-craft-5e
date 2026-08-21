@@ -4,12 +4,14 @@ import { registerCraftProgress } from "./craft/progress.mjs";
 import { registerRecipeLocalization } from "./data/recipe-data.mjs";
 import { registerShopLocalization } from "./data/shop-data.mjs";
 import { registerSettings, registerSidebarButton, registerSpotlightQuery, registerTemplates } from "./settings.mjs";
+import { registerCalendarEvents } from "./shop/calendar-events.mjs";
 
 Hooks.once("init", () => {
   registerSettings();
   registerPurchaseCard();
   registerCraftCard();
   registerCraftProgress();
+  registerCalendarEvents();
   registerTemplates();
   registerSidebarButton();
   registerSpotlightQuery();

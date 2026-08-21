@@ -56,7 +56,7 @@ export async function openHaggleDialog(shopSheet, onPatchPlayerDiscount) {
         });
         if ( rolls?.[0] ) {
           await onPatchPlayerDiscount(
-            actor.uuid, rolls[0].isFailure ? { hagglingLocked: true, hagglingTimestamp: Date.now() } : {}
+            actor.uuid, rolls[0].isFailure ? { hagglingLocked: true, hagglingTimestamp: game.time.worldTime } : {}
           );
         }
         await this.close();

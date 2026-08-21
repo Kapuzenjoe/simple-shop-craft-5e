@@ -1,4 +1,7 @@
 <header class="sheet-header">
+    {{#if shopClosed}}
+    <p class="hint warning">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.ShopClosedWarning" }}</p>
+    {{/if}}
     <div class="header-top">
         <fieldset class="shop-summary">
             <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.Shop" }}</legend>

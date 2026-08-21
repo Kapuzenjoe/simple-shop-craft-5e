@@ -89,7 +89,7 @@ async function handleDecision(message, purchase, decision) {
   if ( decision === "accepted" ) {
     const result = await applyPurchase(purchase);
     if ( !result.ok ) {
-      ui.notifications.error(result.error);
+      ui.notifications.error(result.error, { localize: true });
       return;
     }
   }

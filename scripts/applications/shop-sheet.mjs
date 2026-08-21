@@ -1,11 +1,16 @@
 import { MODULE_ID } from "../config.mjs";
+import { Shop } from "../data/shop-data.mjs";
 import { getShop, updateShop } from "../data/shop-store.mjs";
+import { calendariaWeekdayOptions, isCalendariaActive } from "../integrations/calendaria.mjs";
+import { isDnd5eAutoRecoveryEnabled } from "../shop/calendar-events.mjs";
 import { resolveDefaultPrice, resolveGoldPoolRows } from "../shop/currency.mjs";
 import { entryKey, resolveShopItems } from "../shop/entry-resolver.mjs";
 import { isHagglingLocked } from "../shop/haggling.mjs";
+import { festivalOptions, isShopOpen, openingHoursDisplay } from "../shop/opening-hours.mjs";
 import {
   groupByType, groupSellItems, needsDefaultPrice, resolvePlayerOverride
 } from "../shop/pricing.mjs";
+import { resolveRestockPatch } from "../shop/restock.mjs";
 import { buildItemTableSections, loadingTooltip, selectableActors } from "../utils.mjs";
 
 import { openGenerateItemDialog } from "./generate-item-dialog.mjs";
@@ -15,10 +20,6 @@ import {
   openDiscountDialog, openGoldPoolDialog, openImageDialog, openMaxStockDialog, openModifiersDialog,
   openOwnerDialog, openPlayersDialog, openPriceDialog, openRenameDialog, openSettlementCapDialog
 } from "./shop-config-dialogs.mjs";
-
-/**
- * @import { Shop } from "../data/shop-data.mjs";
- */
 
 const { Application5e } = game.dnd5e.applications.api;
 
@@ -331,6 +332,7 @@ export default class ShopSheet extends Application5e {
     context.isGM = game.user.isGM;
     context.editable = this.isEditable;
     context.isEditMode = this.isEditMode;
+    context.shopClosed = !this.isEditMode && !isShopOpen(this.shop);
     const { characters, party } = selectableActors({ includeParty: true });
     if ( this.selectedActorUuid === undefined ) {
       this.selectedActorUuid = game.user.character?.type === "character" ? game.user.character.uuid : "";
@@ -356,7 +358,7 @@ export default class ShopSheet extends Application5e {
     context.sellGroups = await groupSellItems({
       items: context.actor?.items ?? [], sellModifier: context.shop.sellModifier, sellCart: this.sellCart,
       fixedValueLootTypes: context.shop.fixedValueLootTypes, playerSellModifier: playerOverride.sell,
-      actorName: context.actor?.name, renderDiscountTooltip
+      actorName: context.actor?.name, renderDiscountTooltip, settlementCap: context.shop.settlementCap
     });
     this.#lastSellGroups = context.sellGroups;
 
@@ -378,6 +380,35 @@ export default class ShopSheet extends Application5e {
         type: "button", action: "openCart", icon: "fas fa-basket-shopping",
         label: "SIMPLE_SHOP_CRAFT_5E.ShopCart.ViewCart", cssClass: "always-interactive"
       }];
+    }
+    if ( partId === "description" ) {
+      context.shopFields = Shop.schema.fields;
+      context.openingHoursDisplay = openingHoursDisplay(context.shop);
+      context.statusOverrideOptions = [
+        { value: "", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StatusOverrideAuto") },
+        { value: "open", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StatusOverrideOpen") },
+        { value: "closed", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StatusOverrideClosed") }
+      ];
+      context.restockCalendarActive = isCalendariaActive() || isDnd5eAutoRecoveryEnabled();
+      context.restockWeekdayOptions = isCalendariaActive()
+        ? calendariaWeekdayOptions()
+        : game.time.calendar.days.values.map((day, value) => ({ value, label: _loc(day.name) }));
+      context.restockWeekdays = Array.from(context.shop.restockWeekdays);
+      const selectedNames = context.restockWeekdayOptions
+        .filter(o => context.shop.restockWeekdays.has(o.value)).map(o => o.label);
+      context.restockWeekdaysDisplay = selectedNames.length
+        ? selectedNames.join(", ") : _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.AutoRestockNever");
+
+      context.closedWeekdays = Array.from(context.shop.closedWeekdays);
+      const closedWeekdayNames = context.restockWeekdayOptions
+        .filter(o => context.shop.closedWeekdays.has(o.value)).map(o => o.label);
+      context.closedWeekdaysDisplay = closedWeekdayNames.join(", ");
+
+      context.festivalOptions = festivalOptions();
+      context.closedFestivals = Array.from(context.shop.closedFestivals);
+      const closedFestivalNames = context.festivalOptions
+        .filter(o => context.shop.closedFestivals.has(o.value)).map(o => o.label);
+      context.closedFestivalsDisplay = closedFestivalNames.join(", ");
     }
     if ( partId === "buy" ) {
       context.tabId = "buy";
@@ -540,7 +571,8 @@ export default class ShopSheet extends Application5e {
    */
   static async #adjustCartQuantity(event, target) {
     const key = target.dataset.key;
-    const max = this.shop.items.find(i => entryKey(i) === key)?.stock.current ?? Infinity;
+    const row = this.#findRow(key);
+    const max = row?.suppressed ? 0 : (this.shop.items.find(i => entryKey(i) === key)?.stock.current ?? Infinity);
     const delta = Number(target.dataset.delta);
     const next = Math.clamp((this.cart.get(key) ?? 0) + delta, 0, max);
     if ( next === 0 ) this.cart.delete(key);
@@ -560,7 +592,8 @@ export default class ShopSheet extends Application5e {
   static async #adjustSellQuantity(event, target) {
     const itemId = target.dataset.itemId;
     const actor = this.selectedActorUuid ? fromUuidSync(this.selectedActorUuid) : null;
-    const max = actor?.items.get(itemId)?.system?.quantity ?? 0;
+    const row = this.#lastSellGroups.flatMap(group => group.items).find(row => row.item.id === itemId);
+    const max = row?.suppressed ? 0 : (actor?.items.get(itemId)?.system?.quantity ?? 0);
     const delta = Number(target.dataset.delta);
     const next = Math.clamp((this.sellCart.get(itemId) ?? 0) + delta, 0, max);
     if ( next === 0 ) this.sellCart.delete(itemId);
@@ -732,6 +765,14 @@ export default class ShopSheet extends Application5e {
     const patch = { items };
     if ( data.img !== undefined ) patch.img = data.img;
     if ( data.location !== undefined ) patch.location = data.location;
+    if ( data.openHour !== undefined ) patch.openHour = (data.openHour === "") ? null : Number(data.openHour);
+    if ( data.openMinute !== undefined ) patch.openMinute = Math.clamp(Math.round(data.openMinute ?? 0), 0, 59);
+    if ( data.closeHour !== undefined ) patch.closeHour = (data.closeHour === "") ? null : Number(data.closeHour);
+    if ( data.closeMinute !== undefined ) patch.closeMinute = Math.clamp(Math.round(data.closeMinute ?? 0), 0, 59);
+    if ( data.restockWeekdays !== undefined ) patch.restockWeekdays = data.restockWeekdays;
+    if ( data.closedWeekdays !== undefined ) patch.closedWeekdays = data.closedWeekdays;
+    if ( data.closedFestivals !== undefined ) patch.closedFestivals = data.closedFestivals;
+    if ( data.statusOverride !== undefined ) patch.statusOverride = data.statusOverride;
     if ( data.description !== undefined ) patch.description = data.description;
     if ( data.currentGold ) {
       const current = Object.fromEntries(
@@ -801,15 +842,7 @@ export default class ShopSheet extends Application5e {
    * @this {ShopSheet}
    */
   static async #resetShop() {
-    const items = this.shop.items.map(entry => {
-      const obj = entry.toObject();
-      if ( !obj.noRestock ) obj.stock = { ...obj.stock, current: obj.stock.max };
-      return obj;
-    });
-    const goldPool = { ...this.shop.goldPool };
-    if ( !goldPool.unlimited ) goldPool.current = { ...goldPool.max };
-
-    await this.#updateShop({ items, goldPool, lastRestock: Date.now() });
+    await this.#updateShop(resolveRestockPatch(this.shop));
   }
 
   /* -------------------------------------------- */
@@ -821,11 +854,11 @@ export default class ShopSheet extends Application5e {
   static async #spotlight() {
     const targets = game.users.filter(u => u.active && (u.id !== game.user.id));
     if ( !targets.length ) {
-      ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SpotlightNoTargets");
+      ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SpotlightNoTargets", { localize: true });
       return;
     }
     await User.queryMany(targets, `${MODULE_ID}.spotlight`, { shopId: this.shopId });
-    ui.notifications.info("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SpotlightSuccess");
+    ui.notifications.info("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SpotlightSuccess", { localize: true });
   }
 
   /* -------------------------------------------- */
@@ -857,13 +890,24 @@ export default class ShopSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
+   * Find a row from the most recently rendered Buy groups.
+   * @param {string} key
+   * @returns {object|null}
+   */
+  #findRow(key) {
+    return this.#lastGroups.flatMap(group => group.items).find(row => row.key === key) ?? null;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
    * Find a row's resolved item from the most recently rendered Buy/Sell groups, used for
    * generated entries which have no resolvable UUID.
    * @param {string} key
    * @returns {object|null}
    */
   #findRowItem(key) {
-    return this.#lastGroups.flatMap(group => group.items).find(row => row.key === key)?.item ?? null;
+    return this.#findRow(key)?.item ?? null;
   }
 
   /* -------------------------------------------- */

@@ -1,4 +1,4 @@
-<li class="item">
+<li class="item{{#if suppressed}} suppressed{{/if}}">
     <div class="item-row">
         <div class="item-detail item-cart">
             <a class="adjustment-button" data-action="adjustSellQuantity" data-item-id="{{ item.id }}" data-delta="-1"
@@ -15,6 +15,9 @@
              role="button" aria-label="{{ item.name }}">
             {{> "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs"
                 img=item.img name=item.name }}
+            {{#if suppressed}}
+            <i class="fa-solid fa-triangle-exclamation warning" data-tooltip="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.SuppressedCap' }}"></i>
+            {{/if}}
         </div>
         <div class="item-detail item-discount"
              {{#if discountTooltip}}data-tooltip="{{ discountTooltip }}"

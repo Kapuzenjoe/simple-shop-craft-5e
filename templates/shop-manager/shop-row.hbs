@@ -9,6 +9,7 @@
             <span class="title">{{ npc.name }}</span>
             {{/if}}
         </div>
+        <div class="item-detail item-openingHours">{{ openingHours }}</div>
         <div class="item-detail item-active always-visible">
             {{#if @root.isGM}}
             <button type="button" class="unbutton config-button item-control item-action{{#if shop.active}} active{{/if}}"

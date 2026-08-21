@@ -28,7 +28,7 @@ export default class ShopCart extends BasePromptDialog {
           await createPurchaseMessage(
             shopSheet, state.actor, state.lines, state.sellLines, state.total.parts, state.netCP
           );
-          ui.notifications.info("SIMPLE_SHOP_CRAFT_5E.ShopCart.PurchaseRequested");
+          ui.notifications.info("SIMPLE_SHOP_CRAFT_5E.ShopCart.PurchaseRequested", { localize: true });
           shopSheet.cart.clear();
           shopSheet.sellCart.clear();
           await shopSheet.render();

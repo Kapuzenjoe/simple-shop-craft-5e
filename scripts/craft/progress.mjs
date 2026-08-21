@@ -71,7 +71,7 @@ async function completeCraft(item, craft) {
   const [resolved] = await resolveEntries([craft.targetItem]);
   const fullItem = resolved.item?.uuid ? await fromUuid(resolved.item.uuid) : null;
   if ( !fullItem ) {
-    ui.notifications.error("SIMPLE_SHOP_CRAFT_5E.CraftCard.MissingItem");
+    ui.notifications.error("SIMPLE_SHOP_CRAFT_5E.CraftCard.MissingItem", { localize: true });
     return;
   }
 

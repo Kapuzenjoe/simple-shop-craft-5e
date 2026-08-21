@@ -79,7 +79,7 @@ async function handleDecision(message, craft, decision) {
   if ( decision === "accepted" ) {
     const result = await applyCraftStart(craft);
     if ( !result.ok ) {
-      ui.notifications.error(result.error);
+      ui.notifications.error(result.error, { localize: true });
       return;
     }
   }

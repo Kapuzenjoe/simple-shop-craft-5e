@@ -7,8 +7,8 @@
  *                                             the shop's sellModifier. `null` = no override.
  * @property {boolean} hagglingLocked          Whether this actor is locked out from Haggling for this shop after a
  *                                             failed Influence check.
- * @property {number|null} hagglingTimestamp   Timestamp (`Date.now()`) when the lockout was set, or `null` if
- *                                             never locked.
+ * @property {number|null} hagglingTimestamp   World time (`game.time.worldTime`) when the lockout was set, or
+ *                                             `null` if never locked.
  */
 
 /* -------------------------------------------- */
@@ -58,11 +58,21 @@
  * @property {number|null} settlementCap.value        Max. price of the most expensive item this shop sells
  *                                                    (DMG 2024 "Settlements by Size"). `null` = no cap.
  * @property {string} settlementCap.denomination      Currency denomination of the cap.
+ * @property {boolean} settlementCap.appliesToSell     Whether the cap also blocks selling items to this shop
+ *                                                    above the cap, not just buying them. Default `true`.
  * @property {object} goldPool
  * @property {Record<string, number>} goldPool.max      Maximum gold pool, per denomination.
  * @property {Record<string, number>} goldPool.current  Current gold pool, per denomination.
  * @property {boolean} goldPool.unlimited                Whether this shop's buy-back funds are unlimited.
- * @property {number|null} lastRestock       World-time of the last stock/gold-pool reset, or `null` if never reset.
+ * @property {Set<number>} restockWeekdays   Weekday indices (`dayOfWeek`) this shop restocks on automatically.
+ *                                           Empty = disabled.
+ * @property {Set<number>} closedWeekdays    Weekday indices (`dayOfWeek`) this shop is closed on. Empty = never.
+ * @property {Set<string>} closedFestivals   Festival names (from the active calendar's festival day, if any) this
+ *                                           shop is closed on. Empty = never.
+ * @property {string} statusOverride         `""` (automatic) | `"open"` | `"closed"` — forces the shop's open
+ *                                           status, bypassing hours/weekdays/festivals entirely.
+ * @property {number|null} openHour          Hour (0-23) this shop opens each day, or `null` for no restriction.
+ * @property {number|null} closeHour         Hour (0-23) this shop closes each day, or `null` for no restriction.
  * @property {string} [description]          Optional shop description.
  * @property {ShopItemEntryData[]} items     Items available in this shop.
  */

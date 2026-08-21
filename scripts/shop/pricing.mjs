@@ -97,12 +97,17 @@ export async function groupByType({
  * @param {number|null} [options.playerSellModifier]  Acting actor's sell-side override, if configured.
  * @param {string} [options.actorName]  Acting actor's name, used to label the player row.
  * @param {(sources: object[], total: string) => Promise<string>} options.renderDiscountTooltip
+ * @param {{ value: number|null, denomination: string, appliesToSell: boolean }} [options.settlementCap]
+ *   Blocks selling an item for more than this value, if `appliesToSell` is set.
  * @returns {Promise<{ type: string, label: string, items: object[] }[]>}
  */
 export async function groupSellItems({
-  items, sellModifier, sellCart, fixedValueLootTypes, playerSellModifier, actorName, renderDiscountTooltip
+  items, sellModifier, sellCart, fixedValueLootTypes, playerSellModifier, actorName, renderDiscountTooltip,
+  settlementCap
 }) {
   const targetUnit = game.settings.get("dnd5e", "metricWeightUnits") ? "kg" : "lb";
+  const capCP = (settlementCap?.value != null) && settlementCap.appliesToSell
+    ? toCopper(settlementCap.value, settlementCap.denomination) : null;
   const sellable = Array.from(items).filter(item => CONFIG.Item.dataModels[item.type]?.inventorySection);
   const resolved = await resolveShopItems(sellable.map(item => ({ identifier: item.system.identifier })));
   const groups = new Map();
@@ -118,6 +123,7 @@ export async function groupSellItems({
     });
     const finalValue = basePrice * (1 + (discountPercent / 100));
     const priceCP = toCopper(finalValue, denomination);
+    const suppressed = (capCP != null) && (priceCP > capCP);
     const row = {
       item,
       priceDisplay: breakdownCopper(priceCP),
@@ -126,6 +132,7 @@ export async function groupSellItems({
       sellQuantity: sellCart.get(item.id) ?? 0,
       owned: item.system.quantity ?? 1,
       priceCP,
+      suppressed,
       weight: resolveWeight(item.system, targetUnit)
     };
     if ( !groups.has(item.type) ) groups.set(item.type, []);
