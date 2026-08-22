@@ -6,10 +6,10 @@ import BasePromptDialog from "./base-prompt-dialog.mjs";
  * Open a dialog to pick a Charisma skill and the NPC's attitude, then roll it against the shop NPC's DC
  * for the acting actor.
  * @param {ShopSheet} shopSheet
- * @param {(actorUuid: string, patch: object) => Promise<void>} onPatchPlayerDiscount
+ * @param {(actorUuid: string, updateData: object) => Promise<void>} onUpdatePlayerDiscount
  * @returns {Promise<void>}
  */
-export async function openHaggleDialog(shopSheet, onPatchPlayerDiscount) {
+export async function openHaggleDialog(shopSheet, onUpdatePlayerDiscount) {
   const actor = shopSheet.selectedActorUuid ? fromUuidSync(shopSheet.selectedActorUuid) : null;
   if ( !actor ) return;
   const playerOverride = resolvePlayerOverride(shopSheet.shop.playerDiscounts, shopSheet.selectedActorUuid);
@@ -55,7 +55,7 @@ export async function openHaggleDialog(shopSheet, onPatchPlayerDiscount) {
           advantage: data.attitude === "friendly", disadvantage: data.attitude === "hostile"
         });
         if ( rolls?.[0] ) {
-          await onPatchPlayerDiscount(
+          await onUpdatePlayerDiscount(
             actor.uuid, rolls[0].isFailure ? { hagglingLocked: true, hagglingTimestamp: game.time.worldTime } : {}
           );
         }

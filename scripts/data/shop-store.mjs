@@ -63,10 +63,10 @@ export async function setShops(shops) {
 /**
  * Merge a partial update into a single shop.
  * @param {string} shopId
- * @param {object} patch  Fields to merge into the shop's current data.
+ * @param {object} updateData  Fields to merge into the shop's current data.
  * @returns {Promise<void>}
  */
-export async function updateShop(shopId, patch) {
+export async function updateShop(shopId, updateData) {
   const shops = getShops();
-  await setShops(shops.map(s => s._id === shopId ? { ...s.toObject(), ...patch } : s.toObject()));
+  await setShops(shops.map(s => s._id === shopId ? { ...s.toObject(), ...updateData } : s.toObject()));
 }

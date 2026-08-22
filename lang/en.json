@@ -50,8 +50,7 @@
         },
         "toolProficiencies": { "label": "Tool Proficiencies" },
         "skillProficiencies": {
-          "label": "Skill Proficiencies",
-          "hint": "Alternative to Tool Proficiencies — proficiency in any of these skills also satisfies the requirement, without needing to own a tool."
+          "label": "Skill Proficiencies"
         },
         "allowWorkshopOverride": {
           "label": "Allow Workshop Override",
@@ -155,6 +154,7 @@
       "Spotlight": "Show to All Players",
       "SpotlightNoTargets": "No other players are currently connected.",
       "SpotlightSuccess": "Shop shown to all connected players.",
+      "NoActiveGM": "No GM is currently online — this action requires a GM to be connected.",
       "NoActorSelected": "— None —",
       "LocationPlaceholder": "e.g. Baldur's Gate",
       "OpeningHours": "Opening Hours",

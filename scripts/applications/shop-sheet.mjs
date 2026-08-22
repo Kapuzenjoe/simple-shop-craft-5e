@@ -10,7 +10,7 @@ import { festivalOptions, isShopOpen, openingHoursDisplay } from "../shop/openin
 import {
   groupByType, groupSellItems, needsDefaultPrice, resolvePlayerOverride
 } from "../shop/pricing.mjs";
-import { resolveRestockPatch } from "../shop/restock.mjs";
+import { resolveRestockUpdates } from "../shop/restock.mjs";
 import { buildItemTableSections, loadingTooltip, selectableActors } from "../utils.mjs";
 
 import { openGenerateItemDialog } from "./generate-item-dialog.mjs";
@@ -623,7 +623,7 @@ export default class ShopSheet extends Application5e {
    */
   static async #editDiscount(event, target) {
     const playerOverride = resolvePlayerOverride(this.shop.playerDiscounts, this.selectedActorUuid);
-    await openDiscountDialog(this, target, playerOverride, patch => this.#updateShop(patch));
+    await openDiscountDialog(this, target, playerOverride, updateData => this.#updateShop(updateData));
   }
 
   /* -------------------------------------------- */
@@ -633,7 +633,7 @@ export default class ShopSheet extends Application5e {
    * @this {ShopSheet}
    */
   static async #editGoldPool() {
-    await openGoldPoolDialog(this, patch => this.#updateShop(patch));
+    await openGoldPoolDialog(this, updateData => this.#updateShop(updateData));
   }
 
   /* -------------------------------------------- */
@@ -658,7 +658,7 @@ export default class ShopSheet extends Application5e {
    * @param {HTMLElement} target  Element that was clicked.
    */
   static async #editMaxStock(event, target) {
-    await openMaxStockDialog(this, target, patch => this.#updateShop(patch));
+    await openMaxStockDialog(this, target, updateData => this.#updateShop(updateData));
   }
 
   /* -------------------------------------------- */
@@ -668,7 +668,7 @@ export default class ShopSheet extends Application5e {
    * @this {ShopSheet}
    */
   static async #editModifiers() {
-    await openModifiersDialog(this, patch => this.#updateShop(patch));
+    await openModifiersDialog(this, updateData => this.#updateShop(updateData));
   }
 
   /* -------------------------------------------- */
@@ -678,7 +678,7 @@ export default class ShopSheet extends Application5e {
    * @this {ShopSheet}
    */
   static async #editOwner() {
-    await openOwnerDialog(this, patch => this.#updateShop(patch));
+    await openOwnerDialog(this, updateData => this.#updateShop(updateData));
   }
 
   /* -------------------------------------------- */
@@ -690,8 +690,8 @@ export default class ShopSheet extends Application5e {
   static async #editPlayers() {
     await openPlayersDialog(
       this,
-      patch => this.#updateShop(patch),
-      (actorUuid, patch) => this.#patchPlayerDiscount(actorUuid, patch)
+      updateData => this.#updateShop(updateData),
+      (actorUuid, updateData) => this.#updatePlayerDiscount(actorUuid, updateData)
     );
   }
 
@@ -704,7 +704,7 @@ export default class ShopSheet extends Application5e {
    * @param {HTMLElement} target  Element that was clicked.
    */
   static async #editPrice(event, target) {
-    await openPriceDialog(this, target, patch => this.#updateShop(patch));
+    await openPriceDialog(this, target, updateData => this.#updateShop(updateData));
   }
 
   /* -------------------------------------------- */
@@ -714,7 +714,7 @@ export default class ShopSheet extends Application5e {
    * @this {ShopSheet}
    */
   static async #editSettlementCap() {
-    await openSettlementCapDialog(this, patch => this.#updateShop(patch));
+    await openSettlementCapDialog(this, updateData => this.#updateShop(updateData));
   }
 
   /* -------------------------------------------- */
@@ -735,7 +735,7 @@ export default class ShopSheet extends Application5e {
    * @this {ShopSheet}
    */
   static async #haggle() {
-    await openHaggleDialog(this, (actorUuid, patch) => this.#patchPlayerDiscount(actorUuid, patch));
+    await openHaggleDialog(this, (actorUuid, updateData) => this.#updatePlayerDiscount(actorUuid, updateData));
   }
 
   /* -------------------------------------------- */
@@ -762,25 +762,25 @@ export default class ShopSheet extends Application5e {
       return result;
     });
 
-    const patch = { items };
-    if ( data.img !== undefined ) patch.img = data.img;
-    if ( data.location !== undefined ) patch.location = data.location;
-    if ( data.openHour !== undefined ) patch.openHour = data.openHour;
-    if ( data.openMinute !== undefined ) patch.openMinute = Math.clamp(Math.round(data.openMinute ?? 0), 0, 59);
-    if ( data.closeHour !== undefined ) patch.closeHour = data.closeHour;
-    if ( data.closeMinute !== undefined ) patch.closeMinute = Math.clamp(Math.round(data.closeMinute ?? 0), 0, 59);
-    if ( data.restockWeekdays !== undefined ) patch.restockWeekdays = data.restockWeekdays;
-    if ( data.closedWeekdays !== undefined ) patch.closedWeekdays = data.closedWeekdays;
-    if ( data.closedFestivals !== undefined ) patch.closedFestivals = data.closedFestivals;
-    if ( data.statusOverride !== undefined ) patch.statusOverride = data.statusOverride;
-    if ( data.description !== undefined ) patch.description = data.description;
+    const updateData = { items };
+    if ( data.img !== undefined ) updateData.img = data.img;
+    if ( data.location !== undefined ) updateData.location = data.location;
+    if ( data.openHour !== undefined ) updateData.openHour = data.openHour;
+    if ( data.openMinute !== undefined ) updateData.openMinute = Math.clamp(Math.round(data.openMinute ?? 0), 0, 59);
+    if ( data.closeHour !== undefined ) updateData.closeHour = data.closeHour;
+    if ( data.closeMinute !== undefined ) updateData.closeMinute = Math.clamp(Math.round(data.closeMinute ?? 0), 0, 59);
+    if ( data.restockWeekdays !== undefined ) updateData.restockWeekdays = data.restockWeekdays;
+    if ( data.closedWeekdays !== undefined ) updateData.closedWeekdays = data.closedWeekdays;
+    if ( data.closedFestivals !== undefined ) updateData.closedFestivals = data.closedFestivals;
+    if ( data.statusOverride !== undefined ) updateData.statusOverride = data.statusOverride;
+    if ( data.description !== undefined ) updateData.description = data.description;
     if ( data.currentGold ) {
       const current = Object.fromEntries(
         Object.entries(data.currentGold).map(([denom, value]) => [denom, Math.max(0, Math.round(value ?? 0))])
       );
-      patch.goldPool = { ...this.shop.goldPool, current };
+      updateData.goldPool = { ...this.shop.goldPool, current };
     }
-    await this.#updateShop(patch);
+    await this.#updateShop(updateData);
   }
 
   /* -------------------------------------------- */
@@ -831,7 +831,7 @@ export default class ShopSheet extends Application5e {
    * @this {ShopSheet}
    */
   static async #renameShop() {
-    await openRenameDialog(this, patch => this.#updateShop(patch));
+    await openRenameDialog(this, updateData => this.#updateShop(updateData));
   }
 
   /* -------------------------------------------- */
@@ -842,7 +842,7 @@ export default class ShopSheet extends Application5e {
    * @this {ShopSheet}
    */
   static async #resetShop() {
-    await this.#updateShop(resolveRestockPatch(this.shop));
+    await this.#updateShop(resolveRestockUpdates(this.shop));
   }
 
   /* -------------------------------------------- */
@@ -926,18 +926,18 @@ export default class ShopSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
-   * Merge a patch into an actor's playerDiscounts entry for this shop, creating one with no discount
+   * Merge an update into an actor's playerDiscounts entry for this shop, creating one with no discount
    * overrides yet if it doesn't already exist.
    * @param {string} actorUuid
-   * @param {object} patch
+   * @param {object} updateData
    * @returns {Promise<void>}
    */
-  async #patchPlayerDiscount(actorUuid, patch) {
+  async #updatePlayerDiscount(actorUuid, updateData) {
     const existing = this.shop.playerDiscounts.map(pd => pd.toObject());
     const index = existing.findIndex(pd => pd.actor === actorUuid);
     const playerDiscounts = index >= 0
-      ? existing.map((pd, i) => i === index ? { ...pd, ...patch } : pd)
-      : [...existing, { actor: actorUuid, buyModifier: null, sellModifier: null, ...patch }];
+      ? existing.map((pd, i) => i === index ? { ...pd, ...updateData } : pd)
+      : [...existing, { actor: actorUuid, buyModifier: null, sellModifier: null, ...updateData }];
     await this.#updateShop({ playerDiscounts });
   }
 
@@ -945,11 +945,16 @@ export default class ShopSheet extends Application5e {
 
   /**
    * Persist a partial update to this shop's data and re-render.
-   * @param {object} patch  Fields to merge into the shop's current data.
+   * @param {object} updateData  Fields to merge into the shop's current data.
    * @returns {Promise<void>}
    */
-  async #updateShop(patch) {
-    await updateShop(this.shopId, patch);
+  async #updateShop(updateData) {
+    if ( game.user.isGM ) await updateShop(this.shopId, updateData);
+    else {
+      const gm = game.users.activeGM;
+      if ( !gm ) return ui.notifications.warn(_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoActiveGM"));
+      await gm.query(`${MODULE_ID}.updateShop`, { shopId: this.shopId, updateData });
+    }
     this.render();
     if ( this.#cartApp?.rendered ) this.#cartApp.render();
   }

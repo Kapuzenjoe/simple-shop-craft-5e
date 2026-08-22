@@ -66,6 +66,21 @@ export function registerSpotlightQuery() {
 /* -------------------------------------------- */
 
 /**
+ * Register the GM query used to persist a shop update requested by a non-GM client, since world
+ * settings can only be written by a GM. Loads {@link updateShop} lazily so it isn't pulled in until
+ * a request is actually received.
+ */
+export function registerShopUpdateQuery() {
+  CONFIG.queries[`${MODULE_ID}.updateShop`] = async ({ shopId, updateData }) => {
+    if ( !game.user.isGM ) return;
+    const { updateShop } = await import("./data/shop-store.mjs");
+    await updateShop(shopId, updateData);
+  };
+}
+
+/* -------------------------------------------- */
+
+/**
  * Preload Handlebars partials shared across the module's applications.
  * @returns {Promise<Function[]>}
  */

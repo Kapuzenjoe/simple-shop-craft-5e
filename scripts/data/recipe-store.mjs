@@ -63,10 +63,10 @@ export async function setRecipes(recipes) {
 /**
  * Merge a partial update into a single recipe.
  * @param {string} recipeId
- * @param {object} patch  Fields to merge into the recipe's current data.
+ * @param {object} updateData  Fields to merge into the recipe's current data.
  * @returns {Promise<void>}
  */
-export async function updateRecipe(recipeId, patch) {
+export async function updateRecipe(recipeId, updateData) {
   const recipes = getRecipes();
-  await setRecipes(recipes.map(r => r._id === recipeId ? { ...r.toObject(), ...patch } : r.toObject()));
+  await setRecipes(recipes.map(r => r._id === recipeId ? { ...r.toObject(), ...updateData } : r.toObject()));
 }

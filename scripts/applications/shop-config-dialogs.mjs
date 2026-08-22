@@ -11,7 +11,7 @@ import BaseConfigDialog from "./base-config-dialog.mjs";
  * @param {ShopSheet} shopSheet
  * @param {HTMLElement} target  Element that was clicked.
  * @param {{ buy: number|null, sell: number|null }} playerOverride  Acting actor's discount override, if any.
- * @param {(patch: object) => Promise<void>} onUpdate
+ * @param {(updateData: object) => Promise<void>} onUpdate
  * @returns {Promise<void>}
  */
 export async function openDiscountDialog(shopSheet, target, playerOverride, onUpdate) {
@@ -49,7 +49,7 @@ export async function openDiscountDialog(shopSheet, target, playerOverride, onUp
 /**
  * Open a dialog to edit the shop's maximum money pool.
  * @param {ShopSheet} shopSheet
- * @param {(patch: object) => Promise<void>} onUpdate
+ * @param {(updateData: object) => Promise<void>} onUpdate
  * @returns {Promise<void>}
  */
 export async function openGoldPoolDialog(shopSheet, onUpdate) {
@@ -120,7 +120,7 @@ export async function openImageDialog(shopSheet, target) {
  * Open a small dialog to edit an item's stock max (restock target) and current stock together.
  * @param {ShopSheet} shopSheet
  * @param {HTMLElement} target  Element that was clicked.
- * @param {(patch: object) => Promise<void>} onUpdate
+ * @param {(updateData: object) => Promise<void>} onUpdate
  * @returns {Promise<void>}
  */
 export async function openMaxStockDialog(shopSheet, target, onUpdate) {
@@ -166,7 +166,7 @@ export async function openMaxStockDialog(shopSheet, target, onUpdate) {
 /**
  * Open a dialog to edit the shop's buy/sell price modifiers.
  * @param {ShopSheet} shopSheet
- * @param {(patch: object) => Promise<void>} onUpdate
+ * @param {(updateData: object) => Promise<void>} onUpdate
  * @returns {Promise<void>}
  */
 export async function openModifiersDialog(shopSheet, onUpdate) {
@@ -210,7 +210,7 @@ export async function openModifiersDialog(shopSheet, onUpdate) {
 /**
  * Open a dialog to edit the shop's owner.
  * @param {ShopSheet} shopSheet
- * @param {(patch: object) => Promise<void>} onUpdate
+ * @param {(updateData: object) => Promise<void>} onUpdate
  * @returns {Promise<void>}
  */
 export async function openOwnerDialog(shopSheet, onUpdate) {
@@ -237,11 +237,11 @@ export async function openOwnerDialog(shopSheet, onUpdate) {
 /**
  * Open a dialog to manage a shop's per-player discount overrides and haggling locks.
  * @param {ShopSheet} shopSheet
- * @param {(patch: object) => Promise<void>} onUpdate
- * @param {(actorUuid: string, patch: object) => Promise<void>} onPatchPlayerDiscount
+ * @param {(updateData: object) => Promise<void>} onUpdate
+ * @param {(actorUuid: string, updateData: object) => Promise<void>} onUpdatePlayerDiscount
  * @returns {Promise<void>}
  */
-export async function openPlayersDialog(shopSheet, onUpdate, onPatchPlayerDiscount) {
+export async function openPlayersDialog(shopSheet, onUpdate, onUpdatePlayerDiscount) {
   const buildRows = actorUuids => actorUuids.map((uuid, index) => {
     const existing = shopSheet.shop.playerDiscounts.find(pd => pd.actor === uuid);
     const actor = fromUuidSync(uuid);
@@ -311,7 +311,7 @@ export async function openPlayersDialog(shopSheet, onUpdate, onPatchPlayerDiscou
         const unlockButton = event.target.closest('[data-action="resetHaggling"]');
         if ( unlockButton ) {
           const uuid = unlockButton.closest("li")?.dataset.actorUuid;
-          await onPatchPlayerDiscount(uuid, { hagglingLocked: false, hagglingTimestamp: null });
+          await onUpdatePlayerDiscount(uuid, { hagglingLocked: false, hagglingTimestamp: null });
           app.render({ parts: ["content"] });
         }
       });
@@ -340,7 +340,7 @@ export async function openPlayersDialog(shopSheet, onUpdate, onPatchPlayerDiscou
  * Open a small dialog to edit an item's price.
  * @param {ShopSheet} shopSheet
  * @param {HTMLElement} target  Element that was clicked.
- * @param {(patch: object) => Promise<void>} onUpdate
+ * @param {(updateData: object) => Promise<void>} onUpdate
  * @returns {Promise<void>}
  */
 export async function openPriceDialog(shopSheet, target, onUpdate) {
@@ -390,7 +390,7 @@ export async function openPriceDialog(shopSheet, target, onUpdate) {
 /**
  * Open a dialog to rename this shop.
  * @param {ShopSheet} shopSheet
- * @param {(patch: object) => Promise<void>} onUpdate
+ * @param {(updateData: object) => Promise<void>} onUpdate
  * @returns {Promise<void>}
  */
 export async function openRenameDialog(shopSheet, onUpdate) {
@@ -414,7 +414,7 @@ export async function openRenameDialog(shopSheet, onUpdate) {
 /**
  * Open a dialog to edit the shop's settlement cap.
  * @param {ShopSheet} shopSheet
- * @param {(patch: object) => Promise<void>} onUpdate
+ * @param {(updateData: object) => Promise<void>} onUpdate
  * @returns {Promise<void>}
  */
 export async function openSettlementCapDialog(shopSheet, onUpdate) {

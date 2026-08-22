@@ -29,6 +29,20 @@ export function applyProgressDescription(description, craft) {
 /* -------------------------------------------- */
 
 /**
+ * Resolve an hours-per-use value to a valid, whole-number activity activation: whole hours stay
+ * `type: "hour"`, anything else (e.g. a 30-minute recipe) converts to whole minutes.
+ * @param {number} hoursPerUse
+ * @returns {{ type: "hour"|"minute", value: number }}
+ */
+function resolveActivation(hoursPerUse) {
+  return Number.isInteger(hoursPerUse)
+    ? { type: "hour", value: Math.max(1, hoursPerUse) }
+    : { type: "minute", value: Math.max(1, Math.round(hoursPerUse * 60)) };
+}
+
+/* -------------------------------------------- */
+
+/**
  * Create the "Progress Craft" use-activity on an in-progress craft item.
  * @param {Item5e} item        The in-progress craft item.
  * @param {string} activityId  Id to assign to the created activity.
@@ -40,7 +54,7 @@ export async function createProgressActivity(item, activityId, craft) {
     _id: activityId,
     name: _loc("SIMPLE_SHOP_CRAFT_5E.Craft.ProgressActivityName"),
     description: { chatFlavor: progressLabel(craft) },
-    activation: { type: "hour", value: HOURS_PER_USE },
+    activation: resolveActivation(craft.hoursPerUse ?? HOURS_PER_USE),
     consumption: { targets: [{ type: "itemUses", target: "", value: "1" }] }
   }, { renderSheet: false });
 }
@@ -110,7 +124,7 @@ async function onPostUseActivity(activity) {
   const craft = item?.getFlag(MODULE_ID, "craft");
   if ( !craft || (craft.activityId !== activity.id) ) return;
 
-  const progress = craft.progress + HOURS_PER_USE;
+  const progress = craft.progress + (craft.hoursPerUse ?? HOURS_PER_USE);
   if ( progress >= craft.totalHours ) {
     await completeCraft(item, craft);
     return;
@@ -156,7 +170,8 @@ async function onRenderCharacterActorSheet(app) {
  * @returns {string}
  */
 function progressLabel(craft) {
-  const completed = craft.progress / HOURS_PER_USE;
-  const total = Math.ceil(craft.totalHours / HOURS_PER_USE);
+  const hoursPerUse = craft.hoursPerUse ?? HOURS_PER_USE;
+  const completed = craft.progress / hoursPerUse;
+  const total = Math.ceil(craft.totalHours / hoursPerUse);
   return _loc("SIMPLE_SHOP_CRAFT_5E.Craft.ProgressActivityFlavor", { completed, total });
 }

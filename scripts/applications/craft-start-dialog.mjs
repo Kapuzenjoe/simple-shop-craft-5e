@@ -306,11 +306,13 @@ export default class CraftStartDialog extends Dialog5e {
     const totalHours = recipe.durationOverride.value != null
       ? recipe.durationOverride.value * HOURS_PER_UNIT[recipe.durationOverride.units]
       : (craftCost?.days ?? 0) * HOURS_PER_USE;
+    const hoursPerUse = Math.min(HOURS_PER_USE, totalHours);
 
     return {
       recipe, actor, targetItem, craftCost, fixedLines, freeformItems,
       suppliedCP, thresholdCP, shortfallCP, materialsMet, goldCP, goldInsufficient,
-      toolKeys, chosenToolKey, proficient, toolOwned, toolEligible, skillProficient, canStart, totalHours, weight, halfPrice
+      toolKeys, chosenToolKey, proficient, toolOwned, toolEligible, skillProficient, canStart, totalHours,
+      hoursPerUse, weight, halfPrice
     };
   }
 
@@ -363,7 +365,7 @@ export default class CraftStartDialog extends Dialog5e {
       actor: state.actor, recipe: state.recipe, targetItem: state.targetItem,
       materialLines: [...state.fixedLines.filter(l => l.item), ...state.freeformItems.map(item => ({ item }))],
       goldCP: state.goldCP, toolKey: state.chosenToolKey, totalHours: state.totalHours,
-      weight: state.weight, halfPrice: state.halfPrice
+      hoursPerUse: state.hoursPerUse, weight: state.weight, halfPrice: state.halfPrice
     });
     ui.notifications.info("SIMPLE_SHOP_CRAFT_5E.CraftStart.Requested", { localize: true });
     this.close();

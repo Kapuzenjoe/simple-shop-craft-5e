@@ -3,11 +3,11 @@
  */
 
 /**
- * Resolve a shop's restock patch: full stock (except `noRestock` items) and gold pool.
+ * Resolve a shop's restock updates: full stock (except `noRestock` items) and gold pool.
  * @param {Shop} shop
  * @returns {{ items: object[], goldPool: object }}
  */
-export function resolveRestockPatch(shop) {
+export function resolveRestockUpdates(shop) {
   const items = shop.items.map(entry => {
     const obj = entry.toObject();
     if ( !obj.noRestock ) obj.stock = { ...obj.stock, current: obj.stock.max };

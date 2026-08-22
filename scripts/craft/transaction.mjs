@@ -37,7 +37,7 @@ export async function applyCraftStart(craft) {
   const activityId = foundry.utils.randomID();
   const initialCraft = {
     recipeId: craft.recipeId, targetItem: craft.targetItem,
-    activityId, totalHours: craft.totalHours, progress: 0
+    activityId, totalHours: craft.totalHours, hoursPerUse: craft.hoursPerUse, progress: 0
   };
   const [item] = await actor.createEmbeddedDocuments("Item", [{
     name: _loc("SIMPLE_SHOP_CRAFT_5E.Craft.InProgressName", { name: craft.targetName }),

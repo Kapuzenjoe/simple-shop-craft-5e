@@ -2,7 +2,7 @@ import { getShops, updateShop } from "../data/shop-store.mjs";
 import { calendariaDayOfWeek, isCalendariaActive } from "../integrations/calendaria.mjs";
 import { secondsPerDay } from "../utils.mjs";
 
-import { resolveRestockPatch } from "./restock.mjs";
+import { resolveRestockUpdates } from "./restock.mjs";
 
 /**
  * Whether dnd5e's own Calendar Configuration is set to automatic recovery.
@@ -30,20 +30,21 @@ export function registerCalendarEvents() {
 /**
  * Restock due shops and clear expired haggling locks.
  * @param {number} worldTime
- * @param {number} dayOfWeek
- * @param {boolean} fullWeekPassed  Whether at least a week (or a month/year change) passed in this jump — if
- *   so, every shop with any restock weekday set is restocked, since the exact day crossed can't be pinpointed.
+ * @param {number[]|null} weekdaysPassed  Weekday indices crossed since the last check, or `null` for a
+ *   full week or more.
  * @returns {Promise<void>}
  */
-async function handleDayChange(worldTime, dayOfWeek, fullWeekPassed) {
+async function handleDayChange(worldTime, weekdaysPassed) {
   if ( !game.user.isActiveGM ) return;
 
   const perDay = secondsPerDay();
   for ( const shop of getShops() ) {
-    const patch = {};
+    const updateData = {};
 
-    const restockDue = fullWeekPassed ? (shop.restockWeekdays.size > 0) : shop.restockWeekdays.has(dayOfWeek);
-    if ( restockDue ) Object.assign(patch, resolveRestockPatch(shop));
+    const restockDue = weekdaysPassed === null
+      ? (shop.restockWeekdays.size > 0)
+      : weekdaysPassed.some(d => shop.restockWeekdays.has(d));
+    if ( restockDue ) Object.assign(updateData, resolveRestockUpdates(shop));
 
     let hagglingChanged = false;
     const playerDiscounts = shop.playerDiscounts.map(pd => {
@@ -51,9 +52,9 @@ async function handleDayChange(worldTime, dayOfWeek, fullWeekPassed) {
       hagglingChanged = true;
       return { ...pd.toObject(), hagglingLocked: false, hagglingTimestamp: null };
     });
-    if ( hagglingChanged ) patch.playerDiscounts = playerDiscounts;
+    if ( hagglingChanged ) updateData.playerDiscounts = playerDiscounts;
 
-    if ( Object.keys(patch).length ) await updateShop(shop._id, patch);
+    if ( Object.keys(updateData).length ) await updateShop(shop._id, updateData);
   }
 }
 
@@ -66,9 +67,14 @@ async function handleDayChange(worldTime, dayOfWeek, fullWeekPassed) {
  */
 async function onCalendariaDayChange(data) {
   const worldTime = game.time.worldTime;
-  const fullWeekPassed = (data.current.month !== data.previous.month) || (data.current.year !== data.previous.year)
-    || ((data.current.dayOfMonth - data.previous.dayOfMonth) > 7);
-  await handleDayChange(worldTime, calendariaDayOfWeek(worldTime), fullWeekPassed);
+  const dayCount = data.current.dayOfMonth - data.previous.dayOfMonth;
+  if ( dayCount <= 0 ) return;
+  const weekLength = game.time.calendar.daysInWeek;
+  const monthOrYearChanged = (data.current.month !== data.previous.month) || (data.current.year !== data.previous.year);
+  const weekdaysPassed = (monthOrYearChanged || (dayCount >= weekLength))
+    ? null
+    : Array.from({ length: dayCount }, (_, i) => (calendariaDayOfWeek(data.current) - i + weekLength) % weekLength);
+  await handleDayChange(worldTime, weekdaysPassed);
 }
 
 /* -------------------------------------------- */
@@ -82,9 +88,13 @@ async function onCalendariaDayChange(data) {
  */
 async function onUpdateWorldTime(worldTime, dt, options) {
   if ( dt <= 0 ) return;
-  if ( !(options.dnd5e?.deltas?.midnights > 0) ) return;
+  const midnights = options.dnd5e?.deltas?.midnights;
+  if ( !(midnights > 0) ) return;
   if ( !isDnd5eAutoRecoveryEnabled() ) return;
-  await handleDayChange(
-    worldTime, game.time.calendar.timeToComponents(worldTime).dayOfWeek, options.dnd5e.deltas.midnights > 7
-  );
+  const weekLength = game.time.calendar.days.values.length;
+  const dayOfWeek = game.time.calendar.timeToComponents(worldTime).dayOfWeek;
+  const weekdaysPassed = (midnights >= weekLength)
+    ? null
+    : Array.from({ length: midnights }, (_, i) => (dayOfWeek - i + weekLength) % weekLength);
+  await handleDayChange(worldTime, weekdaysPassed);
 }

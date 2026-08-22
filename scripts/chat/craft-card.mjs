@@ -28,12 +28,13 @@ const STATUS_LABELS = {
  * @param {number} options.goldCP                     Copper amount filled in from the actor's own currency.
  * @param {string|null} options.toolKey               Tool proficiency key used, if any.
  * @param {number} options.totalHours                 Total progress hours needed to finish the craft.
+ * @param {number} options.hoursPerUse                Progress hours added by each "Progress Craft" activation.
  * @param {{ value: number, units: string }} options.weight              Target item's weight.
  * @param {{ value: number, denomination: string }} options.halfPrice    Half the target item's price.
  * @returns {Promise<ChatMessage>}
  */
 export async function createCraftMessage({
-  actor, recipe, targetItem, materialLines, goldCP, toolKey, totalHours, weight, halfPrice
+  actor, recipe, targetItem, materialLines, goldCP, toolKey, totalHours, hoursPerUse, weight, halfPrice
 }) {
   const craft = {
     status: "pending",
@@ -47,7 +48,7 @@ export async function createCraftMessage({
     materialLines: materialLines.map(line => ({ itemId: line.item.id, name: line.item.name, img: line.item.img })),
     goldCP,
     goldParts: goldCP > 0 ? breakdownCopper(goldCP) : [],
-    totalHours, weight, halfPrice
+    totalHours, hoursPerUse, weight, halfPrice
   };
 
   return ChatMessage.create({
