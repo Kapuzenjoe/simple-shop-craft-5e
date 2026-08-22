@@ -49,6 +49,10 @@
           "hint": "Required value of the selected materials. Leave empty to use the rules-based value for the target item."
         },
         "toolProficiencies": { "label": "Tool Proficiencies" },
+        "skillProficiencies": {
+          "label": "Skill Proficiencies",
+          "hint": "Alternative to Tool Proficiencies — proficiency in any of these skills also satisfies the requirement, without needing to own a tool."
+        },
         "allowWorkshopOverride": {
           "label": "Allow Workshop Override",
           "hint": "Players can claim access to a proper workshop instead of owning the required tool."
@@ -232,6 +236,7 @@
       "NoActor": "Select a character above to continue.",
       "NotProficient": "You are not proficient with this tool.",
       "ToolMissing": "You don't own this tool.",
+      "SkillProficient": "A qualifying skill proficiency satisfies this requirement.",
       "WorkshopAccess": "Workshop Access",
       "MaterialMissing": "Not in your inventory",
       "DropMaterialHint": "Drop an item here to use it as a material.",

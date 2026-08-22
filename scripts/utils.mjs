@@ -106,6 +106,7 @@ export function itemRefKey(entry) {
  * @returns {string}
  */
 export function loadingTooltip(uuid) {
+  if ( game.dnd5e.utils.loadingTooltip ) return game.dnd5e.utils.loadingTooltip({ uuid });
   return `<section class="loading" data-uuid="${uuid}"><i class="fas fa-spinner fa-spin-pulse" inert></i></section>`;
 }
 

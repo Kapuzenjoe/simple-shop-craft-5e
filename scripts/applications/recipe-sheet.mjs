@@ -155,6 +155,10 @@ export default class RecipeSheet extends Application5e {
         field: fields.toolProficiencies, name: "toolProficiencies", value: Array.from(recipe.toolProficiencies),
         options: await toolOptions()
       },
+      {
+        field: fields.skillProficiencies, name: "skillProficiencies", value: Array.from(recipe.skillProficiencies),
+        options: skillOptions()
+      },
       { field: fields.allowWorkshopOverride, name: "allowWorkshopOverride", value: recipe.allowWorkshopOverride }
     ];
     context.durationFields = [
@@ -354,5 +358,17 @@ async function toolOptions() {
   return Object.entries({ ...artisanTools, ...specialtyKits })
     .filter(([, data]) => data)
     .map(([value, { label }]) => ({ value, label }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Build the skill select options: all skills, for the alternative skill-proficiency requirement.
+ * @returns {{ value: string, label: string }[]}
+ */
+function skillOptions() {
+  return Object.entries(CONFIG.DND5E.skills)
+    .map(([value, { label }]) => ({ value, label: _loc(label) }))
     .sort((a, b) => a.label.localeCompare(b.label));
 }

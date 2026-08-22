@@ -182,6 +182,7 @@ export default class CraftStartDialog extends Dialog5e {
     context.thresholdParts = breakdownCopper(state.thresholdCP);
     context.toolProficient = state.proficient;
     context.toolOwned = state.toolOwned;
+    context.skillProficient = state.skillProficient;
     context.chosenToolKey = state.chosenToolKey;
 
     context.toolLabel = null;
@@ -296,7 +297,10 @@ export default class CraftStartDialog extends Dialog5e {
     const toolEligible = !chosenToolKey
       || (proficient && (toolOwned || (recipe.allowWorkshopOverride && this.#workshopClaimed)));
 
-    const canStart = !!actor && !!targetItem && toolEligible
+    const skillKeys = Array.from(recipe.skillProficiencies);
+    const skillProficient = !!actor && skillKeys.some(k => (actor.system.skills[k]?.value ?? 0) > 0);
+
+    const canStart = !!actor && !!targetItem && (toolEligible || skillProficient)
       && (materialsMet || (this.#fillWithGold && !goldInsufficient));
 
     const totalHours = recipe.durationOverride.value != null
@@ -306,7 +310,7 @@ export default class CraftStartDialog extends Dialog5e {
     return {
       recipe, actor, targetItem, craftCost, fixedLines, freeformItems,
       suppliedCP, thresholdCP, shortfallCP, materialsMet, goldCP, goldInsufficient,
-      toolKeys, chosenToolKey, proficient, toolOwned, toolEligible, canStart, totalHours, weight, halfPrice
+      toolKeys, chosenToolKey, proficient, toolOwned, toolEligible, skillProficient, canStart, totalHours, weight, halfPrice
     };
   }
 

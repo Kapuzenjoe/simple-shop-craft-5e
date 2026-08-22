@@ -21,6 +21,8 @@
   - Added a checkbox next to the Settlement Cap to turn this off (on by default).
 - Fixed the buy/sell quantity counters ignoring the Settlement Cap, letting items exceeding it be added to the cart despite the warning shown.
 - Fixed the item generator ignoring the Settlement Cap, letting generated items over it silently land in the shop as unbuyable.
+- Fixed the shop's Gold Pool being visible to players — it's now only shown to the GM.
+- Added an optional "Skill Proficiencies" setting on recipes (e.g. Arcana for spell scrolls) — an actor proficient in any of the listed skills may start the craft without needing to also own or be proficient with one of the recipe's tools.
 
 
 ## 0.0.1

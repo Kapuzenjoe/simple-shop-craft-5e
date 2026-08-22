@@ -51,6 +51,7 @@ export class Recipe extends foundry.abstract.DataModel {
       openToAll: new BooleanField({ initial: false }),
       materialPrice: new ObjectField({ initial: {} }),
       toolProficiencies: new SetField(new StringField()),
+      skillProficiencies: new SetField(new StringField()),
       allowWorkshopOverride: new BooleanField({ initial: false }),
       durationOverride: new SchemaField({
         value: new NumberField({ initial: null, nullable: true, integer: true, min: 0 }),

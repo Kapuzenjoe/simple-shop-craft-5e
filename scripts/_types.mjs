@@ -101,6 +101,7 @@
  * @property {boolean} openToAll                 Whether any actor may start this craft, ignoring `unlockedFor`.
  * @property {Record<string, number>} materialPrice  Required value of the selected materials, per denomination.
  * @property {Set<string>} toolProficiencies     Required tool proficiency keys (`CONFIG.DND5E.tools`).
+ * @property {Set<string>} skillProficiencies    Alternative skill proficiency keys (`CONFIG.DND5E.skills`) — any one satisfies the requirement without needing an owned tool.
  * @property {boolean} allowWorkshopOverride     Whether players may claim workshop access instead of owning the tool.
  * @property {object} durationOverride
  * @property {number|null} durationOverride.value  Manual override amount. `null` uses the rules-based value.
