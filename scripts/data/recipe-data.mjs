@@ -35,8 +35,12 @@ export class Recipe extends foundry.abstract.DataModel {
    */
   static DEFAULT_ICON = "icons/svg/book.svg";
 
+  /* -------------------------------------------- */
+
   /** @override */
   static LOCALIZATION_PREFIXES = ["SIMPLE_SHOP_CRAFT_5E.RECIPE"];
+
+  /* -------------------------------------------- */
 
   /** @override */
   static defineSchema() {

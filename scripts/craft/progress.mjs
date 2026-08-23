@@ -29,20 +29,6 @@ export function applyProgressDescription(description, craft) {
 /* -------------------------------------------- */
 
 /**
- * Resolve an hours-per-use value to a valid, whole-number activity activation: whole hours stay
- * `type: "hour"`, anything else (e.g. a 30-minute recipe) converts to whole minutes.
- * @param {number} hoursPerUse
- * @returns {{ type: "hour"|"minute", value: number }}
- */
-function resolveActivation(hoursPerUse) {
-  return Number.isInteger(hoursPerUse)
-    ? { type: "hour", value: Math.max(1, hoursPerUse) }
-    : { type: "minute", value: Math.max(1, Math.round(hoursPerUse * 60)) };
-}
-
-/* -------------------------------------------- */
-
-/**
  * Create the "Progress Craft" use-activity on an in-progress craft item.
  * @param {Item5e} item        The in-progress craft item.
  * @param {string} activityId  Id to assign to the created activity.
@@ -174,4 +160,18 @@ function progressLabel(craft) {
   const completed = craft.progress / hoursPerUse;
   const total = Math.ceil(craft.totalHours / hoursPerUse);
   return _loc("SIMPLE_SHOP_CRAFT_5E.Craft.ProgressActivityFlavor", { completed, total });
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Resolve an hours-per-use value to a valid, whole-number activity activation: whole hours stay
+ * `type: "hour"`, anything else (e.g. a 30-minute recipe) converts to whole minutes.
+ * @param {number} hoursPerUse
+ * @returns {{ type: "hour"|"minute", value: number }}
+ */
+function resolveActivation(hoursPerUse) {
+  return Number.isInteger(hoursPerUse)
+    ? { type: "hour", value: Math.max(1, hoursPerUse) }
+    : { type: "minute", value: Math.max(1, Math.round(hoursPerUse * 60)) };
 }

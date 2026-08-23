@@ -3,6 +3,10 @@ import { itemRefKey, resolveIdentifierIndex } from "../utils.mjs";
 import { synthesizeEnchantedItem } from "./enchantment.mjs";
 
 /**
+ * @import { ShopItemEntryData } from "../_types.mjs";
+ */
+
+/**
  * Stable key identifying a shop item entry — a composite of the generated recipe for generated entries,
  * the spell UUID for spell scroll entries, otherwise the generic identifier/uuid key.
  * @param {ShopItemEntryData} entry

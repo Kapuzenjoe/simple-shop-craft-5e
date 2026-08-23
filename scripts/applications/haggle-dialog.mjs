@@ -1,37 +1,85 @@
 import { resolvePlayerOverride } from "../shop/pricing.mjs";
 
-import BasePromptDialog from "./base-prompt-dialog.mjs";
+/**
+ * @import { default as ShopSheet } from "./shop-sheet.mjs";
+ */
+
+const { Dialog5e } = game.dnd5e.applications.api;
 
 /**
- * Open a dialog to pick a Charisma skill and the NPC's attitude, then roll it against the shop NPC's DC
- * for the acting actor.
- * @param {ShopSheet} shopSheet
- * @param {(actorUuid: string, updateData: object) => Promise<void>} onUpdatePlayerDiscount
- * @returns {Promise<void>}
+ * Dialog to pick a Charisma skill and the NPC's attitude, then roll it against the shop NPC's DC for
+ * the acting actor.
  */
-export async function openHaggleDialog(shopSheet, onUpdatePlayerDiscount) {
-  const actor = shopSheet.selectedActorUuid ? fromUuidSync(shopSheet.selectedActorUuid) : null;
-  if ( !actor ) return;
-  const playerOverride = resolvePlayerOverride(shopSheet.shop.playerDiscounts, shopSheet.selectedActorUuid);
-  const effectiveBuy = shopSheet.shop.buyModifier + (playerOverride.buy ?? 0);
-  const effectiveSell = shopSheet.shop.sellModifier + (playerOverride.sell ?? 0);
-  const chaSkills = Object.entries(CONFIG.DND5E.skills).filter(([, s]) => s.ability === "cha");
-  const npc = shopSheet.shop.npc ? await fromUuid(shopSheet.shop.npc) : null;
-  const dc = Math.max(15, npc?.system.abilities?.int?.value ?? 0);
-  const dispositionAttitude = {
-    [CONST.TOKEN_DISPOSITIONS.HOSTILE]: "hostile", [CONST.TOKEN_DISPOSITIONS.FRIENDLY]: "friendly"
+export default class HaggleDialog extends Dialog5e {
+  constructor({ shopSheet, onUpdatePlayerDiscount, ...options }={}) {
+    super(options);
+    this.shopSheet = shopSheet;
+    this.onUpdatePlayerDiscount = onUpdatePlayerDiscount;
+  }
+
+  /* -------------------------------------------- */
+
+  /** @override */
+  static DEFAULT_OPTIONS = {
+    id: "haggle-dialog-{id}",
+    classes: ["simple-shop-craft-5e", "haggle-dialog", "standard-form"],
+    window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Haggling" },
+    position: { width: 400 },
+    buttons: [
+      { action: "roll", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.HagglingRoll", icon: "fa-solid fa-dice-d20", default: true }
+    ],
+    form: { handler: HaggleDialog.#onSubmit }
   };
 
-  const dialog = new BasePromptDialog({
-    window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Haggling" },
-    hint: `${_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.HagglingCurrent")}: `
+  /* -------------------------------------------- */
+
+  /** @override */
+  static PARTS = {
+    ...super.PARTS,
+    content: { template: "modules/simple-shop-craft-5e/templates/partials/config-dialog-content.hbs" }
+  };
+
+  /**
+   * The shop editor this dialog belongs to.
+   * @type {ShopSheet}
+   */
+  shopSheet;
+
+  /**
+   * Callback receiving a haggling-lock update for the acting actor.
+   * @type {(actorUuid: string, updateData: object) => Promise<void>}
+   */
+  onUpdatePlayerDiscount;
+
+  /**
+   * DC computed for the current NPC, cached during content preparation for reuse on submit.
+   * @type {number}
+   */
+  #dc;
+
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  async _prepareContentContext(context, options) {
+    context = await super._prepareContentContext(context, options);
+    context.legend = this.options.window?.title;
+    const playerOverride = resolvePlayerOverride(this.shopSheet.shop.playerDiscounts, this.shopSheet.selectedActorUuid);
+    const effectiveBuy = this.shopSheet.shop.buyModifier + (playerOverride.buy ?? 0);
+    const effectiveSell = this.shopSheet.shop.sellModifier + (playerOverride.sell ?? 0);
+    const chaSkills = Object.entries(CONFIG.DND5E.skills).filter(([, s]) => s.ability === "cha");
+    const npc = this.shopSheet.shop.npc ? await fromUuid(this.shopSheet.shop.npc) : null;
+    this.#dc = Math.max(15, npc?.system.abilities?.int?.value ?? 0);
+    const dispositionAttitude = {
+      [CONST.TOKEN_DISPOSITIONS.HOSTILE]: "hostile", [CONST.TOKEN_DISPOSITIONS.FRIENDLY]: "friendly"
+    };
+
+    context.hint = `${_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.HagglingCurrent")}: `
       + `${_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Buy")} ${effectiveBuy}% / `
-      + `${_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Sell")} ${effectiveSell}% (DC ${dc})`,
-    fields: [
+      + `${_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Sell")} ${effectiveSell}% (DC ${this.#dc})`;
+    context.fields = [
       {
         field: new foundry.data.fields.StringField(), name: "skill",
-        label: _loc("DND5E.Skill"),
-        options: chaSkills.map(([value, s]) => ({ value, label: s.label }))
+        label: _loc("DND5E.Skill"), options: chaSkills.map(([value, s]) => ({ value, label: s.label }))
       },
       {
         field: new foundry.data.fields.StringField(), name: "attitude",
@@ -43,25 +91,33 @@ export async function openHaggleDialog(shopSheet, onUpdatePlayerDiscount) {
           { value: "friendly", label: _loc("TOKEN.DISPOSITION.FRIENDLY") }
         ]
       }
-    ],
-    buttons: [
-      { action: "roll", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.HagglingRoll", icon: "fa-solid fa-dice-d20", default: true }
-    ],
-    form: {
-      handler: async function(event, form, formData) {
-        const data = foundry.utils.expandObject(formData.object);
-        const rolls = await actor.rollSkill({
-          skill: data.skill, target: dc,
-          advantage: data.attitude === "friendly", disadvantage: data.attitude === "hostile"
-        });
-        if ( rolls?.[0] ) {
-          await onUpdatePlayerDiscount(
-            actor.uuid, rolls[0].isFailure ? { hagglingLocked: true, hagglingTimestamp: game.time.worldTime } : {}
-          );
-        }
-        await this.close();
-      }
+    ];
+    return context;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle rolling the haggle check and applying a lock on failure.
+   * @this {HaggleDialog}
+   * @param {Event} event                Triggering submit event.
+   * @param {HTMLFormElement} form       The submitted form.
+   * @param {FormDataExtended} formData  Data from the form.
+   * @returns {Promise<void>}
+   */
+  static async #onSubmit(event, form, formData) {
+    const actor = fromUuidSync(this.shopSheet.selectedActorUuid);
+    if ( !actor ) return;
+    const data = foundry.utils.expandObject(formData.object);
+    const rolls = await actor.rollSkill({
+      skill: data.skill, target: this.#dc,
+      advantage: data.attitude === "friendly", disadvantage: data.attitude === "hostile"
+    });
+    if ( rolls?.[0] ) {
+      await this.onUpdatePlayerDiscount(
+        actor.uuid, rolls[0].isFailure ? { hagglingLocked: true, hagglingTimestamp: game.time.worldTime } : {}
+      );
     }
-  });
-  await dialog.render({ force: true });
+    await this.close();
+  }
 }

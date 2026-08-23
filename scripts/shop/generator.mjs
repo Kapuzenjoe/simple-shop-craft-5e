@@ -6,7 +6,13 @@ import { findEnchantableBaseItem, getEnchantmentProfiles, resolveProfileRarity }
 import { entryKey } from "./entry-resolver.mjs";
 
 /**
- * @typedef {{ kind: "item"|"spell", index: object }} GeneratorCandidate
+ * @import { ShopItemEntryData } from "../_types.mjs";
+ */
+
+/**
+ * @typedef {object} GeneratorCandidate
+ * @property {"item"|"spell"} kind
+ * @property {object} index
  */
 
 /**

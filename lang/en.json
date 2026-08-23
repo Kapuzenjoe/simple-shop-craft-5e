@@ -172,6 +172,7 @@
       "StatusOverrideClosed": "Force Closed",
       "ShopClosedWarning": "This shop is outside its opening hours — players can't access it right now.",
       "SettlementCap": "Settlement Cap",
+      "SettlementCapValue": "Value",
       "SettlementCapAppliesToSell": "Applies to Selling",
       "SettlementCapAppliesToSellHint": "Items can't be sold to this shop for more than the cap.",
       "NoCap": "No Cap",

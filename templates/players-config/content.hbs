@@ -1,0 +1,8 @@
+<section class="tab active players-config-content">
+    <fieldset>
+        <legend>{{ localize legend }}</legend>
+        {{> "modules/simple-shop-craft-5e/templates/partials/item-table.hbs" table}}
+        <document-tags name="newPlayerActors" type="Actor" class="drop-area"
+            data-drop-hint="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.Players.DropHint' }}"></document-tags>
+    </fieldset>
+</section>

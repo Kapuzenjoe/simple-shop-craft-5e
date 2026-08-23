@@ -2,57 +2,58 @@ import { createPurchaseMessage } from "../chat/purchase-card.mjs";
 import { breakdownCopper } from "../shop/currency.mjs";
 import { summarizeNet } from "../shop/pricing.mjs";
 
-import BasePromptDialog from "./base-prompt-dialog.mjs";
+/**
+ * @import { default as ShopSheet } from "./shop-sheet.mjs";
+ */
+
+const { Dialog5e } = game.dnd5e.applications.api;
 
 /**
  * Window showing the current shopping cart for a shop, with a confirm action.
  */
-export default class ShopCart extends BasePromptDialog {
-
-  /**
-   * @param {object} [options]
-   * @param {ShopSheet} [options.shopSheet]  The shop editor this cart belongs to.
-   */
+export default class ShopCart extends Dialog5e {
   constructor({ shopSheet, ...options }={}) {
-    super({
-      window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopCart.Title", resizable: true },
-      extraContent: () => ShopCart.#renderContent(shopSheet),
-      buttons: () => {
-        const state = ShopCart.#computeState(shopSheet);
-        return [{ action: "confirm", label: "DND5E.Confirm", disabled: state.confirmDisabled }];
-      },
-      form: {
-        closeOnSubmit: false,
-        handler: async function(event, form, formData) {
-          const state = ShopCart.#computeState(shopSheet);
-          await createPurchaseMessage(
-            shopSheet, state.actor, state.lines, state.sellLines, state.total.parts, state.netCP
-          );
-          ui.notifications.info("SIMPLE_SHOP_CRAFT_5E.ShopCart.PurchaseRequested", { localize: true });
-          shopSheet.cart.clear();
-          shopSheet.sellCart.clear();
-          await shopSheet.render();
-          this.render();
-        }
-      },
-      ...options
-    });
+    super(options);
     this.shopSheet = shopSheet;
   }
 
   /* -------------------------------------------- */
 
+  /** @override */
+  static DEFAULT_OPTIONS = {
+    id: "shop-cart-{id}",
+    classes: ["simple-shop-craft-5e", "shop-cart", "standard-form"],
+    window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopCart.Title", resizable: true },
+    position: { width: 400 },
+    form: { handler: ShopCart.#onSubmit, closeOnSubmit: false }
+  };
+
+  /* -------------------------------------------- */
+
+  /** @override */
+  static PARTS = {
+    ...super.PARTS,
+    content: { template: "modules/simple-shop-craft-5e/templates/shop-cart/content.hbs" }
+  };
+
   /**
-   * Compute the current buy/sell lines, net total, and confirm-eligibility for a shop editor's cart.
-   * @param {ShopSheet} shopSheet
+   * The shop editor this cart belongs to.
+   * @type {ShopSheet}
+   */
+  shopSheet;
+
+  /* -------------------------------------------- */
+
+  /**
+   * Compute the current buy/sell lines, net total, and confirm-eligibility for this cart.
    * @returns {object}
    */
-  static #computeState(shopSheet) {
-    const lines = shopSheet.cartLines.map(row => ({
+  #computeState() {
+    const lines = this.shopSheet.cartLines.map(row => ({
       ...row,
       subtotal: breakdownCopper(row.priceCP * row.cartQuantity, { negative: true })
     }));
-    const sellLines = shopSheet.sellLines.map(row => ({
+    const sellLines = this.shopSheet.sellLines.map(row => ({
       ...row,
       subtotal: breakdownCopper(row.priceCP * row.sellQuantity)
     }));
@@ -61,7 +62,7 @@ export default class ShopCart extends BasePromptDialog {
     const hasLines = count > 0;
     const total = { parts };
 
-    const actor = shopSheet.selectedActorUuid ? fromUuidSync(shopSheet.selectedActorUuid) : null;
+    const actor = this.shopSheet.selectedActorUuid ? fromUuidSync(this.shopSheet.selectedActorUuid) : null;
     const balance = { insufficient: false };
     if ( actor && (netCP < 0) ) {
       const updates = game.dnd5e.applications.CurrencyManager.getActorCurrencyUpdates(actor, -netCP, "cp", {});
@@ -75,26 +76,53 @@ export default class ShopCart extends BasePromptDialog {
 
   /* -------------------------------------------- */
 
-  /**
-   * Render the buy list, sell list, and balance sections for the dialog's content.
-   * @param {ShopSheet} shopSheet
-   * @returns {Promise<string>}
-   */
-  static async #renderContent(shopSheet) {
-    const state = ShopCart.#computeState(shopSheet);
-    const buyRows = state.lines.map(row => ({
+  /** @inheritDoc */
+  async _prepareContentContext(context, options) {
+    context = await super._prepareContentContext(context, options);
+    const state = this.#computeState();
+    context.buyRows = state.lines.map(row => ({
       img: row.item.img, name: row.item.name, quantity: row.cartQuantity, subtotal: row.subtotal
     }));
-    const sellRows = state.sellLines.map(row => ({
+    context.sellRows = state.sellLines.map(row => ({
       img: row.item.img, name: row.item.name, quantity: row.sellQuantity, subtotal: row.subtotal
     }));
+    context.hasLines = state.hasLines;
+    context.total = state.total;
+    context.balance = state.balance;
+    context.actor = state.actor;
+    context.noActiveGM = state.noActiveGM;
+    return context;
+  }
 
-    return foundry.applications.handlebars.renderTemplate(
-      "modules/simple-shop-craft-5e/templates/shop-cart/content.hbs",
-      {
-        buyRows, sellRows, hasLines: state.hasLines, total: state.total,
-        balance: state.balance, actor: state.actor, noActiveGM: state.noActiveGM
-      }
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  async _prepareFooterContext(context, options) {
+    context = await super._prepareFooterContext(context, options);
+    const state = this.#computeState();
+    context.buttons = [{ action: "confirm", label: "DND5E.Confirm", disabled: state.confirmDisabled }];
+    return context;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle confirming the cart: send a GM-confirmation purchase chat card, clear both carts.
+   * @this {ShopCart}
+   * @param {Event} event                Triggering submit event.
+   * @param {HTMLFormElement} form       The submitted form.
+   * @param {FormDataExtended} formData  Data from the form.
+   * @returns {Promise<void>}
+   */
+  static async #onSubmit(event, form, formData) {
+    const state = this.#computeState();
+    await createPurchaseMessage(
+      this.shopSheet, state.actor, state.lines, state.sellLines, state.total.parts, state.netCP
     );
+    ui.notifications.info("SIMPLE_SHOP_CRAFT_5E.ShopCart.PurchaseRequested", { localize: true });
+    this.shopSheet.cart.clear();
+    this.shopSheet.sellCart.clear();
+    await this.shopSheet.render();
+    this.render();
   }
 }

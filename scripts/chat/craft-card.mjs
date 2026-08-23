@@ -3,6 +3,10 @@ import { applyCraftStart } from "../craft/transaction.mjs";
 import { breakdownCopper } from "../shop/currency.mjs";
 
 /**
+ * @import { Recipe } from "../data/recipe-data.mjs";
+ */
+
+/**
  * Template used to render a craft-start chat card.
  * @type {string}
  */

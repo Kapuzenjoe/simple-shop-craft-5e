@@ -73,6 +73,8 @@
  *                                           status, bypassing hours/weekdays/festivals entirely.
  * @property {number|null} openHour          Hour (0-23) this shop opens each day, or `null` for no restriction.
  * @property {number|null} closeHour         Hour (0-23) this shop closes each day, or `null` for no restriction.
+ * @property {number} openMinute             Minute (0-59) this shop opens each day.
+ * @property {number} closeMinute            Minute (0-59) this shop closes each day.
  * @property {string} [description]          Optional shop description.
  * @property {ShopItemEntryData[]} items     Items available in this shop.
  */
@@ -101,7 +103,8 @@
  * @property {boolean} openToAll                 Whether any actor may start this craft, ignoring `unlockedFor`.
  * @property {Record<string, number>} materialPrice  Required value of the selected materials, per denomination.
  * @property {Set<string>} toolProficiencies     Required tool proficiency keys (`CONFIG.DND5E.tools`).
- * @property {Set<string>} skillProficiencies    Alternative skill proficiency keys (`CONFIG.DND5E.skills`) — any one satisfies the requirement without needing an owned tool.
+ * @property {Set<string>} skillProficiencies    Alternative skill proficiency keys (`CONFIG.DND5E.skills`) — any one
+ *                                               satisfies the requirement without needing an owned tool.
  * @property {boolean} allowWorkshopOverride     Whether players may claim workshop access instead of owning the tool.
  * @property {object} durationOverride
  * @property {number|null} durationOverride.value  Manual override amount. `null` uses the rules-based value.

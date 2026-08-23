@@ -48,7 +48,7 @@ export default class RecipeSheet extends Application5e {
   };
 
   /* -------------------------------------------- */
-  /*  Properties                                   */
+  /*  Properties                                  */
   /* -------------------------------------------- */
 
   /**
@@ -93,7 +93,7 @@ export default class RecipeSheet extends Application5e {
   }
 
   /* -------------------------------------------- */
-  /*  Rendering                                    */
+  /*  Rendering                                   */
   /* -------------------------------------------- */
 
   /** @inheritDoc */
@@ -178,7 +178,7 @@ export default class RecipeSheet extends Application5e {
   }
 
   /* -------------------------------------------- */
-  /*  Life-Cycle Handlers                          */
+  /*  Life-Cycle Handlers                         */
   /* -------------------------------------------- */
 
   /** @inheritDoc */
@@ -198,7 +198,7 @@ export default class RecipeSheet extends Application5e {
   }
 
   /* -------------------------------------------- */
-  /*  Event Listeners and Handlers                 */
+  /*  Event Listeners and Handlers                */
   /* -------------------------------------------- */
 
   /**
@@ -241,7 +241,11 @@ export default class RecipeSheet extends Application5e {
     const item = uuid ? await fromUuid(uuid) : null;
     if ( !item ) return;
 
-    await updateRecipe(this.recipeId, { targetItem: itemEntryRef(item), img: item.img });
+    const skillProficiencies = new Set(this.recipe.skillProficiencies);
+    if ( item.system.properties?.has("mgc") ) skillProficiencies.add("arc");
+    await updateRecipe(this.recipeId, {
+      targetItem: itemEntryRef(item), img: item.img, skillProficiencies: Array.from(skillProficiencies)
+    });
     this.render();
   }
 
@@ -259,11 +263,14 @@ export default class RecipeSheet extends Application5e {
     const data = foundry.utils.expandObject(formData.object);
     if ( data.durationOverride ) data.durationOverride.value ??= null;
     let rerender = false;
-    if ( data.targetItem?.uuid ) {
+    if ( data.targetItem?.uuid && (data.targetItem.uuid !== this.recipe.targetItem.uuid) ) {
       const item = await fromUuid(data.targetItem.uuid);
       if ( item ) {
         data.targetItem = itemEntryRef(item);
         data.img = item.img;
+        const skillProficiencies = new Set(data.skillProficiencies ?? this.recipe.skillProficiencies);
+        if ( item.system.properties?.has("mgc") ) skillProficiencies.add("arc");
+        data.skillProficiencies = Array.from(skillProficiencies);
         rerender = true;
       }
     }
@@ -307,7 +314,7 @@ export default class RecipeSheet extends Application5e {
   }
 
   /* -------------------------------------------- */
-  /*  Helpers                                      */
+  /*  Helpers                                     */
   /* -------------------------------------------- */
 
   /**
@@ -347,6 +354,18 @@ function itemEntryRef(item) {
 /* -------------------------------------------- */
 
 /**
+ * Build the skill select options: all skills, for the alternative skill-proficiency requirement.
+ * @returns {{ value: string, label: string }[]}
+ */
+function skillOptions() {
+  return Object.entries(CONFIG.DND5E.skills)
+    .map(([value, { label }]) => ({ value, label: _loc(label) }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+/* -------------------------------------------- */
+
+/**
  * Build the tool proficiency select options: Artisan's Tools plus the Herbalism Kit and Poisoner's Kit,
  * the two specialty kits with a defined crafting role (Potions, poisons).
  * @returns {Promise<{ value: string, label: string }[]>}
@@ -358,17 +377,5 @@ async function toolOptions() {
   return Object.entries({ ...artisanTools, ...specialtyKits })
     .filter(([, data]) => data)
     .map(([value, { label }]) => ({ value, label }))
-    .sort((a, b) => a.label.localeCompare(b.label));
-}
-
-/* -------------------------------------------- */
-
-/**
- * Build the skill select options: all skills, for the alternative skill-proficiency requirement.
- * @returns {{ value: string, label: string }[]}
- */
-function skillOptions() {
-  return Object.entries(CONFIG.DND5E.skills)
-    .map(([value, { label }]) => ({ value, label: _loc(label) }))
     .sort((a, b) => a.label.localeCompare(b.label));
 }

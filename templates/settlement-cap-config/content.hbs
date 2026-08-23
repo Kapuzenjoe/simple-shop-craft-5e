@@ -1,0 +1,12 @@
+<section class="tab active settlement-cap-content">
+    <fieldset>
+        <legend>{{ localize legend }}</legend>
+        {{> "dnd5e.fieldlist" fields}}
+    </fieldset>
+    {{#if customFields}}
+    <fieldset>
+        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.Custom" }}</legend>
+        {{> "dnd5e.fieldlist" customFields}}
+    </fieldset>
+    {{/if}}
+</section>

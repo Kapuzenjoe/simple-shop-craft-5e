@@ -2,6 +2,11 @@ import { entryKey } from "../shop/entry-resolver.mjs";
 import { rollShopItems } from "../shop/generator.mjs";
 import { subtypeOptions } from "../utils.mjs";
 
+/**
+ * @import { ShopItemEntryData } from "../_types.mjs";
+ * @import { default as ShopSheet } from "./shop-sheet.mjs";
+ */
+
 const { Dialog5e } = game.dnd5e.applications.api;
 
 /**
@@ -320,18 +325,6 @@ export default class GenerateItemDialog extends Dialog5e {
         : ["SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemPartial", { count: rolled.length, total: this.#count }];
     ui.notifications.info(key, { format });
   }
-}
-
-/* -------------------------------------------- */
-
-/**
- * Open the item generator dialog for a shop.
- * @param {ShopSheet} shopSheet
- * @param {(entries: ShopItemEntryData[]) => Promise<void>} onGenerated
- * @returns {Promise<void>}
- */
-export async function openGenerateItemDialog(shopSheet, onGenerated) {
-  await new GenerateItemDialog({ shopSheet, onGenerated }).render({ force: true });
 }
 
 /* -------------------------------------------- */

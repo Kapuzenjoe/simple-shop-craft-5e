@@ -10,9 +10,9 @@ import { resolveRestockUpdates } from "./restock.mjs";
  */
 export function isDnd5eAutoRecoveryEnabled() {
   if ( !game.settings.settings.has("dnd5e.calendarConfig") ) return false;
-  const { enabled, dailyRecovery } = game.settings.get("dnd5e", "calendarConfig");
-  const manualRecovery = (dailyRecovery === "manual") || (!dailyRecovery && !enabled);
-  return !!enabled && !manualRecovery;
+  const cfg = game.settings.get("dnd5e", "calendarConfig");
+  if ( !("dailyRecovery" in cfg) ) return !!cfg.enabled;
+  return !!cfg.enabled && !cfg.manualRecovery;
 }
 
 /* -------------------------------------------- */

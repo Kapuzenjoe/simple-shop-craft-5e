@@ -39,6 +39,21 @@ export function registerSettings() {
 /* -------------------------------------------- */
 
 /**
+ * Register the GM query used to persist a shop update requested by a non-GM client, since world
+ * settings can only be written by a GM. Loads {@link updateShop} lazily so it isn't pulled in until
+ * a request is actually received.
+ */
+export function registerShopUpdateQuery() {
+  CONFIG.queries[`${MODULE_ID}.updateShop`] = async ({ shopId, updateData }) => {
+    if ( !game.user.isGM ) return;
+    const { updateShop } = await import("./data/shop-store.mjs");
+    await updateShop(shopId, updateData);
+  };
+}
+
+/* -------------------------------------------- */
+
+/**
  * Register the sidebar button that opens the Shop Manager from the Item Directory. Loads
  * {@link ShopManager} lazily so it isn't pulled in until the button is actually rendered.
  */
@@ -60,21 +75,6 @@ export function registerSpotlightQuery() {
     if ( !shopId ) return;
     const { default: ShopSheet } = await import("./applications/shop-sheet.mjs");
     new ShopSheet({ shopId }).render({ force: true });
-  };
-}
-
-/* -------------------------------------------- */
-
-/**
- * Register the GM query used to persist a shop update requested by a non-GM client, since world
- * settings can only be written by a GM. Loads {@link updateShop} lazily so it isn't pulled in until
- * a request is actually received.
- */
-export function registerShopUpdateQuery() {
-  CONFIG.queries[`${MODULE_ID}.updateShop`] = async ({ shopId, updateData }) => {
-    if ( !game.user.isGM ) return;
-    const { updateShop } = await import("./data/shop-store.mjs");
-    await updateShop(shopId, updateData);
   };
 }
 
@@ -109,7 +109,7 @@ async function refreshShopApplications() {
   const { default: ShopSheet } = await import("./applications/shop-sheet.mjs");
   foundry.applications.instances.forEach(app => {
     if ( app instanceof ShopManager ) app.render();
-    if ( ( app instanceof ShopSheet ) ) {
+    if ( app instanceof ShopSheet ) {
       if ( app.shop ) app.render();
       else app.close();
     }

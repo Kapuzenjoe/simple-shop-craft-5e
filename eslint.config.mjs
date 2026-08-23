@@ -2,7 +2,7 @@ import foundry from "@bytestruct/foundry-eslint";
 import globals from "globals";
 
 export default [
-  { ignores: ["node_modules/", "packs/"] },
+  { ignores: ["node_modules/", "packs/", "temp/"] },
   ...foundry.configs.recommended,
   {
     languageOptions: {

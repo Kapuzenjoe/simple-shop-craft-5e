@@ -2,6 +2,10 @@ import { MODULE_ID } from "../config.mjs";
 import { applyPurchase } from "../shop/transaction.mjs";
 
 /**
+ * @import { default as ShopSheet } from "../applications/shop-sheet.mjs";
+ */
+
+/**
  * Template used to render a purchase chat card.
  * @type {string}
  */

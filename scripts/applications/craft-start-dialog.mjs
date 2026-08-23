@@ -5,6 +5,10 @@ import { breakdownCopper, effectiveCraftCost, resolveDefaultPrice, toCopper } fr
 import { needsDefaultPrice } from "../shop/pricing.mjs";
 import { resolveEntries, selectableActors } from "../utils.mjs";
 
+/**
+ * @import { Recipe } from "../data/recipe-data.mjs";
+ */
+
 const { Dialog5e } = game.dnd5e.applications.api;
 
 /**

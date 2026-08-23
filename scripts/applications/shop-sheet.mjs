@@ -13,13 +13,17 @@ import {
 import { resolveRestockUpdates } from "../shop/restock.mjs";
 import { buildItemTableSections, loadingTooltip, selectableActors } from "../utils.mjs";
 
-import { openGenerateItemDialog } from "./generate-item-dialog.mjs";
-import { openHaggleDialog } from "./haggle-dialog.mjs";
+import GenerateItemDialog from "./generate-item-dialog.mjs";
+import HaggleDialog from "./haggle-dialog.mjs";
 import ShopCart from "./shop-cart.mjs";
+import GoldPoolConfig from "./shop-config/gold-pool-config.mjs";
+import MaxStockConfig from "./shop-config/max-stock-config.mjs";
+import PlayersConfig from "./shop-config/players-config.mjs";
+import SettlementCapConfig from "./shop-config/settlement-cap-config.mjs";
 import {
-  openDiscountDialog, openGoldPoolDialog, openImageDialog, openMaxStockDialog, openModifiersDialog,
-  openOwnerDialog, openPlayersDialog, openPriceDialog, openRenameDialog, openSettlementCapDialog
-} from "./shop-config-dialogs.mjs";
+  openDiscountConfig, openModifiersConfig,
+  openOwnerConfig, openPriceConfig, openRenameConfig
+} from "./shop-config/simple-configs.mjs";
 
 const { Application5e } = game.dnd5e.applications.api;
 
@@ -53,17 +57,16 @@ const SELL_COLUMNS = [
 
 /**
  * Application for viewing and, in Edit mode, configuring a single shop.
+ * @param {object} [options]
+ * @param {string} [options.shopId]  Id of the ShopData being edited.
  */
 export default class ShopSheet extends Application5e {
-
-  /**
-   * @param {object} [options]
-   * @param {string} [options.shopId]  Id of the ShopData being edited.
-   */
   constructor(options={}) {
     super(options);
     this.shopId = options.shopId;
   }
+
+  /* -------------------------------------------- */
 
   /** @override */
   static DEFAULT_OPTIONS = {
@@ -178,7 +181,15 @@ export default class ShopSheet extends Application5e {
   };
 
   /* -------------------------------------------- */
-  /*  Properties                                   */
+  /*  Properties                                  */
+  /* -------------------------------------------- */
+
+  /**
+   * Id of the shop being edited.
+   * @type {string}
+   */
+  shopId;
+
   /* -------------------------------------------- */
 
   /**
@@ -294,7 +305,7 @@ export default class ShopSheet extends Application5e {
   }
 
   /* -------------------------------------------- */
-  /*  Rendering                                    */
+  /*  Rendering                                   */
   /* -------------------------------------------- */
 
   /** @inheritDoc */
@@ -430,7 +441,7 @@ export default class ShopSheet extends Application5e {
   }
 
   /* -------------------------------------------- */
-  /*  Life-Cycle Handlers                          */
+  /*  Life-Cycle Handlers                         */
   /* -------------------------------------------- */
 
   /** @inheritDoc */
@@ -474,7 +485,7 @@ export default class ShopSheet extends Application5e {
   }
 
   /* -------------------------------------------- */
-  /*  Event Listeners and Handlers                 */
+  /*  Event Listeners and Handlers                */
   /* -------------------------------------------- */
 
   /** @inheritDoc */
@@ -497,8 +508,10 @@ export default class ShopSheet extends Application5e {
         const uuid = el.dataset.uuid;
         if ( !uuid ) return;
         if ( (partId === "buy") && needsDefaultPrice(this.#findRowItem(el.dataset.key)) ) return;
-        el.dataset.tooltip = loadingTooltip(uuid);
-        el.dataset.tooltipClass = "dnd5e2 dnd5e-tooltip item-tooltip themed theme-light";
+        el.dataset.tooltipHtml = loadingTooltip(uuid);
+        el.dataset.tooltipClass = game.dnd5e.utils.loadingTooltip
+          ? "dnd5e2 dnd5e-tooltip item-tooltip"
+          : "dnd5e2 dnd5e-tooltip item-tooltip themed theme-light";
         el.dataset.tooltipDirection ??= "LEFT";
       });
     }
@@ -515,7 +528,7 @@ export default class ShopSheet extends Application5e {
           .then(tooltipItem => tooltipItem?.richTooltip())
           .then(result => {
             if ( !result ) return;
-            el.dataset.tooltip = result.content;
+            el.dataset.tooltipHtml = result.content;
             el.dataset.tooltipClass = result.classes.join(" ");
             el.dataset.tooltipDirection ??= "LEFT";
           });
@@ -623,7 +636,7 @@ export default class ShopSheet extends Application5e {
    */
   static async #editDiscount(event, target) {
     const playerOverride = resolvePlayerOverride(this.shop.playerDiscounts, this.selectedActorUuid);
-    await openDiscountDialog(this, target, playerOverride, updateData => this.#updateShop(updateData));
+    await openDiscountConfig(this, target, playerOverride, updateData => this.#updateShop(updateData));
   }
 
   /* -------------------------------------------- */
@@ -633,7 +646,8 @@ export default class ShopSheet extends Application5e {
    * @this {ShopSheet}
    */
   static async #editGoldPool() {
-    await openGoldPoolDialog(this, updateData => this.#updateShop(updateData));
+    await new GoldPoolConfig({ shopSheet: this, onUpdate: updateData => this.#updateShop(updateData) })
+      .render({ force: true });
   }
 
   /* -------------------------------------------- */
@@ -646,7 +660,19 @@ export default class ShopSheet extends Application5e {
    * @param {HTMLElement} target  The `<img data-edit="img">` element that was clicked.
    */
   static async #editImage(event, target) {
-    await openImageDialog(this, target);
+    const fp = new foundry.applications.apps.FilePicker.implementation({
+      current: this.shop.img,
+      type: "image",
+      redirectToRoot: [Shop.DEFAULT_ICON],
+      callback: path => {
+        target.src = path;
+        if ( this.options.form.submitOnChange ) {
+          this.form.dispatchEvent(new Event("submit", { cancelable: true }));
+        }
+      },
+      position: { top: this.position.top + 40, left: this.position.left + 10 }
+    });
+    await fp.browse();
   }
 
   /* -------------------------------------------- */
@@ -658,7 +684,9 @@ export default class ShopSheet extends Application5e {
    * @param {HTMLElement} target  Element that was clicked.
    */
   static async #editMaxStock(event, target) {
-    await openMaxStockDialog(this, target, updateData => this.#updateShop(updateData));
+    await new MaxStockConfig({
+      shopSheet: this, entryKey: target.dataset.key, onUpdate: updateData => this.#updateShop(updateData)
+    }).render({ force: true });
   }
 
   /* -------------------------------------------- */
@@ -668,7 +696,7 @@ export default class ShopSheet extends Application5e {
    * @this {ShopSheet}
    */
   static async #editModifiers() {
-    await openModifiersDialog(this, updateData => this.#updateShop(updateData));
+    await openModifiersConfig(this, updateData => this.#updateShop(updateData));
   }
 
   /* -------------------------------------------- */
@@ -678,7 +706,7 @@ export default class ShopSheet extends Application5e {
    * @this {ShopSheet}
    */
   static async #editOwner() {
-    await openOwnerDialog(this, updateData => this.#updateShop(updateData));
+    await openOwnerConfig(this, updateData => this.#updateShop(updateData));
   }
 
   /* -------------------------------------------- */
@@ -688,11 +716,11 @@ export default class ShopSheet extends Application5e {
    * @this {ShopSheet}
    */
   static async #editPlayers() {
-    await openPlayersDialog(
-      this,
-      updateData => this.#updateShop(updateData),
-      (actorUuid, updateData) => this.#updatePlayerDiscount(actorUuid, updateData)
-    );
+    await new PlayersConfig({
+      shopSheet: this,
+      onUpdate: updateData => this.#updateShop(updateData),
+      onUpdatePlayerDiscount: (actorUuid, updateData) => this.#updatePlayerDiscount(actorUuid, updateData)
+    }).render({ force: true });
   }
 
   /* -------------------------------------------- */
@@ -704,7 +732,7 @@ export default class ShopSheet extends Application5e {
    * @param {HTMLElement} target  Element that was clicked.
    */
   static async #editPrice(event, target) {
-    await openPriceDialog(this, target, updateData => this.#updateShop(updateData));
+    await openPriceConfig(this, target, updateData => this.#updateShop(updateData));
   }
 
   /* -------------------------------------------- */
@@ -714,7 +742,8 @@ export default class ShopSheet extends Application5e {
    * @this {ShopSheet}
    */
   static async #editSettlementCap() {
-    await openSettlementCapDialog(this, updateData => this.#updateShop(updateData));
+    await new SettlementCapConfig({ shopSheet: this, onUpdate: updateData => this.#updateShop(updateData) })
+      .render({ force: true });
   }
 
   /* -------------------------------------------- */
@@ -724,7 +753,8 @@ export default class ShopSheet extends Application5e {
    * @this {ShopSheet}
    */
   static async #generateItem() {
-    await openGenerateItemDialog(this, entries => this.#mergeItemEntries(entries));
+    await new GenerateItemDialog({ shopSheet: this, onGenerated: entries => this.#mergeItemEntries(entries) })
+      .render({ force: true });
   }
 
   /* -------------------------------------------- */
@@ -735,7 +765,11 @@ export default class ShopSheet extends Application5e {
    * @this {ShopSheet}
    */
   static async #haggle() {
-    await openHaggleDialog(this, (actorUuid, updateData) => this.#updatePlayerDiscount(actorUuid, updateData));
+    if ( !this.selectedActorUuid ) return;
+    await new HaggleDialog({
+      shopSheet: this,
+      onUpdatePlayerDiscount: (actorUuid, updateData) => this.#updatePlayerDiscount(actorUuid, updateData)
+    }).render({ force: true });
   }
 
   /* -------------------------------------------- */
@@ -807,7 +841,10 @@ export default class ShopSheet extends Application5e {
   static async #openItemSheet(event, target) {
     const uuid = target.dataset.uuid;
     const item = uuid ? await fromUuid(uuid) : this.#findRowItem(target.dataset.key);
-    item?.sheet?.render(true);
+    if ( !item ) return;
+    const sheet = item.sheet;
+    if ( !item.collection?.has(item.id) ) Object.defineProperty(sheet, "isEditable", { get: () => false });
+    sheet.render(true);
   }
 
   /* -------------------------------------------- */
@@ -831,7 +868,7 @@ export default class ShopSheet extends Application5e {
    * @this {ShopSheet}
    */
   static async #renameShop() {
-    await openRenameDialog(this, updateData => this.#updateShop(updateData));
+    await openRenameConfig(this, updateData => this.#updateShop(updateData));
   }
 
   /* -------------------------------------------- */
@@ -872,7 +909,7 @@ export default class ShopSheet extends Application5e {
   }
 
   /* -------------------------------------------- */
-  /*  Helpers                                      */
+  /*  Helpers                                     */
   /* -------------------------------------------- */
 
   /**

@@ -156,14 +156,19 @@ export async function resolveIdentifierIndex(identifiers) {
         const identifier = entry.system?.identifier;
         if ( !identifier || !remaining.has(identifier) ) continue;
         if ( entry.system?.container ) continue;
-        const entryRules = entry.system?.source?.rules;
-        if ( entryRules && (entryRules !== rules) ) continue;
         if ( !CONFIG.Item.dataModels[entry.type]?.inventorySection ) continue;
-        if ( byIdentifier.has(identifier) ) {
-          console.debug(`${MODULE_ID} | Multiple items share identifier "${identifier}":`, byIdentifier.get(identifier), entry);
+
+        const existing = byIdentifier.get(identifier);
+        if ( !existing ) {
+          byIdentifier.set(identifier, entry);
           continue;
         }
-        byIdentifier.set(identifier, entry);
+        const entryMatches = (entry.system?.source?.rules ?? rules) === rules;
+        const existingMatches = (existing.system?.source?.rules ?? rules) === rules;
+        if ( entryMatches && !existingMatches ) byIdentifier.set(identifier, entry);
+        else if ( entryMatches === existingMatches ) {
+          console.debug(`${MODULE_ID} | Multiple items share identifier "${identifier}":`, existing, entry);
+        }
       }
     }
     for ( const identifier of byIdentifier.keys() ) remaining.delete(identifier);

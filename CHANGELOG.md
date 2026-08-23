@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0
+
+- Added an automatic Arcana suggestion under a recipe's Skill Proficiencies whenever the target item is magical — pre-checked, but freely removable.
+- Fixed recipes/materials referencing a legacy (2014 Rules) item failing to resolve while playing with modern rules — the active ruleset is now only a preference between multiple matches, not a hard exclusion.
+- Fixed the shop's Settlement Cap custom value/currency fields being invisible and unusable on dnd5e 5.3.3.
+- Fixed clicking a generated (enchanted) item's name in the Buy/Sell table throwing a console error.
+
 ## 0.1.0
 
 - Added automatic shop restock: pick the weekdays a shop restocks on via the restock button next to the manual

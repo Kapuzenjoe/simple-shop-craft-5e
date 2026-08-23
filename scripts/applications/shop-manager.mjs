@@ -1,14 +1,18 @@
-import { SETTLEMENT_CAPS, GOLD_POOL_DEFAULT } from "../config.mjs";
+import { SETTLEMENT_CAPS } from "../config.mjs";
 import { createRecipe, deleteRecipe, getRecipe, getRecipes } from "../data/recipe-store.mjs";
 import { createShop, deleteShop, getShop, getShops, updateShop } from "../data/shop-store.mjs";
-import { getStarterItems, getStarterPackOptions } from "../data/starter-packs.mjs";
 import { isShopOpen, openingHoursDisplay } from "../shop/opening-hours.mjs";
 import { buildItemTableSections, finalizeGroups, resolveEntries } from "../utils.mjs";
 
-import BasePromptDialog from "./base-prompt-dialog.mjs";
 import CraftStartDialog from "./craft-start-dialog.mjs";
 import RecipeSheet from "./recipe-sheet.mjs";
+import ShopCreateDialog from "./shop-create-dialog.mjs";
 import ShopSheet from "./shop-sheet.mjs";
+
+/**
+ * @import { Recipe } from "../data/recipe-data.mjs";
+ * @import { Shop } from "../data/shop-data.mjs";
+ */
 
 const { Application5e } = game.dnd5e.applications.api;
 
@@ -68,7 +72,7 @@ export default class ShopManager extends Application5e {
   };
 
   /* -------------------------------------------- */
-  /*  Rendering                                    */
+  /*  Rendering                                   */
   /* -------------------------------------------- */
 
   /** @inheritDoc */
@@ -142,7 +146,7 @@ export default class ShopManager extends Application5e {
   }
 
   /* -------------------------------------------- */
-  /*  Life-Cycle Handlers                          */
+  /*  Life-Cycle Handlers                         */
   /* -------------------------------------------- */
 
   /** @inheritDoc */
@@ -165,7 +169,7 @@ export default class ShopManager extends Application5e {
   }
 
   /* -------------------------------------------- */
-  /*  Event Listeners and Handlers                 */
+  /*  Event Listeners and Handlers                */
   /* -------------------------------------------- */
 
   /** @inheritDoc */
@@ -199,54 +203,7 @@ export default class ShopManager extends Application5e {
    * @returns {Promise<void>}
    */
   static async #createShop() {
-    const shopManager = this;
-    const starterPackOptions = [
-      { value: "", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Empty") },
-      ...getStarterPackOptions()
-    ];
-
-    const dialog = new BasePromptDialog({
-      window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Create" },
-      fields: [
-        {
-          field: new foundry.data.fields.StringField(), name: "starterPack",
-          label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.StarterPack"), options: starterPackOptions
-        },
-        {
-          field: new foundry.data.fields.StringField(), name: "name",
-          label: _loc("SIMPLE_SHOP_CRAFT_5E.Shop")
-        }
-      ],
-      buttons: [
-        { action: "create", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Create", icon: "fas fa-plus", default: true }
-      ],
-      onRender: app => {
-        const select = app.element.querySelector('select[name="starterPack"]');
-        const name = app.element.querySelector('input[name="name"]');
-        select?.addEventListener("change", () => {
-          name.placeholder = select.value ? (select.selectedOptions[0]?.text ?? "") : "";
-        });
-      },
-      form: {
-        handler: async function(event, form, formData) {
-          const data = foundry.utils.expandObject(formData.object);
-          const packs = getStarterPackOptions();
-          const newShop = {
-            name: data.name || packs.find(p => p.value === data.starterPack)?.label
-              || _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Create"),
-            goldPool: { max: { gp: GOLD_POOL_DEFAULT }, current: { gp: GOLD_POOL_DEFAULT }, unlimited: false },
-            items: getStarterItems(data.starterPack).map(({ identifier, bundleSize }) => ({
-              identifier, bundleSize, stock: { max: null, current: null }
-            }))
-          };
-          const created = await createShop(newShop);
-          shopManager.render();
-          new ShopSheet({ shopId: created._id }).render({ force: true, mode: ShopSheet.MODES.EDIT });
-          await this.close();
-        }
-      }
-    });
-    await dialog.render({ force: true });
+    await new ShopCreateDialog({ shopManager: this }).render({ force: true });
   }
 
   /* -------------------------------------------- */
@@ -315,7 +272,7 @@ export default class ShopManager extends Application5e {
   }
 
   /* -------------------------------------------- */
-  /*  Helpers                                      */
+  /*  Helpers                                     */
   /* -------------------------------------------- */
 
   /**
