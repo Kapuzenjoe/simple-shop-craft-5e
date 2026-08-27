@@ -3,6 +3,10 @@ import { applyCraftStart } from "../craft/transaction.mjs";
 import { breakdownCopper } from "../shop/currency.mjs";
 
 /**
+ * @import { Recipe } from "../data/recipe-data.mjs";
+ */
+
+/**
  * Template used to render a craft-start chat card.
  * @type {string}
  */
@@ -24,7 +28,7 @@ const STATUS_LABELS = {
  * @param {Actor5e} options.actor                    The crafting actor.
  * @param {Recipe} options.recipe                    The recipe being crafted.
  * @param {Item5e} options.targetItem                Resolved target item (name/img).
- * @param {{ item: Item5e }[]} options.materialLines  Owned items contributed as materials.
+ * @param {{ item: Item5e, quantity: number }[]} options.materialLines  Owned items contributed as materials.
  * @param {number} options.goldCP                     Copper amount filled in from the actor's own currency.
  * @param {string|null} options.toolKey               Tool proficiency key used, if any.
  * @param {number} options.totalHours                 Total progress hours needed to finish the craft.
@@ -45,7 +49,9 @@ export async function createCraftMessage({
     actorUuid: actor.uuid,
     actorName: actor.name,
     toolKey: toolKey || null,
-    materialLines: materialLines.map(line => ({ itemId: line.item.id, name: line.item.name, img: line.item.img })),
+    materialLines: materialLines.map(line => ({
+      itemId: line.item.id, name: line.item.name, img: line.item.img, quantity: line.quantity
+    })),
     goldCP,
     goldParts: goldCP > 0 ? breakdownCopper(goldCP) : [],
     totalHours, hoursPerUse, weight, halfPrice

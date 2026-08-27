@@ -19,7 +19,10 @@
         <li class="target">
             <img class="gold-icon" src="{{ targetItem.img }}" alt="{{ targetItem.name }}">
             <div class="name-stacked">
-                <span class="title">{{ targetItem.name }}</span>
+                <span class="title">
+                    {{ targetItem.name }}
+                    {{#if (gt recipe.targetQuantity 1)}}<span class="bundle-size">(&times;{{ recipe.targetQuantity }})</span>{{/if}}
+                </span>
             </div>
         </li>
     </ol>
@@ -50,54 +53,35 @@
 {{/if}}
 
 <fieldset class="card-tray">
-    <legend>{{ localize "DND5E.Materials" }}</legend>
-    <ol class="targets unlist">
-        {{#each fixedMaterials}}
-        <li class="target">
-            <img class="gold-icon" src="{{ this.img }}" alt="{{ this.name }}">
-            <div class="name-stacked">
-                <span class="title">{{ this.name }}</span>
-                {{#unless this.item}}
-                <span class="subtitle">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.MaterialMissing" }}</span>
-                {{/unless}}
-            </div>
-        </li>
-        {{/each}}
-        {{#each freeformItems}}
-        <li class="target">
-            <img class="gold-icon" src="{{ this.img }}" alt="{{ this.name }}">
-            <div class="name-stacked">
-                <span class="title">{{ this.name }}</span>
-            </div>
-            <button type="button" class="unbutton config-button item-control" data-action="removeFreeformMaterial"
-                    data-item-id="{{ this.id }}" data-tooltip
-                    aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.RemoveMaterial' }}">
-                <i class="fa-solid fa-xmark" inert></i>
-            </button>
-        </li>
-        {{/each}}
-    </ol>
+    <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.CraftingMaterials" }}</legend>
+    {{> "modules/simple-shop-craft-5e/templates/partials/item-table.hbs" materialsTable}}
 
     {{#if allowFreeform}}
     <div class="drop-area" data-drop-area>
         <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.DropMaterialHint" }}</p>
     </div>
     {{/if}}
+</fieldset>
 
-    <ol class="targets unlist">
-        <li class="target">
-            <div class="name-stacked">
-                <span class="title">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.Supplied" }}</span>
-            </div>
-            {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=suppliedParts }}
-        </li>
-        <li class="target">
-            <div class="name-stacked">
-                <span class="title">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.Threshold" }}</span>
-            </div>
-            {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=thresholdParts }}
-        </li>
-    </ol>
+{{#unless requiredAvailable}}
+<p class="hint warning">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.RequiredMissing" }}</p>
+{{/unless}}
+
+{{#unless recipe.ignoreCraftValue}}
+<fieldset class="card-tray">
+    <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.MaterialValue" }}</legend>
+    {{#unless materialsMet}}
+    <p class="hint warning">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.ValueMissing" }}</p>
+    {{/unless}}
+
+    <p class="hint">
+        {{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.Supplied" }}:
+        {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=suppliedParts }}
+    </p>
+    <p class="hint{{#unless materialsMet}} warning{{/unless}}">
+        {{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.Threshold" }}:
+        {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=thresholdParts }}
+    </p>
 
     {{#if goldField}}
     {{> "dnd5e.fieldlist" goldField}}
@@ -112,6 +96,7 @@
     {{/if}}
     {{/if}}
 </fieldset>
+{{/unless}}
 
 {{/if}}
 </section>

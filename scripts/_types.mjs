@@ -73,6 +73,8 @@
  *                                           status, bypassing hours/weekdays/festivals entirely.
  * @property {number|null} openHour          Hour (0-23) this shop opens each day, or `null` for no restriction.
  * @property {number|null} closeHour         Hour (0-23) this shop closes each day, or `null` for no restriction.
+ * @property {number} openMinute             Minute (0-59) this shop opens each day.
+ * @property {number} closeMinute            Minute (0-59) this shop closes each day.
  * @property {string} [description]          Optional shop description.
  * @property {ShopItemEntryData[]} items     Items available in this shop.
  */
@@ -83,6 +85,22 @@
  * @typedef RecipeMaterialData
  * @property {string} [identifier]  Stable `system.identifier` of the referenced material item.
  * @property {string} [uuid]        Direct UUID reference, used when no `system.identifier` match exists.
+ * @property {RecipeMaterialCriteria|null} [criteria]  Type/subtype/value rule instead of a fixed reference.
+ * @property {boolean} required     Whether this slot must have a resolved match to start crafting.
+ * @property {number} quantity      Number of matching units required to fully satisfy this slot.
+ * @property {object} value               Crafting value per contributed unit: for a fixed reference, an
+ *                                         override of the item's own price; for a criteria rule, the
+ *                                         qualifying minimum and the value credited per unit.
+ * @property {number|null} value.value    The amount. `null` means no override (fixed) or no minimum (criteria).
+ * @property {string} value.denomination  Currency denomination for the override.
+ */
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef RecipeMaterialCriteria
+ * @property {string} type             Item type (`CONFIG.Item.dataModels` key).
+ * @property {string} [subtype]        Item subtype within `type`, if applicable.
  */
 
 /* -------------------------------------------- */
@@ -95,13 +113,17 @@
  * @property {object} targetItem
  * @property {string} [targetItem.identifier]    Stable `system.identifier` of the item this recipe produces.
  * @property {string} [targetItem.uuid]          Direct UUID reference, used when no `system.identifier` match exists.
+ * @property {number} targetQuantity              Units produced per craft (e.g. 20 for a stack of arrows).
  * @property {RecipeMaterialData[]} materials    Fixed materials required by this recipe.
  * @property {boolean} allowFreeformMaterials    Whether players may substitute any sufficiently valuable item.
+ * @property {boolean} ignoreCraftValue           Whether this recipe requires only material presence, ignoring
+ *                                                the crafting-value threshold entirely.
  * @property {Set<string>} unlockedFor           Actor UUIDs allowed to start this craft.
  * @property {boolean} openToAll                 Whether any actor may start this craft, ignoring `unlockedFor`.
  * @property {Record<string, number>} materialPrice  Required value of the selected materials, per denomination.
  * @property {Set<string>} toolProficiencies     Required tool proficiency keys (`CONFIG.DND5E.tools`).
- * @property {Set<string>} skillProficiencies    Alternative skill proficiency keys (`CONFIG.DND5E.skills`) — any one satisfies the requirement without needing an owned tool.
+ * @property {Set<string>} skillProficiencies    Alternative skill proficiency keys (`CONFIG.DND5E.skills`) — any one
+ *                                               satisfies the requirement without needing an owned tool.
  * @property {boolean} allowWorkshopOverride     Whether players may claim workshop access instead of owning the tool.
  * @property {object} durationOverride
  * @property {number|null} durationOverride.value  Manual override amount. `null` uses the rules-based value.

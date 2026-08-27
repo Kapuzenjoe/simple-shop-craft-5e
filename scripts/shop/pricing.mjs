@@ -4,6 +4,7 @@ import { breakdownCopper, resolveItemPrice, toCopper } from "./currency.mjs";
 import { entryKey, resolveShopItems } from "./entry-resolver.mjs";
 
 /**
+ * @import { ShopItemEntryData } from "../_types.mjs";
  * @import { ShopPlayerDiscount } from "../data/shop-data.mjs";
  */
 

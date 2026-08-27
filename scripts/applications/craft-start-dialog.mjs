@@ -1,9 +1,16 @@
 import { createCraftMessage } from "../chat/craft-card.mjs";
 import { HOURS_PER_USE } from "../config.mjs";
 import { getRecipe } from "../data/recipe-store.mjs";
-import { breakdownCopper, effectiveCraftCost, resolveDefaultPrice, toCopper } from "../shop/currency.mjs";
+import { breakdownCopper, effectiveCraftCost, resolveDefaultPrice, resolveItemPrice, toCopper } from "../shop/currency.mjs";
 import { needsDefaultPrice } from "../shop/pricing.mjs";
-import { resolveEntries, selectableActors } from "../utils.mjs";
+import {
+  buildItemTableSections, loadingTooltip, openItemSheet, resolveBundleSizes, resolveEntries, selectableActors,
+  subtypeOptions
+} from "../utils.mjs";
+
+/**
+ * @import { Recipe } from "../data/recipe-data.mjs";
+ */
 
 const { Dialog5e } = game.dnd5e.applications.api;
 
@@ -33,7 +40,9 @@ export default class CraftStartDialog extends Dialog5e {
     window: { resizable: true },
     position: { width: 420, height: "auto" },
     actions: {
-      removeFreeformMaterial: CraftStartDialog.#removeFreeformMaterial,
+      openItemSheet: CraftStartDialog.#openItemSheet,
+      removeMaterial: CraftStartDialog.#removeFreeformMaterial,
+      stepMaterialQuantity: CraftStartDialog.#stepMaterialCandidate,
       startCraft: CraftStartDialog.#startCraft
     }
   };
@@ -43,7 +52,13 @@ export default class CraftStartDialog extends Dialog5e {
   /** @override */
   static PARTS = {
     ...super.PARTS,
-    content: { template: "modules/simple-shop-craft-5e/templates/craft-start-dialog/content.hbs" }
+    content: {
+      template: "modules/simple-shop-craft-5e/templates/craft-start-dialog/content.hbs",
+      templates: [
+        "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs",
+        "modules/simple-shop-craft-5e/templates/partials/item-table.hbs"
+      ]
+    }
   };
 
   /* -------------------------------------------- */
@@ -83,6 +98,12 @@ export default class CraftStartDialog extends Dialog5e {
    * @type {boolean}
    */
   #fillWithGold = false;
+
+  /**
+   * Selected quantity per criteria-slot candidate, keyed by `{index}:{itemId}`.
+   * @type {Map<string, number>}
+   */
+  #materialQuantities = new Map();
 
   /**
    * Name of the resolved target item, cached as a title fallback once known.
@@ -131,6 +152,7 @@ export default class CraftStartDialog extends Dialog5e {
         this.#toolKey = null;
         this.#workshopClaimed = false;
         this.#fillWithGold = false;
+        this.#materialQuantities.clear();
       }
       else if ( event.target.name === "toolKey" ) this.#toolKey = event.target.value;
       else if ( event.target.name === "workshopClaimed" ) this.#workshopClaimed = event.target.checked;
@@ -147,6 +169,16 @@ export default class CraftStartDialog extends Dialog5e {
       dropArea.classList.remove("is-dragover");
     });
     dropArea?.addEventListener("drop", event => this.#onDropItem(event));
+
+    this.element.querySelectorAll(".item-tooltip[data-uuid]").forEach(el => {
+      const uuid = el.dataset.uuid;
+      if ( !uuid ) return;
+      el.dataset.tooltipHtml = loadingTooltip(uuid);
+      el.dataset.tooltipClass = game.dnd5e.utils.loadingTooltip
+        ? "dnd5e2 dnd5e-tooltip item-tooltip"
+        : "dnd5e2 dnd5e-tooltip item-tooltip themed theme-light";
+      el.dataset.tooltipDirection ??= "LEFT";
+    });
   }
 
   /* -------------------------------------------- */
@@ -175,11 +207,13 @@ export default class CraftStartDialog extends Dialog5e {
     context.displayName = state.recipe.name || state.targetItem?.name
       || _loc("SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder");
     context.noActor = !state.actor;
-    context.fixedMaterials = state.fixedLines;
-    context.freeformItems = state.freeformItems.map(item => ({ id: item.id, name: item.name, img: item.img }));
+    context.materialsTable = buildMaterialsTable(state);
     context.allowFreeform = state.recipe.allowFreeformMaterials;
     context.suppliedParts = breakdownCopper(state.suppliedCP);
     context.thresholdParts = breakdownCopper(state.thresholdCP);
+    context.materialsMet = state.materialsMet;
+    context.requiredMet = state.requiredMet;
+    context.requiredAvailable = state.requiredAvailable;
     context.toolProficient = state.proficient;
     context.toolOwned = state.toolOwned;
     context.skillProficient = state.skillProficient;
@@ -262,21 +296,78 @@ export default class CraftStartDialog extends Dialog5e {
     }
 
     const materialsResolved = await resolveEntries(recipe.materials);
-    const fixedLines = materialsResolved.map(({ entry, item }) => {
-      const owned = (actor && entry.identifier)
-        ? actor.items.find(i => i.system.identifier === entry.identifier)
-        : null;
-      return { name: item?.name ?? entry.identifier ?? entry.uuid, img: item?.img, item: owned };
-    });
-
     const freeformItems = actor
       ? Array.from(this.#freeformIds).map(id => actor.items.get(id)).filter(Boolean)
       : [];
-    const includedItems = [...fixedLines.filter(l => l.item).map(l => l.item), ...freeformItems];
-    const suppliedCP = includedItems.reduce((sum, item) => sum + materialValueCP(item), 0);
-    const thresholdCP = craftThresholdCP(recipe, craftCost);
+    const rawCandidates = materialsResolved.map(({ entry }) => {
+      if ( !actor || !entry.criteria?.type ) return [];
+      return actor.items.filter(i => {
+        if ( i.type !== entry.criteria.type ) return false;
+        if ( entry.criteria.subtype && (i.system.type?.value !== entry.criteria.subtype) ) return false;
+        return true;
+      });
+    });
+    const bundleSizes = await resolveBundleSizes([...rawCandidates.flat(), ...freeformItems]);
+
+    const fixedLines = materialsResolved.map(({ entry, item }, index) => {
+      if ( entry.criteria?.type ) {
+        const minValueCP = (entry.value?.value != null) ? toCopper(entry.value.value, entry.value.denomination) : null;
+        const candidates = rawCandidates[index]
+          .filter(i => materialValueCP(i, bundleSizes.get(i.id)) >= (minValueCP ?? 0))
+          .map(i => {
+            const valueCP = materialValueCP(i, bundleSizes.get(i.id));
+            return {
+              id: i.id, name: i.name, img: i.img, uuid: i.uuid, owned: i.system.quantity,
+              selected: Math.min(this.#materialQuantities.get(`${index}:${i.id}`) ?? 0, i.system.quantity),
+              valueCP, price: breakdownCopper(valueCP)
+            };
+          });
+        const suppliedUnits = candidates.reduce((sum, c) => sum + c.selected, 0);
+        const suppliedLineCP = (minValueCP != null)
+          ? Math.min(suppliedUnits, entry.quantity) * minValueCP
+          : candidates.reduce((sum, c) => sum + (c.selected * c.valueCP), 0);
+        const subtypeLabel = entry.criteria.subtype
+          ? subtypeOptions([entry.criteria.type]).find(o => o.value === entry.criteria.subtype)?.label
+          : null;
+        const name = subtypeLabel ?? _loc(`TYPES.Item.${entry.criteria.type}Pl`);
+        return {
+          name, criteria: entry.criteria, candidates, index, required: entry.required, quantity: entry.quantity,
+          suppliedUnits, suppliedLineCP, slotMet: suppliedUnits >= entry.quantity,
+          priceOverride: (entry.value?.value != null) ? entry.value : null
+        };
+      }
+      const owned = (actor && entry.identifier)
+        ? actor.items.find(i => i.system.identifier === entry.identifier)
+        : null;
+      const maxUnits = owned ? Math.min(owned.system.quantity, entry.quantity) : 0;
+      const overrideKey = owned ? `${index}:${owned.id}` : null;
+      const suppliedUnits = owned ? Math.min(this.#materialQuantities.get(overrideKey) ?? 0, maxUnits) : 0;
+      const itemBundleSize = (item?.system?.quantity > 1) ? item.system.quantity : 1;
+      const itemValueCP = (entry.value?.value != null)
+        ? toCopper(entry.value.value, entry.value.denomination)
+        : (owned ? materialValueCP(owned, itemBundleSize) : 0);
+      const ownedPrice = owned ? resolveItemPrice(owned) : null;
+      return {
+        name: item?.name ?? entry.identifier ?? entry.uuid, img: item?.img, item: owned,
+        required: entry.required, quantity: entry.quantity, suppliedUnits, ownedQuantity: owned?.system.quantity ?? 0,
+        suppliedLineCP: suppliedUnits * itemValueCP, slotMet: suppliedUnits >= entry.quantity,
+        priceOverride: (entry.value?.value != null) ? entry.value : (ownedPrice
+          ? { value: ownedPrice.value / itemBundleSize, denomination: ownedPrice.denomination }
+          : null)
+      };
+    });
+    const suppliedCP = fixedLines.reduce((sum, l) => sum + l.suppliedLineCP, 0)
+      + freeformItems.reduce((sum, item) => sum + materialValueCP(item, bundleSizes.get(item.id)), 0);
+    const targetBundleSize = (targetItem?.system?.quantity > 1) ? targetItem.system.quantity : 1;
+    const thresholdCP = craftThresholdCP(recipe, craftCost) * (recipe.targetQuantity / targetBundleSize);
     const shortfallCP = Math.max(0, thresholdCP - suppliedCP);
-    const materialsMet = suppliedCP >= thresholdCP;
+    const materialsMet = recipe.ignoreCraftValue || (suppliedCP >= thresholdCP);
+    const requiredMet = fixedLines.every(l => !l.required || l.slotMet);
+    const requiredAvailable = fixedLines.every(l => {
+      if ( !l.required ) return true;
+      if ( l.criteria ) return l.candidates.reduce((sum, c) => sum + c.owned, 0) >= l.quantity;
+      return l.ownedQuantity >= l.quantity;
+    });
 
     let goldCP = 0;
     let goldInsufficient = false;
@@ -300,7 +391,7 @@ export default class CraftStartDialog extends Dialog5e {
     const skillKeys = Array.from(recipe.skillProficiencies);
     const skillProficient = !!actor && skillKeys.some(k => (actor.system.skills[k]?.value ?? 0) > 0);
 
-    const canStart = !!actor && !!targetItem && (toolEligible || skillProficient)
+    const canStart = !!actor && !!targetItem && (toolEligible || skillProficient) && requiredMet
       && (materialsMet || (this.#fillWithGold && !goldInsufficient));
 
     const totalHours = recipe.durationOverride.value != null
@@ -312,7 +403,7 @@ export default class CraftStartDialog extends Dialog5e {
       recipe, actor, targetItem, craftCost, fixedLines, freeformItems,
       suppliedCP, thresholdCP, shortfallCP, materialsMet, goldCP, goldInsufficient,
       toolKeys, chosenToolKey, proficient, toolOwned, toolEligible, skillProficient, canStart, totalHours,
-      hoursPerUse, weight, halfPrice
+      hoursPerUse, weight, halfPrice, requiredMet, requiredAvailable
     };
   }
 
@@ -353,6 +444,34 @@ export default class CraftStartDialog extends Dialog5e {
   /* -------------------------------------------- */
 
   /**
+   * Handle adjusting how many units of a criteria-slot candidate are contributed.
+   * @this {CraftStartDialog}
+   * @param {Event} event         Triggering click event.
+   * @param {HTMLElement} target  Button that was clicked.
+   */
+  static #stepMaterialCandidate(event, target) {
+    const key = `${target.dataset.index}:${target.dataset.itemId}`;
+    const step = Number(target.dataset.step);
+    this.#materialQuantities.set(key, Math.max(0, (this.#materialQuantities.get(key) ?? 0) + step));
+    this.render({ parts: ["content", "footer"] });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle opening a criteria candidate's item sheet.
+   * @param {Event} event         Triggering click event.
+   * @param {HTMLElement} target  Button that was clicked.
+   * @returns {Promise<void>}
+   */
+  static async #openItemSheet(event, target) {
+    const item = await fromUuid(target.dataset.uuid);
+    if ( item ) openItemSheet(item);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
    * Handle requesting the craft start: sends a GM-confirmation chat card.
    * @this {CraftStartDialog}
    * @returns {Promise<void>}
@@ -361,15 +480,75 @@ export default class CraftStartDialog extends Dialog5e {
     const state = await this.#computeState();
     if ( !state.canStart ) return;
 
+    const materialLines = [
+      ...state.fixedLines.flatMap(l => l.criteria
+        ? l.candidates.filter(c => c.selected > 0)
+          .map(c => ({ item: state.actor.items.get(c.id), quantity: c.selected }))
+        : (l.item ? [{ item: l.item, quantity: l.suppliedUnits }] : [])),
+      ...state.freeformItems.map(item => ({ item, quantity: 1 }))
+    ];
     await createCraftMessage({
       actor: state.actor, recipe: state.recipe, targetItem: state.targetItem,
-      materialLines: [...state.fixedLines.filter(l => l.item), ...state.freeformItems.map(item => ({ item }))],
+      materialLines,
       goldCP: state.goldCP, toolKey: state.chosenToolKey, totalHours: state.totalHours,
       hoursPerUse: state.hoursPerUse, weight: state.weight, halfPrice: state.halfPrice
     });
     ui.notifications.info("SIMPLE_SHOP_CRAFT_5E.CraftStart.Requested", { localize: true });
     this.close();
   }
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Build item-table row data for the crafting-materials list: fixed material lines, one row per criteria
+ * slot (with its candidates nested as an activity list), and freeform items.
+ * @param {object} state  Computed dialog state.
+ * @returns {{ hasRows: boolean, emptyLabel: string, sections: object[] }}
+ */
+function buildMaterialsTable(state) {
+  const requiredTooltip = "SIMPLE_SHOP_CRAFT_5E.CraftStart.MaterialRequired";
+  const rows = state.fixedLines.map((line, index) => {
+    const shared = { index, required: line.required, requiredEditable: false, requiredTooltip };
+    const price = line.priceOverride ? [line.priceOverride] : null;
+    if ( line.criteria ) {
+      return {
+        ...shared, img: "systems/dnd5e/icons/svg/item-choice.svg", name: line.name, price,
+        subtitle: line.candidates.length
+          ? _loc("SIMPLE_SHOP_CRAFT_5E.MaterialRule")
+          : _loc("SIMPLE_SHOP_CRAFT_5E.CraftStart.MaterialMissing"),
+        quantityLabel: `${line.suppliedUnits}/${line.quantity}`, candidates: line.candidates
+      };
+    }
+    return {
+      ...shared, img: line.img, name: line.name, uuid: line.item?.uuid ?? null, price,
+      showQuantity: !!line.item, quantity: line.suppliedUnits, itemId: line.item?.id ?? null,
+      quantityLabel: line.item ? line.suppliedUnits : null,
+      subtitle: (line.ownedQuantity >= line.quantity)
+        ? null
+        : (line.ownedQuantity > 0
+          ? game.i18n.format("SIMPLE_SHOP_CRAFT_5E.CraftStart.MaterialInsufficient",
+            { owned: line.ownedQuantity, required: line.quantity })
+          : _loc("SIMPLE_SHOP_CRAFT_5E.CraftStart.MaterialMissing"))
+    };
+  });
+  for ( const item of state.freeformItems ) {
+    rows.push({
+      img: item.img, name: item.name, uuid: item.uuid,
+      removable: true, removeTooltip: "SIMPLE_SHOP_CRAFT_5E.RemoveMaterial", itemId: item.id
+    });
+  }
+
+  return buildItemTableSections({
+    groups: rows.length ? [{ label: "", items: rows }] : [],
+    emptyLabel: "SIMPLE_SHOP_CRAFT_5E.CraftStart.MaterialsNone",
+    columns: [
+      { id: "name", label: "SIMPLE_SHOP_CRAFT_5E.Material" },
+      { id: "price", label: "DND5E.Price" },
+      { id: "quantity", label: "DND5E.Quantity" }, { id: "controls" }
+    ],
+    rowTemplate: "modules/simple-shop-craft-5e/templates/partials/material-row.hbs"
+  });
 }
 
 /* -------------------------------------------- */
@@ -391,12 +570,14 @@ function craftThresholdCP(recipe, craftCost) {
 /* -------------------------------------------- */
 
 /**
- * Resolve an owned item's contributed value in copper, via its own price or the rarity-based fallback.
+ * Resolve an owned item's contributed value in copper, per unit — via its own price or the rarity-based
+ * fallback, divided by its canonical bundle size (e.g. a stack of 20 arrows priced as a whole).
  * @param {Item5e} item
+ * @param {number} [bundleSize]
  * @returns {number}
  */
-function materialValueCP(item) {
+function materialValueCP(item, bundleSize=1) {
   const price = needsDefaultPrice(item) ? resolveDefaultPrice(item) : item.system.price;
   if ( !price?.value ) return 0;
-  return toCopper(price.value, price.denomination);
+  return toCopper(price.value, price.denomination) / bundleSize;
 }

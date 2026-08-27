@@ -47,6 +47,29 @@
 
     .unit { color: var(--color-text-tertiary); font-size: var(--font-size-12); }
   }
+
+  .value-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .value-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+
+    .name-stacked {
+      flex: 1;
+    }
+  }
+
+  .card-tray {
+    margin-inline: 0;
+  }
 }
 
 .simple-shop-craft-5e.shop-sheet {

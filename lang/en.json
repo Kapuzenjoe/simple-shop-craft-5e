@@ -1,5 +1,6 @@
 {
   "SIMPLE_SHOP_CRAFT_5E": {
+    "Material": "Material",
     "SHOP": {
       "FIELDS": {
         "name": { "label": "Shop Name" },
@@ -32,9 +33,17 @@
             "hint": "Alternative to the browser above — paste or drop an item UUID directly, useful for world items in no compendium."
           }
         },
+        "targetQuantity": {
+          "label": "Quantity Produced",
+          "hint": "How many units this recipe produces per craft — defaults to the item's own stack size."
+        },
         "allowFreeformMaterials": {
           "label": "Allow Freeform Materials",
           "hint": "Players may substitute any item of sufficient value for the fixed materials below."
+        },
+        "ignoreCraftValue": {
+          "label": "Ignore Crafting Value",
+          "hint": "Ignore the crafting-value threshold — only material presence is required to start crafting."
         },
         "unlockedFor": {
           "label": "Unlocked For",
@@ -109,7 +118,23 @@
       "RemoveTargetItem": "Remove Target Item",
       "MaterialsNone": "No materials yet. Use the <i class=\"fas fa-plus\"></i> button above to add one.",
       "AddMaterial": "Add Material",
+      "AddMaterialCriteria": "Add Material Rule",
+      "MaterialRequired": "Toggle Required",
       "DropMaterialHint": "Drop an item here to add it as a material.",
+      "MaterialCriteriaTitle": "Add Material Rule",
+      "MaterialCriteriaType": "Item Type",
+      "MaterialCriteriaChooseType": "Choose a type…",
+      "MaterialCriteriaSubtype": "Subtype",
+      "MaterialCriteriaAny": "Any",
+      "ChangeValue": "Change Value",
+      "MaterialValueHint": "Override this material's crafting value.",
+      "ChangeIdentifier": "Change Identifier",
+      "ChangeIdentifierHint": "Must match an existing item's identifier.",
+      "IdentifierRequired": "Enter an identifier.",
+      "IdentifierNotFound": "No item with this identifier could be found.",
+      "RequiredMaterialsValue": "Required Materials Value",
+      "CraftValueIgnored": "Crafting value is ignored for this recipe.",
+      "MaterialCriteriaTypeRequired": "Choose an item type.",
       "Unlock": "Unlock"
     },
     "ShopEditor": {
@@ -172,6 +197,7 @@
       "StatusOverrideClosed": "Force Closed",
       "ShopClosedWarning": "This shop is outside its opening hours — players can't access it right now.",
       "SettlementCap": "Settlement Cap",
+      "SettlementCapValue": "Value",
       "SettlementCapAppliesToSell": "Applies to Selling",
       "SettlementCapAppliesToSellHint": "Items can't be sold to this shop for more than the cap.",
       "NoCap": "No Cap",
@@ -234,11 +260,18 @@
     },
     "CraftStart": {
       "NoActor": "Select a character above to continue.",
+      "CraftingMaterials": "Crafting Materials",
+      "MaterialsNone": "No materials required.",
       "NotProficient": "You are not proficient with this tool.",
       "ToolMissing": "You don't own this tool.",
       "SkillProficient": "A qualifying skill proficiency satisfies this requirement.",
       "WorkshopAccess": "Workshop Access",
-      "MaterialMissing": "Not in your inventory",
+      "MaterialMissing": "Not in your inventory.",
+      "MaterialInsufficient": "Only {owned} of {required} available.",
+      "MaterialRequired": "Required to start crafting",
+      "MaterialValue": "Material Value",
+      "RequiredMissing": "Not all required materials are supplied yet.",
+      "ValueMissing": "The supplied material value doesn't meet the threshold yet.",
       "DropMaterialHint": "Drop an item here to use it as a material.",
       "MustOwnMaterial": "You can only use your own items as materials.",
       "Supplied": "Supplied",
@@ -264,6 +297,7 @@
     "Unknown": "Unknown",
     "NewRecipePlaceholder": "New Recipe",
     "RemoveMaterial": "Remove Material",
+    "MaterialRule": "Material Rule",
     "Tool": "Tool",
     "Buying": "Buying",
     "Selling": "Selling",

@@ -1,5 +1,6 @@
-<fieldset>
-    {{#if hint}}<p class="hint">{{ hint }}</p>{{/if}}
-    {{> "dnd5e.fieldlist" fields}}
-    {{{ extraContent }}}
-</fieldset>
+<section class="tab active config-content">
+    <fieldset>
+        <legend>{{ localize legend }}</legend>
+        {{> "dnd5e.fieldlist" fields}}
+    </fieldset>
+</section>

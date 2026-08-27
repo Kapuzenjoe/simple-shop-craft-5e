@@ -79,8 +79,12 @@ export class Shop extends foundry.abstract.DataModel {
    */
   static DEFAULT_ICON = "icons/svg/chest.svg";
 
+  /* -------------------------------------------- */
+
   /** @override */
   static LOCALIZATION_PREFIXES = ["SIMPLE_SHOP_CRAFT_5E.SHOP"];
+
+  /* -------------------------------------------- */
 
   /** @override */
   static defineSchema() {
