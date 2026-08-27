@@ -85,6 +85,22 @@
  * @typedef RecipeMaterialData
  * @property {string} [identifier]  Stable `system.identifier` of the referenced material item.
  * @property {string} [uuid]        Direct UUID reference, used when no `system.identifier` match exists.
+ * @property {RecipeMaterialCriteria|null} [criteria]  Type/subtype/value rule instead of a fixed reference.
+ * @property {boolean} required     Whether this slot must have a resolved match to start crafting.
+ * @property {number} quantity      Number of matching units required to fully satisfy this slot.
+ * @property {object} value               Crafting value per contributed unit: for a fixed reference, an
+ *                                         override of the item's own price; for a criteria rule, the
+ *                                         qualifying minimum and the value credited per unit.
+ * @property {number|null} value.value    The amount. `null` means no override (fixed) or no minimum (criteria).
+ * @property {string} value.denomination  Currency denomination for the override.
+ */
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef RecipeMaterialCriteria
+ * @property {string} type             Item type (`CONFIG.Item.dataModels` key).
+ * @property {string} [subtype]        Item subtype within `type`, if applicable.
  */
 
 /* -------------------------------------------- */
@@ -97,8 +113,11 @@
  * @property {object} targetItem
  * @property {string} [targetItem.identifier]    Stable `system.identifier` of the item this recipe produces.
  * @property {string} [targetItem.uuid]          Direct UUID reference, used when no `system.identifier` match exists.
+ * @property {number} targetQuantity              Units produced per craft (e.g. 20 for a stack of arrows).
  * @property {RecipeMaterialData[]} materials    Fixed materials required by this recipe.
  * @property {boolean} allowFreeformMaterials    Whether players may substitute any sufficiently valuable item.
+ * @property {boolean} ignoreCraftValue           Whether this recipe requires only material presence, ignoring
+ *                                                the crafting-value threshold entirely.
  * @property {Set<string>} unlockedFor           Actor UUIDs allowed to start this craft.
  * @property {boolean} openToAll                 Whether any actor may start this craft, ignoring `unlockedFor`.
  * @property {Record<string, number>} materialPrice  Required value of the selected materials, per denomination.

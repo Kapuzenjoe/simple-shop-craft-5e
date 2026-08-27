@@ -1,0 +1,91 @@
+<li class="item" data-index="{{ index }}"{{#if hasContextMenu}} data-id="{{ index }}"{{/if}}>
+    <div class="item-row">
+        <div class="item-name item-tooltip" {{#if uuid}}data-uuid="{{ uuid }}"{{/if}}>
+            {{> "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs"
+                img=img name=name subtitle=subtitle bundleSize=bundleSize }}
+        </div>
+        {{#if price}}
+        <div class="item-detail item-price">
+            {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=price}}
+        </div>
+        {{/if}}
+        <div class="item-detail item-quantity">
+            {{#if showQuantity}}
+            <a class="adjustment-button always-interactive" data-action="stepMaterialQuantity" data-index="{{ index }}"
+               {{#if itemId}}data-item-id="{{ itemId }}"{{/if}} data-step="-1"
+               aria-label="{{ localize 'DND5E.Decrease' }}">
+                <i class="fa-solid fa-minus" inert></i>
+            </a>
+            <span class="value">{{ quantityLabel }}</span>
+            <a class="adjustment-button always-interactive" data-action="stepMaterialQuantity" data-index="{{ index }}"
+               {{#if itemId}}data-item-id="{{ itemId }}"{{/if}} data-step="1"
+               aria-label="{{ localize 'DND5E.Increase' }}">
+                <i class="fa-solid fa-plus" inert></i>
+            </a>
+            {{else}}
+            {{#if quantityLabel}}
+            <span class="value">{{ quantityLabel }}</span>
+            {{/if}}
+            {{/if}}
+        </div>
+        <div class="item-detail item-controls always-visible">
+            {{#if requiredEditable}}
+            <button type="button" class="unbutton config-button item-control always-interactive{{#if required}} active{{/if}}"
+                    data-action="toggleMaterialRequired" data-index="{{ index }}" data-tooltip
+                    aria-label="{{ localize requiredTooltip }}">
+                <i class="fa-{{#if required}}solid{{else}}regular{{/if}} fa-star" inert></i>
+            </button>
+            {{/if}}
+            {{#unless requiredEditable}}
+            {{#if required}}
+            <i class="fa-solid fa-star item-control active" data-tooltip aria-label="{{ localize requiredTooltip }}" inert></i>
+            {{/if}}
+            {{/unless}}
+            {{#if removable}}
+            <button type="button" class="unbutton config-button item-control always-interactive"
+                    data-action="removeMaterial" data-index="{{ index }}"
+                    {{#if itemId}}data-item-id="{{ itemId }}"{{/if}} data-tooltip aria-label="{{ localize removeTooltip }}">
+                <i class="fa-solid fa-xmark" inert></i>
+            </button>
+            {{/if}}
+        </div>
+        {{#if hasContextMenu}}
+        <div class="item-detail item-controls always-visible">
+            <button type="button" class="unbutton config-button item-control always-interactive" data-context-menu
+                    aria-label="{{ localize 'DND5E.AdditionalControls' }}">
+                <i class="fa-solid fa-ellipsis-vertical" inert></i>
+            </button>
+        </div>
+        {{/if}}
+    </div>
+    {{#if candidates.length}}
+    <ol class="activities unlist">
+        {{#each candidates}}
+        <li class="activity-row item-row">
+            <div class="activity-name item-name item-tooltip rollable" data-action="openItemSheet"
+                 {{#if this.uuid}}data-uuid="{{ this.uuid }}"{{/if}} role="button" aria-label="{{ this.name }}">
+                {{ dnd5e-icon this.img alt=this.name classes="activity-image item-image gold-icon" }}
+                <div class="name name-stacked"><span class="title">{{ this.name }}</span></div>
+            </div>
+            <div class="item-detail item-price">
+                {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=this.price}}
+            </div>
+            <div class="item-detail item-quantity">
+                <a class="adjustment-button always-interactive" data-action="stepMaterialQuantity"
+                   data-index="{{ ../index }}" data-item-id="{{ this.id }}" data-step="-1"
+                   aria-label="{{ localize 'DND5E.Decrease' }}">
+                    <i class="fa-solid fa-minus" inert></i>
+                </a>
+                <span class="value">{{ this.selected }}</span>
+                <a class="adjustment-button always-interactive" data-action="stepMaterialQuantity"
+                   data-index="{{ ../index }}" data-item-id="{{ this.id }}" data-step="1"
+                   aria-label="{{ localize 'DND5E.Increase' }}">
+                    <i class="fa-solid fa-plus" inert></i>
+                </a>
+            </div>
+            <div class="item-detail item-controls"></div>
+        </li>
+        {{/each}}
+    </ol>
+    {{/if}}
+</li>

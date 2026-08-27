@@ -4,7 +4,7 @@
         <div class="items-header header">
             {{#each this.columns}}
             {{#if (eq this.id "name")}}
-            <h3 class="item-name">{{ localize ../label }}</h3>
+            <h3 class="item-name">{{ localize (ifThen this.label this.label ../label) }}</h3>
             {{else}}
             <div class="item-header item-{{ this.id }}">{{#if this.label}}{{ localize this.label }}{{/if}}</div>
             {{/if}}

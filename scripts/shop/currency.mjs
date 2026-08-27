@@ -49,7 +49,8 @@ export function currencyRows(amounts={}, namePrefix="", placeholders={}) {
 
 /**
  * Resolve an item's crafting cost — `CONFIG.DND5E.crafting.exceptions`/`.scrolls` for Potion of Healing
- * and Spell Scrolls, otherwise `item.system.getCraftCost()`.
+ * and Spell Scrolls, a copper-precise mundane-item calculation for non-magical items, otherwise
+ * `item.system.getCraftCost()`.
  * @param {Item5e} item
  * @returns {Promise<{ days: number, gold: number }>}
  */
@@ -59,6 +60,16 @@ export async function effectiveCraftCost(item) {
   if ( item.system.type?.value === "scroll" ) {
     const level = item.system.activities?.find(a => a.type === "cast")?.spell?.level;
     if ( (level != null) && scrolls[level] ) return scrolls[level];
+  }
+  if ( !item.system.properties?.has("mgc") || !item.system.rarity ) {
+    const { mundane } = CONFIG.DND5E.crafting;
+    const priceCP = item.system.price?.value
+      ? toCopper(item.system.price.value, item.system.price.denomination) : 0;
+    const copperPerGP = toCopper(1, "gp");
+    return {
+      days: Math.ceil((priceCP / copperPerGP) * mundane.days),
+      gold: Math.floor(priceCP * mundane.gold) / copperPerGP
+    };
   }
   return item.system.getCraftCost();
 }

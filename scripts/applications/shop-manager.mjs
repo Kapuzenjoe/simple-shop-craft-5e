@@ -119,7 +119,8 @@ export default class ShopManager extends Application5e {
         unlockedLabel: recipe.openToAll
           ? _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.UnlockedAll")
           : (recipe.unlockedFor.size ? String(recipe.unlockedFor.size) : ""),
-        type: targetResolved[index]?.item?.type ?? "unknown"
+        type: targetResolved[index]?.item?.type ?? "unknown",
+        bundleSize: (recipe.targetQuantity > 1) ? recipe.targetQuantity : null
       }))
       .toSorted((a, b) => a.displayName.localeCompare(b.displayName));
     const recipeGroups = new Map();

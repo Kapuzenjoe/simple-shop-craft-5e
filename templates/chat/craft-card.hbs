@@ -18,12 +18,15 @@
         </label>
         <div class="collapsible-content">
             <div class="wrapper">
-                <ul class="targets unlist">
+                <ul class="value-list unlist">
                     {{#each materialLines}}
-                    <li class="target">
+                    <li class="value-row">
                         <img class="gold-icon" src="{{ this.img }}" alt="{{ this.name }}">
                         <div class="name-stacked">
-                            <span class="title">{{ this.name }}</span>
+                            <span class="title">
+                                {{ this.name }}
+                                {{#if (gt this.quantity 1)}}<span class="bundle-size">(&times;{{ this.quantity }})</span>{{/if}}
+                            </span>
                         </div>
                     </li>
                     {{/each}}
@@ -36,8 +39,8 @@
     {{#if goldParts.length}}
     <hr>
     <div class="card-tray">
-        <ul class="targets unlist">
-            <li class="target">
+        <ul class="value-list unlist">
+            <li class="value-row">
                 <div class="name-stacked">
                     <span class="title">{{ localize "SIMPLE_SHOP_CRAFT_5E.GoldFilled" }}</span>
                 </div>

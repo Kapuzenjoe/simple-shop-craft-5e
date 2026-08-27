@@ -89,11 +89,15 @@ export function isShopPackSource(uuid) {
 /* -------------------------------------------- */
 
 /**
- * Stable key identifying an identifier/uuid-based entry — `uuid` when present, otherwise `identifier`.
- * @param {{ identifier?: string, uuid?: string }} entry
+ * Stable key identifying an identifier/uuid/criteria-based entry — `uuid` when present, otherwise `identifier`,
+ * otherwise a composite of the type/subtype criteria.
+ * @param {{ identifier?: string, uuid?: string, criteria?: object }} entry
  * @returns {string}
  */
 export function itemRefKey(entry) {
+  if ( entry.criteria?.type ) {
+    return `criteria:${entry.criteria.type}:${entry.criteria.subtype || ""}`;
+  }
   return entry.uuid || entry.identifier;
 }
 
@@ -108,6 +112,37 @@ export function itemRefKey(entry) {
 export function loadingTooltip(uuid) {
   if ( game.dnd5e.utils.loadingTooltip ) return game.dnd5e.utils.loadingTooltip({ uuid });
   return `<section class="loading" data-uuid="${uuid}"><i class="fas fa-spinner fa-spin-pulse" inert></i></section>`;
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Open an item's sheet, locking it read-only if the item isn't a persisted document in its own collection
+ * (e.g. a synthesized/unlinked item that would otherwise crash if edited).
+ * @param {Item5e} item
+ */
+export function openItemSheet(item) {
+  const sheet = item.sheet;
+  if ( !item.collection?.has(item.id) ) Object.defineProperty(sheet, "isEditable", { get: () => false });
+  sheet.render(true);
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Resolve the canonical bundle size (stack quantity, e.g. 20 for a stack of arrows) for a batch of owned
+ * items, via their `system.identifier` matched against the catalog. Items without a resolvable identifier,
+ * or whose catalog match isn't itself a multi-unit stack, resolve to 1.
+ * @param {Item5e[]} items
+ * @returns {Promise<Map<string, number>>}  Bundle size per item id.
+ */
+export async function resolveBundleSizes(items) {
+  const identifiers = new Set(items.map(i => i.system.identifier).filter(Boolean));
+  const byIdentifier = await resolveIdentifierIndex(identifiers);
+  return new Map(items.map(i => {
+    const catalogEntry = byIdentifier.get(i.system.identifier);
+    return [i.id, (catalogEntry?.system?.quantity > 1) ? catalogEntry.system.quantity : 1];
+  }));
 }
 
 /* -------------------------------------------- */
@@ -132,8 +167,9 @@ export async function resolveEntries(entries) {
 /* -------------------------------------------- */
 
 /**
- * Resolve a batch of `system.identifier`s against all currently active compendium sources.
- * Tries `module` sources first, then `system`, then `world`.
+ * Resolve a batch of `system.identifier`s against all currently active compendium sources, falling back to
+ * the world's Items directory. Tries `module` sources first, then `system`, then `world` compendiums, then
+ * the world's Items directory.
  * @param {Set<string>} identifiers
  * @returns {Promise<Map<string, object>>}  Matching index entry per identifier, when found.
  */
@@ -145,6 +181,25 @@ export async function resolveIdentifierIndex(identifiers) {
   const packsByPackageType = getPacksByPackageType();
   const remaining = new Set(identifiers);
 
+  const considerEntry = entry => {
+    const identifier = entry.system?.identifier;
+    if ( !identifier || !remaining.has(identifier) ) return;
+    if ( entry.system?.container ) return;
+    if ( !CONFIG.Item.dataModels[entry.type]?.inventorySection ) return;
+
+    const existing = byIdentifier.get(identifier);
+    if ( !existing ) {
+      byIdentifier.set(identifier, entry);
+      return;
+    }
+    const entryMatches = (entry.system?.source?.rules ?? rules) === rules;
+    const existingMatches = (existing.system?.source?.rules ?? rules) === rules;
+    if ( entryMatches && !existingMatches ) byIdentifier.set(identifier, entry);
+    else if ( entryMatches === existingMatches ) {
+      console.debug(`${MODULE_ID} | Multiple items share identifier "${identifier}":`, existing, entry);
+    }
+  };
+
   for ( const packageType of PACKAGE_TYPE_ORDER ) {
     if ( !remaining.size ) break;
     for ( const pack of packsByPackageType.get(packageType) ?? [] ) {
@@ -152,27 +207,12 @@ export async function resolveIdentifierIndex(identifiers) {
         "system.identifier", "system.source.rules", "system.price.value", "system.price.denomination",
         "system.weight.value", "system.weight.units", "system.quantity", "system.type.value"
       ] });
-      for ( const entry of index ) {
-        const identifier = entry.system?.identifier;
-        if ( !identifier || !remaining.has(identifier) ) continue;
-        if ( entry.system?.container ) continue;
-        if ( !CONFIG.Item.dataModels[entry.type]?.inventorySection ) continue;
-
-        const existing = byIdentifier.get(identifier);
-        if ( !existing ) {
-          byIdentifier.set(identifier, entry);
-          continue;
-        }
-        const entryMatches = (entry.system?.source?.rules ?? rules) === rules;
-        const existingMatches = (existing.system?.source?.rules ?? rules) === rules;
-        if ( entryMatches && !existingMatches ) byIdentifier.set(identifier, entry);
-        else if ( entryMatches === existingMatches ) {
-          console.debug(`${MODULE_ID} | Multiple items share identifier "${identifier}":`, existing, entry);
-        }
-      }
+      for ( const entry of index ) considerEntry(entry);
     }
     for ( const identifier of byIdentifier.keys() ) remaining.delete(identifier);
   }
+  if ( remaining.size ) for ( const item of game.items ) considerEntry(item);
+
   return byIdentifier;
 }
 

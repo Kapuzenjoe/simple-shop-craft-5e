@@ -16,10 +16,12 @@ export async function applyCraftStart(craft) {
   const itemsToDelete = [];
   for ( const line of craft.materialLines ) {
     const owned = actor.items.get(line.itemId);
-    if ( !owned || (owned.system.quantity < 1) ) {
+    if ( !owned || (owned.system.quantity < line.quantity) ) {
       return { ok: false, error: "SIMPLE_SHOP_CRAFT_5E.CraftCard.MissingMaterial" };
     }
-    if ( owned.system.quantity > 1 ) itemUpdates.push({ _id: owned.id, "system.quantity": owned.system.quantity - 1 });
+    if ( owned.system.quantity > line.quantity ) {
+      itemUpdates.push({ _id: owned.id, "system.quantity": owned.system.quantity - line.quantity });
+    }
     else itemsToDelete.push(owned.id);
   }
 

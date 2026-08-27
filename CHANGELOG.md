@@ -2,10 +2,20 @@
 
 ## 0.2.0
 
-- Added an automatic Arcana suggestion under a recipe's Skill Proficiencies whenever the target item is magical — pre-checked, but freely removable.
-- Fixed recipes/materials referencing a legacy (2014 Rules) item failing to resolve while playing with modern rules — the active ruleset is now only a preference between multiple matches, not a hard exclusion.
-- Fixed the shop's Settlement Cap custom value/currency fields being invisible and unusable on dnd5e 5.3.3.
-- Fixed clicking a generated (enchanted) item's name in the Buy/Sell table throwing a console error.
+- Added an automatic Arcana suggestion under a recipe's Skill Proficiencies when the target item is magical.
+- Fixed recipes/materials referencing a legacy (2014 Rules) item failing to resolve under modern rules.
+- Fixed the shop's Settlement Cap value fields being invisible on dnd5e 5.3.3.
+- Fixed clicking a generated item's name in the Buy/Sell table throwing an error.
+- Reworked the recipe material system:
+  - Added type/subtype/minimum-value rules as an alternative to fixed item references.
+  - Added a required quantity and a "Required" toggle per material.
+  - Added a crafting-value override per material, independent of its market price.
+  - Added an "Ignore Crafting Value" recipe option for material-presence-only crafting.
+  - Added interactive quantity selection for materials in the craft order.
+  - Added interactive quantity selection for target items.
+  - Changed the material tables to match the shop's Buy/Sell layout, with hover tooltips.
+  - Fixed world items (not from a compendium) sometimes not counting as owned.
+  - Fixed a few incorrect or missing hints about why a craft can't be started.
 
 ## 0.1.0
 

@@ -16,7 +16,19 @@ export class RecipeMaterial extends foundry.abstract.DataModel {
 
   /** @override */
   static defineSchema() {
-    return itemRefSchema();
+    return {
+      ...itemRefSchema(),
+      criteria: new SchemaField({
+        type: new StringField({ blank: true }),
+        subtype: new StringField({ blank: true })
+      }, { nullable: true, initial: null }),
+      required: new BooleanField({ initial: false }),
+      quantity: new NumberField({ initial: 1, integer: true, min: 1 }),
+      value: new SchemaField({
+        value: new NumberField({ initial: null, nullable: true, min: 0 }),
+        denomination: new StringField({ initial: () => CONFIG.DND5E.defaultCurrency })
+      })
+    };
   }
 }
 
@@ -49,8 +61,10 @@ export class Recipe extends foundry.abstract.DataModel {
       name: new StringField({ blank: true }),
       img: new FilePathField({ categories: ["IMAGE"], initial: () => Recipe.DEFAULT_ICON }),
       targetItem: new SchemaField(itemRefSchema()),
+      targetQuantity: new NumberField({ initial: 1, integer: true, min: 1 }),
       materials: new ArrayField(new EmbeddedDataField(RecipeMaterial)),
-      allowFreeformMaterials: new BooleanField({ initial: true }),
+      allowFreeformMaterials: new BooleanField({ initial: false }),
+      ignoreCraftValue: new BooleanField({ initial: false }),
       unlockedFor: new SetField(new DocumentUUIDField({ type: "Actor" })),
       openToAll: new BooleanField({ initial: false }),
       materialPrice: new ObjectField({ initial: {} }),

@@ -11,7 +11,7 @@ import {
   groupByType, groupSellItems, needsDefaultPrice, resolvePlayerOverride
 } from "../shop/pricing.mjs";
 import { resolveRestockUpdates } from "../shop/restock.mjs";
-import { buildItemTableSections, loadingTooltip, selectableActors } from "../utils.mjs";
+import { buildItemTableSections, loadingTooltip, openItemSheet, selectableActors } from "../utils.mjs";
 
 import GenerateItemDialog from "./generate-item-dialog.mjs";
 import HaggleDialog from "./haggle-dialog.mjs";
@@ -841,10 +841,7 @@ export default class ShopSheet extends Application5e {
   static async #openItemSheet(event, target) {
     const uuid = target.dataset.uuid;
     const item = uuid ? await fromUuid(uuid) : this.#findRowItem(target.dataset.key);
-    if ( !item ) return;
-    const sheet = item.sheet;
-    if ( !item.collection?.has(item.id) ) Object.defineProperty(sheet, "isEditable", { get: () => false });
-    sheet.render(true);
+    if ( item ) openItemSheet(item);
   }
 
   /* -------------------------------------------- */

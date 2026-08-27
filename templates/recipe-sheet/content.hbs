@@ -18,6 +18,7 @@
             </div>
         </li>
     </ol>
+    {{> "dnd5e.fieldlist" targetQuantityField}}
     {{else}}
     <button type="button" data-action="editTargetItem">
         {{ localize "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.PickTargetItem" }}
@@ -39,11 +40,24 @@
                 data-tooltip aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.RecipeEditor.AddMaterial' }}">
             <i class="fas fa-plus" inert></i>
         </button>
+        <button type="button" class="unbutton control-button" data-action="addMaterialCriteria"
+                data-tooltip aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.RecipeEditor.AddMaterialCriteria' }}">
+            <i class="fas fa-filter" inert></i>
+        </button>
     </legend>
     {{> "dnd5e.fieldlist" materialFields}}
     <section class="currency">
         {{> "modules/simple-shop-craft-5e/templates/partials/currency-inputs.hbs" rows=materialPriceRows}}
     </section>
+    <p class="hint{{#unless requiredValueMet}} warning{{/unless}}">
+        {{#if recipe.ignoreCraftValue}}
+        {{ localize "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.CraftValueIgnored" }}
+        {{else}}
+        {{ localize "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.RequiredMaterialsValue" }}:
+        {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=requiredValueParts}}
+        / {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=thresholdParts}}
+        {{/if}}
+    </p>
     {{> "modules/simple-shop-craft-5e/templates/partials/item-table.hbs" materialsTable}}
     <div class="drop-area" data-drop-area>
         <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.DropMaterialHint" }}</p>
