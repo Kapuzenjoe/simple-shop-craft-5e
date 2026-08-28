@@ -1,8 +1,8 @@
 import { MODULE_ID } from "../../config.mjs";
 import { Recipe, RecipeMaterial } from "../../data/recipe-data.mjs";
 import {
-  breakdownCopper, buildItemTableSections, currencyRows, effectiveCraftCost, getCurrencyOptions,
-  goldPoolCurrencies, isDefaultIdentifier, itemRefKey, loadingTooltip, resolveEntries, resolveIdentifierIndex,
+  applyLoadingTooltip, breakdownCopper, buildItemTableSections, currencyRows, effectiveCraftCost, getCurrencyOptions,
+  goldPoolCurrencies, isDefaultIdentifier, itemRefKey, resolveEntries, resolveIdentifierIndex,
   resolveItemPrice, subtypeOptions, toCopper
 } from "../../utils.mjs";
 import BaseShopConfig from "../shops/shop-config/base-shop-config.mjs";
@@ -41,7 +41,8 @@ export default class RecipeSheet extends Application5e {
       removeTargetItem: RecipeSheet.#removeTargetItem,
       stepMaterialQuantity: RecipeSheet.#stepMaterialQuantity,
       toggleMaterialRequired: RecipeSheet.#toggleMaterialRequired
-    }
+    },
+    recipeId: null
   };
 
   /* -------------------------------------------- */
@@ -133,8 +134,7 @@ export default class RecipeSheet extends Application5e {
     const thresholdCP = recipe.craftThreshold(context.craftCost, targetResolved.item);
 
     const materialsResolved = await resolveEntries(recipe.materials);
-    const materialRows = materialsResolved.map((r, index) => ({ ...r, index }))
-      .filter(r => r.item || r.entry.criteria?.type).map(r => {
+    const materialRows = materialsResolved.map((r, index) => ({ ...r, index })).map(r => {
         const shared = {
           index: r.index, required: r.entry.required, requiredEditable: true,
           requiredTooltip: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.MaterialRequired",
@@ -158,6 +158,14 @@ export default class RecipeSheet extends Application5e {
             subtitle: _loc("SIMPLE_SHOP_CRAFT_5E.MaterialRule")
           };
         }
+        if ( !r.item ) {
+          return {
+            ...shared, img: "icons/svg/hazard.svg",
+            name: r.entry.identifier || r.entry.uuid || _loc("SIMPLE_SHOP_CRAFT_5E.Unknown"),
+            subtitle: r.entry.identifier || null, price: null, valueCP: 0,
+            warning: true, warningTooltip: _loc("SIMPLE_SHOP_CRAFT_5E.RecipeEditor.UnresolvedWarning")
+          };
+        }
         return {
           ...shared, img: r.item.img, name: r.item.name, subtitle: r.entry.identifier || null,
           price, valueCP, warning: isDefaultIdentifier(r.item),
@@ -170,10 +178,9 @@ export default class RecipeSheet extends Application5e {
     context.thresholdParts = breakdownCopper(thresholdCP);
     context.requiredValueMet = recipe.ignoreCraftValue || (requiredSumCP >= thresholdCP);
     context.materialsTable = buildItemTableSections({
-      groups: materialRows.length ? [{ label: "", items: materialRows }] : [],
+      groups: materialRows.length ? [{ label: "SIMPLE_SHOP_CRAFT_5E.Material", items: materialRows }] : [],
       emptyLabel: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.MaterialsNone",
       columns: [
-        { id: "name", label: "SIMPLE_SHOP_CRAFT_5E.Material" },
         { id: "price", label: "DND5E.Price" },
         { id: "quantity", label: "DND5E.Quantity" }, { id: "controls" }, { id: "controls" }
       ],
@@ -237,6 +244,14 @@ export default class RecipeSheet extends Application5e {
   /* -------------------------------------------- */
 
   /** @inheritDoc */
+  async _onFirstRender(context, options) {
+    await super._onFirstRender(context, options);
+    new game.dnd5e.applications.ContextMenu5e(this.element, "[data-id]", this.#materialContextOptions(), { jQuery: false });
+  }
+
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
   async _onRender(context, options) {
     await super._onRender(context, options);
     if ( this.hasFrame ) this.window.title.innerText = this.title;
@@ -251,17 +266,7 @@ export default class RecipeSheet extends Application5e {
     });
     dropArea?.addEventListener("drop", event => this.#onDropItem(event));
 
-    this.element.querySelectorAll(".item-tooltip[data-uuid]").forEach(el => {
-      const uuid = el.dataset.uuid;
-      if ( !uuid ) return;
-      el.dataset.tooltipHtml = loadingTooltip(uuid);
-      el.dataset.tooltipClass = game.dnd5e.utils.loadingTooltip
-        ? "dnd5e2 dnd5e-tooltip item-tooltip"
-        : "dnd5e2 dnd5e-tooltip item-tooltip themed theme-light";
-      el.dataset.tooltipDirection ??= "LEFT";
-    });
-
-    new game.dnd5e.applications.ContextMenu5e(this.element, "[data-id]", this.#materialContextOptions(), { jQuery: false });
+    this.element.querySelectorAll(".item-tooltip[data-uuid]").forEach(applyLoadingTooltip);
   }
 
   /* -------------------------------------------- */
@@ -388,6 +393,7 @@ export default class RecipeSheet extends Application5e {
       if ( item ) {
         data.targetItem = await itemEntryRef(item);
         data.img = item.img;
+        data.targetQuantity = (item.system.quantity > 1) ? item.system.quantity : 1;
         const skillProficiencies = new Set(data.skillProficiencies ?? this.recipe.skillProficiencies);
         if ( item.system.properties?.has("mgc") ) skillProficiencies.add("arc");
         data.skillProficiencies = Array.from(skillProficiencies);
@@ -408,7 +414,6 @@ export default class RecipeSheet extends Application5e {
 
   /**
    * Build the entries for a material row's additional-controls context menu.
-   * @this {RecipeSheet}
    * @returns {ContextMenuEntry[]}
    */
   #materialContextOptions() {
@@ -436,7 +441,6 @@ export default class RecipeSheet extends Application5e {
 
   /**
    * Handle editing a fixed material's crafting-value override.
-   * @this {RecipeSheet}
    * @param {HTMLElement} target  Row element the context menu was triggered for.
    * @returns {Promise<void>}
    */
@@ -478,7 +482,6 @@ export default class RecipeSheet extends Application5e {
   /**
    * Handle editing a fixed material's identifier reference. Resolved the same way as any other identifier
    * (module compendiums, then system, then world compendiums, then the world's Items directory).
-   * @this {RecipeSheet}
    * @param {HTMLElement} target  Row element the context menu was triggered for.
    * @returns {Promise<void>}
    */

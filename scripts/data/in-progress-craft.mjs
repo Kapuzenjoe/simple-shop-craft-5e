@@ -4,6 +4,10 @@ import { deductActorCurrencyChecked, resolveEntries } from "../utils.mjs";
 const { DocumentUUIDField, NumberField, SchemaField, StringField } = foundry.data.fields;
 
 /**
+ * @import { InProgressCraftData } from "../_types.mjs";
+ */
+
+/**
  * Activity type used for the "Progress Craft" activity — generic, no combat mechanics.
  * @type {string}
  */
@@ -17,7 +21,8 @@ const PROGRESS_BLOCK_REGEX = /<div class="simple-shop-craft-5e craft-progress">[
 
 /**
  * A data model that represents a craft in progress, tracked via a consumable item's own flags.
- * @extends {foundry.abstract.DataModel}
+ * @extends {foundry.abstract.DataModel<InProgressCraftData>}
+ * @mixes InProgressCraftData
  */
 export class InProgressCraft extends foundry.abstract.DataModel {
 

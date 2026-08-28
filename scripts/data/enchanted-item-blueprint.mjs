@@ -3,6 +3,10 @@ import { excludeFilter, isShopPackSource } from "../utils.mjs";
 const { DocumentUUIDField, StringField } = foundry.data.fields;
 
 /**
+ * @import { EnchantedItemBlueprintData } from "../_types.mjs";
+ */
+
+/**
  * `CONFIG.DND5E` base-item registries per item type, restricting enchant base-item search to real
  * catalog items instead of anything merely tagged with a matching `system.type.value`.
  * @type {Record<string, () => Record<string, string>>}
@@ -16,7 +20,8 @@ const BASE_ITEM_REGISTRIES = {
 /**
  * A data model that represents a shop entry's enchant-generation blueprint — a base item combined with an
  * enchantment profile from a separate enchant item, synthesized fresh into a non-persisted Item on resolve.
- * @extends {foundry.abstract.DataModel}
+ * @extends {foundry.abstract.DataModel<EnchantedItemBlueprintData>}
+ * @mixes EnchantedItemBlueprintData
  */
 export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
 

@@ -2,7 +2,7 @@ import { HOURS_PER_USE } from "../../config.mjs";
 import { CraftMessageData } from "../../data/craft-message.mjs";
 import { Recipe } from "../../data/recipe-data.mjs";
 import {
-  breakdownCopper, buildItemTableSections, effectiveCraftCost, loadingTooltip, needsDefaultPrice, openItemSheet,
+  applyLoadingTooltip, breakdownCopper, buildItemTableSections, effectiveCraftCost, needsDefaultPrice, openItemSheet,
   resolveBundleSizes, resolveEntries, resolveItemPrice, selectableActors, subtypeOptions, toCopper
 } from "../../utils.mjs";
 
@@ -38,7 +38,8 @@ export default class CraftStartDialog extends Dialog5e {
       removeMaterial: CraftStartDialog.#removeFreeformMaterial,
       stepMaterialQuantity: CraftStartDialog.#stepMaterialCandidate,
       startCraft: CraftStartDialog.#startCraft
-    }
+    },
+    recipeId: null
   };
 
   /* -------------------------------------------- */
@@ -164,15 +165,7 @@ export default class CraftStartDialog extends Dialog5e {
     });
     dropArea?.addEventListener("drop", event => this.#onDropItem(event));
 
-    this.element.querySelectorAll(".item-tooltip[data-uuid]").forEach(el => {
-      const uuid = el.dataset.uuid;
-      if ( !uuid ) return;
-      el.dataset.tooltipHtml = loadingTooltip(uuid);
-      el.dataset.tooltipClass = game.dnd5e.utils.loadingTooltip
-        ? "dnd5e2 dnd5e-tooltip item-tooltip"
-        : "dnd5e2 dnd5e-tooltip item-tooltip themed theme-light";
-      el.dataset.tooltipDirection ??= "LEFT";
-    });
+    this.element.querySelectorAll(".item-tooltip[data-uuid]").forEach(applyLoadingTooltip);
   }
 
   /* -------------------------------------------- */
@@ -211,6 +204,7 @@ export default class CraftStartDialog extends Dialog5e {
     context.toolProficient = state.proficient;
     context.toolOwned = state.toolOwned;
     context.skillProficient = state.skillProficient;
+    context.skillRequired = state.skillRequired;
     context.chosenToolKey = state.chosenToolKey;
 
     context.toolLabel = null;
@@ -331,10 +325,12 @@ export default class CraftStartDialog extends Dialog5e {
         };
       }
       const materialIdentifier = item?.system?.identifier || entry.identifier;
-      const owned = (actor && materialIdentifier)
-        ? actor.items.find(i => i.system.identifier === materialIdentifier)
-        : null;
-      const maxUnits = owned ? Math.min(owned.system.quantity, entry.quantity) : 0;
+      const ownedStacks = (actor && materialIdentifier)
+        ? actor.items.filter(i => i.system.identifier === materialIdentifier)
+        : [];
+      const owned = ownedStacks[0] ?? null;
+      const ownedQuantity = ownedStacks.reduce((sum, i) => sum + i.system.quantity, 0);
+      const maxUnits = Math.min(ownedQuantity, entry.quantity);
       const overrideKey = owned ? `${index}:${owned.id}` : null;
       const suppliedUnits = owned ? Math.min(this.#materialQuantities.get(overrideKey) ?? 0, maxUnits) : 0;
       const itemBundleSize = (item?.system?.quantity > 1) ? item.system.quantity : 1;
@@ -343,8 +339,8 @@ export default class CraftStartDialog extends Dialog5e {
         : (owned ? materialValueCP(owned, itemBundleSize) : 0);
       const ownedPrice = owned ? resolveItemPrice(owned) : null;
       return {
-        name: item?.name ?? entry.identifier ?? entry.uuid, img: item?.img, item: owned,
-        required: entry.required, quantity: entry.quantity, suppliedUnits, ownedQuantity: owned?.system.quantity ?? 0,
+        name: item?.name ?? entry.identifier ?? entry.uuid, img: item?.img, item: owned, ownedStacks,
+        required: entry.required, quantity: entry.quantity, suppliedUnits, ownedQuantity,
         suppliedLineCP: suppliedUnits * itemValueCP, slotMet: suppliedUnits >= entry.quantity,
         priceOverride: (entry.value?.value != null) ? entry.value : (ownedPrice
           ? { value: ownedPrice.value / itemBundleSize, denomination: ownedPrice.denomination }
@@ -384,8 +380,9 @@ export default class CraftStartDialog extends Dialog5e {
 
     const skillKeys = Array.from(recipe.skillProficiencies);
     const skillProficient = !!actor && skillKeys.some(k => (actor.system.skills[k]?.value ?? 0) > 0);
+    const skillEligible = !skillKeys.length || skillProficient;
 
-    const canStart = !!actor && !!targetItem && (toolEligible || skillProficient) && requiredMet
+    const canStart = !!actor && !!targetItem && toolEligible && skillEligible && requiredMet
       && (materialsMet || (this.#fillWithGold && !goldInsufficient));
 
     const totalHours = recipe.durationOverride.value != null
@@ -396,7 +393,8 @@ export default class CraftStartDialog extends Dialog5e {
     return {
       recipe, actor, targetItem, craftCost, fixedLines, freeformItems,
       suppliedCP, thresholdCP, shortfallCP, materialsMet, goldCP, goldInsufficient,
-      toolKeys, chosenToolKey, proficient, toolOwned, toolEligible, skillProficient, canStart, totalHours,
+      toolKeys, chosenToolKey, proficient, toolOwned, toolEligible, skillProficient,
+      skillRequired: skillKeys.length > 0, canStart, totalHours,
       hoursPerUse, weight, halfPrice, requiredMet, requiredAvailable
     };
   }
@@ -446,7 +444,8 @@ export default class CraftStartDialog extends Dialog5e {
   static #stepMaterialCandidate(event, target) {
     const key = `${target.dataset.index}:${target.dataset.itemId}`;
     const step = Number(target.dataset.step);
-    this.#materialQuantities.set(key, Math.max(0, (this.#materialQuantities.get(key) ?? 0) + step));
+    const max = Number(target.dataset.max ?? Infinity);
+    this.#materialQuantities.set(key, Math.min(max, Math.max(0, (this.#materialQuantities.get(key) ?? 0) + step)));
     this.render({ parts: ["content", "footer"] });
   }
 
@@ -478,7 +477,7 @@ export default class CraftStartDialog extends Dialog5e {
       ...state.fixedLines.flatMap(l => l.criteria
         ? l.candidates.filter(c => c.selected > 0)
           .map(c => ({ item: state.actor.items.get(c.id), quantity: c.selected }))
-        : ((l.item && (l.suppliedUnits > 0)) ? [{ item: l.item, quantity: l.suppliedUnits }] : [])),
+        : distributeAcrossStacks(l.ownedStacks, l.suppliedUnits)),
       ...state.freeformItems.map(item => ({ item, quantity: 1 }))
     ];
     await CraftMessageData.create({
@@ -517,11 +516,12 @@ function buildMaterialsTable(state) {
     return {
       ...shared, img: line.img, name: line.name, uuid: line.item?.uuid ?? null, price,
       showQuantity: !!line.item, quantity: line.suppliedUnits, itemId: line.item?.id ?? null,
-      quantityLabel: line.item ? line.suppliedUnits : null,
+      maxUnits: line.item ? Math.min(line.ownedQuantity, line.quantity) : 0,
+      quantityLabel: !line.item ? null : (line.required ? `${line.suppliedUnits}/${line.quantity}` : line.suppliedUnits),
       subtitle: (line.ownedQuantity >= line.quantity)
         ? null
         : (line.ownedQuantity > 0
-          ? game.i18n.format("SIMPLE_SHOP_CRAFT_5E.CraftStart.MaterialInsufficient",
+          ? _loc("SIMPLE_SHOP_CRAFT_5E.CraftStart.MaterialInsufficient",
             { owned: line.ownedQuantity, required: line.quantity })
           : _loc("SIMPLE_SHOP_CRAFT_5E.CraftStart.MaterialMissing"))
     };
@@ -534,15 +534,35 @@ function buildMaterialsTable(state) {
   }
 
   return buildItemTableSections({
-    groups: rows.length ? [{ label: "", items: rows }] : [],
+    groups: rows.length ? [{ label: "SIMPLE_SHOP_CRAFT_5E.Material", items: rows }] : [],
     emptyLabel: "SIMPLE_SHOP_CRAFT_5E.CraftStart.MaterialsNone",
     columns: [
-      { id: "name", label: "SIMPLE_SHOP_CRAFT_5E.Material" },
       { id: "price", label: "DND5E.Price" },
       { id: "quantity", label: "DND5E.Quantity" }, { id: "controls" }
     ],
     rowTemplate: "modules/simple-shop-craft-5e/templates/partials/material-row.hbs"
   });
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Distribute a required quantity across an owned material's stacks, consuming each in order (by owned
+ * item collection order) until the quantity is satisfied or the stacks run out.
+ * @param {Item5e[]} stacks
+ * @param {number} quantity
+ * @returns {{ item: Item5e, quantity: number }[]}
+ */
+function distributeAcrossStacks(stacks, quantity) {
+  const lines = [];
+  let remaining = quantity;
+  for ( const stack of stacks ) {
+    if ( remaining <= 0 ) break;
+    const take = Math.min(stack.system.quantity, remaining);
+    if ( take > 0 ) lines.push({ item: stack, quantity: take });
+    remaining -= take;
+  }
+  return lines;
 }
 
 /* -------------------------------------------- */

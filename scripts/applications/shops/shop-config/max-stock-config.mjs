@@ -29,7 +29,10 @@ export default class MaxStockConfig extends BaseShopConfig {
     id: "max-stock-config-{id}",
     window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.StockMax" },
     position: { width: 480 },
-    form: { handler: MaxStockConfig.#onSubmit }
+    form: { handler: MaxStockConfig.#onSubmit },
+    shopSheet: null,
+    entryKey: null,
+    onUpdate: null
   };
 
   /**

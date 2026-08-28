@@ -43,7 +43,9 @@ export default class GenerateItemDialog extends Dialog5e {
     ],
     actions: {
       generate: GenerateItemDialog.#generate
-    }
+    },
+    shopSheet: null,
+    onGenerated: null
   };
 
   /* -------------------------------------------- */

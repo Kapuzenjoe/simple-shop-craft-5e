@@ -235,6 +235,23 @@ export function loadingTooltip(uuid) {
 /* -------------------------------------------- */
 
 /**
+ * Wire an element's loading-tooltip dataset attributes, keyed by its `data-uuid`. No-op if the element
+ * has no `data-uuid`.
+ * @param {HTMLElement} el
+ */
+export function applyLoadingTooltip(el) {
+  const uuid = el.dataset.uuid;
+  if ( !uuid ) return;
+  el.dataset.tooltipHtml = loadingTooltip(uuid);
+  el.dataset.tooltipClass = game.dnd5e.utils.loadingTooltip
+    ? "dnd5e2 dnd5e-tooltip item-tooltip"
+    : "dnd5e2 dnd5e-tooltip item-tooltip themed theme-light";
+  el.dataset.tooltipDirection ??= "LEFT";
+}
+
+/* -------------------------------------------- */
+
+/**
  * Whether an item's own price is unset, meaning a rarity-based fallback price is being shown for it
  * instead.
  * @param {Item5e|null} item
@@ -335,7 +352,7 @@ export async function resolveIdentifierIndex(identifiers) {
     for ( const pack of packsByPackageType.get(packageType) ?? [] ) {
       const index = await pack.getIndex({ fields: [
         "system.identifier", "system.source.rules", "system.price.value", "system.price.denomination",
-        "system.weight.value", "system.weight.units", "system.quantity", "system.type.value"
+        "system.weight.value", "system.weight.units", "system.quantity", "system.type.value", "system.rarity"
       ] });
       for ( const entry of index ) considerEntry(entry);
     }
@@ -467,4 +484,25 @@ function getPacksByPackageType() {
     packsByPackageType.get(packageType).push(pack);
   }
   return packsByPackageType;
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Define a set of template paths to pre-load. Pre-loaded templates are compiled and cached for fast access when
+ * rendering.
+ * @returns {Promise}
+ */
+export async function preloadHandlebarsTemplates() {
+  return foundry.applications.handlebars.loadTemplates([
+    "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs",
+    "modules/simple-shop-craft-5e/templates/partials/currency-inputs.hbs",
+    "modules/simple-shop-craft-5e/templates/partials/item-table.hbs",
+    "modules/simple-shop-craft-5e/templates/partials/material-row.hbs",
+    "modules/simple-shop-craft-5e/templates/shop-manager/recipe-row.hbs",
+    "modules/simple-shop-craft-5e/templates/shop-manager/shop-row.hbs",
+    "modules/simple-shop-craft-5e/templates/shop-sheet/buy-row.hbs",
+    "modules/simple-shop-craft-5e/templates/shop-sheet/sell-row.hbs",
+    "modules/simple-shop-craft-5e/templates/shop-sheet/players-dialog-row.hbs"
+  ]);
 }

@@ -24,7 +24,8 @@ export default class ShopCart extends Dialog5e {
     classes: ["simple-shop-craft-5e", "shop-cart", "standard-form"],
     window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopCart.Title", resizable: true },
     position: { width: 400 },
-    form: { handler: ShopCart.#onSubmit, closeOnSubmit: false }
+    form: { handler: ShopCart.#onSubmit, closeOnSubmit: false },
+    shopSheet: null
   };
 
   /* -------------------------------------------- */

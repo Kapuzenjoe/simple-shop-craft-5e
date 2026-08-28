@@ -1,9 +1,14 @@
 const { DocumentUUIDField } = foundry.data.fields;
 
 /**
+ * @import { SpellScrollBlueprintData } from "../_types.mjs";
+ */
+
+/**
  * A data model that represents a shop entry's spell-scroll blueprint — a spell synthesized fresh into a
  * non-persisted scroll Item on resolve, with a unique per-level, per-spell identifier.
- * @extends {foundry.abstract.DataModel}
+ * @extends {foundry.abstract.DataModel<SpellScrollBlueprintData>}
+ * @mixes SpellScrollBlueprintData
  */
 export class SpellScrollBlueprint extends foundry.abstract.DataModel {
 

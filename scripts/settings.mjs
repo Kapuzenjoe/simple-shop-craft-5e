@@ -28,9 +28,7 @@ const SETTINGS = [
 /* -------------------------------------------- */
 
 /**
- * Register all module settings and the GM-relay queries needed to write them from a non-GM client,
- * since world settings can only be written by a GM. Loads {@link Shop}/{@link ShopSheet} lazily so
- * neither is pulled in until a request is actually received.
+ * Register all module settings and the GM-relay queries used to write them from a non-GM client.
  */
 export function registerSettings() {
   for ( const { key, ...data } of SETTINGS ) {
@@ -39,7 +37,6 @@ export function registerSettings() {
 
   CONFIG.queries[`${MODULE_ID}.updateShop`] = async ({ shopId, updateData }) => {
     if ( !game.user.isGM ) return;
-    const { Shop } = await import("./data/shop-data.mjs");
     await Shop.update(shopId, updateData);
   };
 

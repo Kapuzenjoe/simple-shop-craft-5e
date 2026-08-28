@@ -29,7 +29,8 @@ export default class ShopCreateDialog extends Dialog5e {
     buttons: [
       { action: "create", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Create", icon: "fas fa-plus", default: true }
     ],
-    form: { handler: ShopCreateDialog.#onSubmit }
+    form: { handler: ShopCreateDialog.#onSubmit },
+    shopManager: null
   };
 
   /* -------------------------------------------- */

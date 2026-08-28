@@ -30,7 +30,10 @@ export default class PlayersConfig extends BaseShopConfig {
     actions: {
       removePlayerDiscount: PlayersConfig.#removePlayerDiscount,
       resetHaggling: PlayersConfig.#resetHaggling
-    }
+    },
+    shopSheet: null,
+    onUpdate: null,
+    onUpdatePlayerDiscount: null
   };
 
   /** @override */
@@ -86,7 +89,6 @@ export default class PlayersConfig extends BaseShopConfig {
       sections: [{
         label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Player",
         columns: [
-          { id: "name" },
           { id: "discount", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Buy" },
           { id: "discount", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Sell" },
           { id: "controls" }

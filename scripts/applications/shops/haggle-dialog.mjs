@@ -26,7 +26,9 @@ export default class HaggleDialog extends Dialog5e {
     buttons: [
       { action: "roll", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.HagglingRoll", icon: "fa-solid fa-dice-d20", default: true }
     ],
-    form: { handler: HaggleDialog.#onSubmit }
+    form: { handler: HaggleDialog.#onSubmit },
+    shopSheet: null,
+    onUpdatePlayerDiscount: null
   };
 
   /* -------------------------------------------- */

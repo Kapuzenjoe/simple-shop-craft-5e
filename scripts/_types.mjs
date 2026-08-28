@@ -129,3 +129,99 @@
  * @property {number|null} durationOverride.value  Manual override amount. `null` uses the rules-based value.
  * @property {string} durationOverride.units       Unit for the override (`minute`, `hour`, or `day`).
  */
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef InProgressCraftData
+ * @property {string} recipeId                 Id of the recipe this craft was started from.
+ * @property {object} targetItem
+ * @property {string} [targetItem.identifier]  Stable `system.identifier` of the item this craft produces.
+ * @property {string} [targetItem.uuid]        Direct UUID reference, used when no `system.identifier` match exists.
+ * @property {string} activityId               Id of the "Progress Craft" activity on the tracked item.
+ * @property {number} totalHours               Total progress hours needed to finish the craft.
+ * @property {number|null} hoursPerUse         Progress hours added per activation. `null` uses the module default.
+ * @property {number} progress                 Progress hours accumulated so far.
+ */
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef EnchantedItemBlueprintData
+ * @property {string} baseItemUuid      UUID of the base item the enchantment is applied to.
+ * @property {string} enchantItemUuid   UUID of the item granting the enchantment.
+ * @property {string} effectId          Id of the specific enchantment effect applied.
+ */
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef SpellScrollBlueprintData
+ * @property {string} spellUuid  UUID of the spell the scroll casts.
+ */
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef CraftMaterialLine
+ * @property {string} itemId    Id of the contributed item.
+ * @property {string} name      Display name of the contributed item.
+ * @property {string} img       Image path of the contributed item.
+ * @property {number} quantity  Quantity contributed from this item.
+ */
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef CurrencyPart
+ * @property {string} denomination  Currency denomination.
+ * @property {number} value         Amount in this denomination.
+ */
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef PurchaseBuyLine
+ * @property {string} [identifier]                         Stable `system.identifier` of the referenced item.
+ * @property {string} [uuid]                                Direct UUID reference, used when no `system.identifier`
+ *                                                          match exists.
+ * @property {EnchantedItemBlueprintData|null} generated    Enchant-generation blueprint, `null` for normal items.
+ * @property {SpellScrollBlueprintData|null} spellScroll    Spell-scroll blueprint, `null` for normal items.
+ * @property {string} name                                  Display name of the purchased item.
+ * @property {string} img                                   Image path of the purchased item.
+ * @property {number} quantity                              Quantity purchased.
+ * @property {number} priceCP                                Price per unit, in copper.
+ * @property {number} bundleSize                             Units the listed price buys (e.g. 20 for a bundle).
+ * @property {CurrencyPart[]} subtotal                       Line subtotal, broken down by denomination.
+ */
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef PurchaseSellLine
+ * @property {string} itemId           Id of the sold item.
+ * @property {string} identifier       Stable `system.identifier` of the sold item.
+ * @property {string} name             Display name of the sold item.
+ * @property {string} img              Image path of the sold item.
+ * @property {number} quantity         Quantity sold.
+ * @property {number} priceCP          Price per unit, in copper.
+ * @property {CurrencyPart[]} subtotal Line subtotal, broken down by denomination.
+ */
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef GeneratorCandidate
+ * @property {"item"|"spell"} kind
+ * @property {object} index
+ */
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef SpellFilter
+ * @property {Set<string>|null} schools
+ * @property {boolean} ritualOnly
+ * @property {Set<string>|null} classes
+ * @property {Set<number>|null} levels
+ */

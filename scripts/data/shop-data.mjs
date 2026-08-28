@@ -15,7 +15,7 @@ const {
 } = foundry.data.fields;
 
 /**
- * @import { ShopPlayerDiscountData, ShopItemEntryData, ShopData } from "../_types.mjs";
+ * @import { ShopPlayerDiscountData, ShopItemEntryData, ShopData, GeneratorCandidate, SpellFilter } from "../_types.mjs";
  */
 
 /**
@@ -254,22 +254,6 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
     return null;
   }
 }
-
-/**
- * @typedef {object} GeneratorCandidate
- * @property {"item"|"spell"} kind
- * @property {object} index
- */
-
-/**
- * @typedef {object} SpellFilter
- * @property {Set<string>|null} schools
- * @property {boolean} ritualOnly
- * @property {Set<string>|null} classes
- * @property {Set<number>|null} levels
- */
-
-/* -------------------------------------------- */
 
 /**
  * A data model that represents a per-actor discount override for a shop.

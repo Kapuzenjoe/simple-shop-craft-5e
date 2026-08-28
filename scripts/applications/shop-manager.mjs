@@ -82,7 +82,6 @@ export default class ShopManager extends Application5e {
       template: "modules/simple-shop-craft-5e/templates/shop-manager/shop-row.hbs"
     }));
     const columns = [
-      { id: "name" },
       { id: "npc", label: "SIMPLE_SHOP_CRAFT_5E.Owner" },
       { id: "openingHours", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.OpeningHours" },
       { id: "active", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Status" },
@@ -125,7 +124,7 @@ export default class ShopManager extends Application5e {
     context.recipeTable = buildItemTableSections({
       groups: finalizeGroups(recipeGroups),
       emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.None",
-      columns: [{ id: "name" }, { id: "unlocked", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Unlocked" }, { id: "controls" }],
+      columns: [{ id: "unlocked", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Unlocked" }, { id: "controls" }],
       rowTemplate: "modules/simple-shop-craft-5e/templates/shop-manager/recipe-row.hbs"
     });
     return context;
@@ -161,20 +160,6 @@ export default class ShopManager extends Application5e {
       },
       jQuery: false
     });
-  }
-
-  /* -------------------------------------------- */
-  /*  Event Listeners and Handlers                */
-  /* -------------------------------------------- */
-
-  /** @inheritDoc */
-  _attachPartListeners(partId, htmlElement, options) {
-    super._attachPartListeners(partId, htmlElement, options);
-    if ( ["shops", "recipes"].includes(partId) ) {
-      htmlElement.querySelectorAll("[data-context-menu]").forEach(control => {
-        return control.addEventListener("click", game.dnd5e.applications.ContextMenu5e.triggerEvent);
-      });
-    }
   }
 
   /* -------------------------------------------- */

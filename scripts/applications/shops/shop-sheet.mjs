@@ -2,7 +2,7 @@ import { MODULE_ID } from "../../config.mjs";
 import { Shop, ShopItemEntry } from "../../data/shop-data.mjs";
 import { calendariaWeekdayOptions, isCalendariaActive } from "../../integrations/calendaria.mjs";
 import {
-  breakdownCopper, buildItemTableSections, finalizeGroups, isDnd5eAutoRecoveryEnabled, loadingTooltip,
+  applyLoadingTooltip, breakdownCopper, buildItemTableSections, finalizeGroups, isDnd5eAutoRecoveryEnabled,
   needsDefaultPrice, openItemSheet, resolveItemPrice, selectableActors, toCopper
 } from "../../utils.mjs";
 
@@ -30,7 +30,6 @@ const { Application5e } = game.dnd5e.applications.api;
  */
 const BUY_COLUMNS = [
   { id: "cart", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.CartQuantity" },
-  { id: "name" },
   { id: "discount", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.PriceModifier" },
   { id: "price", label: "DND5E.Price" },
   { id: "weight", label: "DND5E.Weight" },
@@ -44,7 +43,6 @@ const BUY_COLUMNS = [
  */
 const SELL_COLUMNS = [
   { id: "cart", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SellQuantity" },
-  { id: "name" },
   { id: "discount", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.PriceModifier" },
   { id: "price", label: "DND5E.Price" },
   { id: "weight", label: "DND5E.Weight" },
@@ -80,11 +78,22 @@ export default class ShopSheet extends Application5e {
   /** @override */
   static DEFAULT_OPTIONS = {
     id: "shop-sheet-{id}",
+    shopId: null,
     classes: ["sheet", "simple-shop-craft-5e", "shop-sheet", "standard-form"],
     tag: "form",
     window: {
       title: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Title",
-      resizable: true
+      resizable: true,
+      controls: [
+        { action: "renameShop", icon: "fa-solid fa-pen", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.RenameShop",
+          visible: ShopSheet.#isEditable },
+        { action: "toggleActive", icon: "fa-solid fa-toggle-on", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Deactivate",
+          visible: ShopSheet.#canDeactivate },
+        { action: "toggleActive", icon: "fa-solid fa-toggle-off", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Activate",
+          visible: ShopSheet.#canActivate },
+        { action: "spotlight", icon: "fa-solid fa-bullhorn", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Spotlight",
+          visible: ShopSheet.#isEditable }
+      ]
     },
     position: {
       width: 850,
@@ -325,21 +334,35 @@ export default class ShopSheet extends Application5e {
 
   /* -------------------------------------------- */
 
-  /** @inheritDoc */
-  _getHeaderControls() {
-    const controls = super._getHeaderControls();
-    if ( !this.isEditable ) return controls;
-    return [
-      ...controls,
-      { icon: "fa-solid fa-pen", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.RenameShop", action: "renameShop" },
-      {
-        icon: this.shop.active ? "fa-solid fa-toggle-on" : "fa-solid fa-toggle-off",
-        label: this.shop.active
-          ? "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Deactivate" : "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Activate",
-        action: "toggleActive"
-      },
-      { icon: "fa-solid fa-bullhorn", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Spotlight", action: "spotlight" }
-    ];
+  /**
+   * Whether shop-editing header controls (rename, spotlight) should be visible.
+   * @this {ShopSheet}
+   * @returns {boolean}
+   */
+  static #isEditable() {
+    return this.isEditable;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Whether the "Deactivate" header control should be visible.
+   * @this {ShopSheet}
+   * @returns {boolean}
+   */
+  static #canDeactivate() {
+    return this.isEditable && this.shop.active;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Whether the "Activate" header control should be visible.
+   * @this {ShopSheet}
+   * @returns {boolean}
+   */
+  static #canActivate() {
+    return this.isEditable && !this.shop.active;
   }
 
   /* -------------------------------------------- */
@@ -395,57 +418,107 @@ export default class ShopSheet extends Application5e {
   async _preparePartContext(partId, context, options) {
     context = await super._preparePartContext(partId, context, options);
     context.tab = context.tabs?.[partId];
-    if ( partId === "footer" ) {
-      context.buttons = [{
-        type: "button", action: "openCart", icon: "fas fa-basket-shopping",
-        label: "SIMPLE_SHOP_CRAFT_5E.ShopCart.ViewCart", cssClass: "always-interactive"
-      }];
+    switch ( partId ) {
+      case "footer": context = await this._prepareFooterContext(context, options); break;
+      case "description": context = await this._prepareDescriptionContext(context, options); break;
+      case "buy": context = await this._prepareBuyContext(context, options); break;
+      case "sell": context = await this._prepareSellContext(context, options); break;
     }
-    if ( partId === "description" ) {
-      context.shopFields = Shop.schema.fields;
-      context.openingHoursDisplay = context.shop.openingHoursDisplay();
-      context.statusOverrideOptions = [
-        { value: "", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StatusOverrideAuto") },
-        { value: "open", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StatusOverrideOpen") },
-        { value: "closed", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StatusOverrideClosed") }
-      ];
-      context.restockCalendarActive = isCalendariaActive() || isDnd5eAutoRecoveryEnabled();
-      context.restockWeekdayOptions = isCalendariaActive()
-        ? calendariaWeekdayOptions()
-        : game.time.calendar.days.values.map((day, value) => ({ value, label: _loc(day.name) }));
-      context.restockWeekdays = Array.from(context.shop.restockWeekdays);
-      const selectedNames = context.restockWeekdayOptions
-        .filter(o => context.shop.restockWeekdays.has(o.value)).map(o => o.label);
-      context.restockWeekdaysDisplay = selectedNames.length
-        ? selectedNames.join(", ") : _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.AutoRestockNever");
+    return context;
+  }
 
-      context.closedWeekdays = Array.from(context.shop.closedWeekdays);
-      const closedWeekdayNames = context.restockWeekdayOptions
-        .filter(o => context.shop.closedWeekdays.has(o.value)).map(o => o.label);
-      context.closedWeekdaysDisplay = closedWeekdayNames.join(", ");
+  /* -------------------------------------------- */
 
-      context.festivalOptions = festivalOptions();
-      context.closedFestivals = Array.from(context.shop.closedFestivals);
-      const closedFestivalNames = context.festivalOptions
-        .filter(o => context.shop.closedFestivals.has(o.value)).map(o => o.label);
-      context.closedFestivalsDisplay = closedFestivalNames.join(", ");
-    }
-    if ( partId === "buy" ) {
-      context.tabId = "buy";
-      context.table = buildItemTableSections({
-        groups: context.groups, emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.None", columns: BUY_COLUMNS,
-        rowTemplate: "modules/simple-shop-craft-5e/templates/shop-sheet/buy-row.hbs"
-      });
-    }
-    if ( partId === "sell" ) {
-      context.tabId = "sell";
-      context.showNoActor = !context.actor;
-      context.noActorLabel = "SIMPLE_SHOP_CRAFT_5E.NoActorSelectedHint";
-      context.table = buildItemTableSections({
-        groups: context.sellGroups, emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoSellableItems",
-        columns: SELL_COLUMNS, rowTemplate: "modules/simple-shop-craft-5e/templates/shop-sheet/sell-row.hbs"
-      });
-    }
+  /**
+   * Prepare rendering context for the footer part.
+   * @param {ApplicationRenderContext} context  Context being prepared.
+   * @param {HandlebarsRenderOptions} options   Options which configure application rendering behavior.
+   * @returns {ApplicationRenderContext}
+   * @protected
+   */
+  async _prepareFooterContext(context, options) {
+    context.buttons = [{
+      type: "button", action: "openCart", icon: "fas fa-basket-shopping",
+      label: "SIMPLE_SHOP_CRAFT_5E.ShopCart.ViewCart", cssClass: "always-interactive"
+    }];
+    return context;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Prepare rendering context for the description tab.
+   * @param {ApplicationRenderContext} context  Context being prepared.
+   * @param {HandlebarsRenderOptions} options   Options which configure application rendering behavior.
+   * @returns {ApplicationRenderContext}
+   * @protected
+   */
+  async _prepareDescriptionContext(context, options) {
+    context.shopFields = Shop.schema.fields;
+    context.openingHoursDisplay = context.shop.openingHoursDisplay();
+    context.statusOverrideOptions = [
+      { value: "", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StatusOverrideAuto") },
+      { value: "open", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StatusOverrideOpen") },
+      { value: "closed", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StatusOverrideClosed") }
+    ];
+    context.restockCalendarActive = isCalendariaActive() || isDnd5eAutoRecoveryEnabled();
+    context.restockWeekdayOptions = isCalendariaActive()
+      ? calendariaWeekdayOptions()
+      : game.time.calendar.days.values.map((day, value) => ({ value, label: _loc(day.name) }));
+    context.restockWeekdays = Array.from(context.shop.restockWeekdays);
+    const selectedNames = context.restockWeekdayOptions
+      .filter(o => context.shop.restockWeekdays.has(o.value)).map(o => o.label);
+    context.restockWeekdaysDisplay = selectedNames.length
+      ? selectedNames.join(", ") : _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.AutoRestockNever");
+
+    context.closedWeekdays = Array.from(context.shop.closedWeekdays);
+    const closedWeekdayNames = context.restockWeekdayOptions
+      .filter(o => context.shop.closedWeekdays.has(o.value)).map(o => o.label);
+    context.closedWeekdaysDisplay = closedWeekdayNames.join(", ");
+
+    context.festivalOptions = festivalOptions();
+    context.closedFestivals = Array.from(context.shop.closedFestivals);
+    const closedFestivalNames = context.festivalOptions
+      .filter(o => context.shop.closedFestivals.has(o.value)).map(o => o.label);
+    context.closedFestivalsDisplay = closedFestivalNames.join(", ");
+    return context;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Prepare rendering context for the buy tab.
+   * @param {ApplicationRenderContext} context  Context being prepared.
+   * @param {HandlebarsRenderOptions} options   Options which configure application rendering behavior.
+   * @returns {ApplicationRenderContext}
+   * @protected
+   */
+  async _prepareBuyContext(context, options) {
+    context.tabId = "buy";
+    context.table = buildItemTableSections({
+      groups: context.groups, emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.None", columns: BUY_COLUMNS,
+      rowTemplate: "modules/simple-shop-craft-5e/templates/shop-sheet/buy-row.hbs"
+    });
+    return context;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Prepare rendering context for the sell tab.
+   * @param {ApplicationRenderContext} context  Context being prepared.
+   * @param {HandlebarsRenderOptions} options   Options which configure application rendering behavior.
+   * @returns {ApplicationRenderContext}
+   * @protected
+   */
+  async _prepareSellContext(context, options) {
+    context.tabId = "sell";
+    context.showNoActor = !context.actor;
+    context.noActorLabel = "SIMPLE_SHOP_CRAFT_5E.NoActorSelectedHint";
+    context.table = buildItemTableSections({
+      groups: context.sellGroups, emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoSellableItems",
+      columns: SELL_COLUMNS, rowTemplate: "modules/simple-shop-craft-5e/templates/shop-sheet/sell-row.hbs"
+    });
     return context;
   }
 
@@ -514,14 +587,8 @@ export default class ShopSheet extends Application5e {
 
     if ( (partId === "buy") || (partId === "sell") ) {
       htmlElement.querySelectorAll(".item-tooltip[data-uuid]").forEach(el => {
-        const uuid = el.dataset.uuid;
-        if ( !uuid ) return;
         if ( (partId === "buy") && needsDefaultPrice(this.#findRowItem(el.dataset.key)) ) return;
-        el.dataset.tooltipHtml = loadingTooltip(uuid);
-        el.dataset.tooltipClass = game.dnd5e.utils.loadingTooltip
-          ? "dnd5e2 dnd5e-tooltip item-tooltip"
-          : "dnd5e2 dnd5e-tooltip item-tooltip themed theme-light";
-        el.dataset.tooltipDirection ??= "LEFT";
+        applyLoadingTooltip(el);
       });
     }
 
