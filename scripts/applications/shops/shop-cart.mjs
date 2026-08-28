@@ -1,6 +1,5 @@
-import { createPurchaseMessage } from "../chat/purchase-card.mjs";
-import { breakdownCopper } from "../shop/currency.mjs";
-import { summarizeNet } from "../shop/pricing.mjs";
+import { PurchaseMessageData } from "../../data/purchase-message.mjs";
+import { breakdownCopper } from "../../utils.mjs";
 
 /**
  * @import { default as ShopSheet } from "./shop-sheet.mjs";
@@ -25,7 +24,8 @@ export default class ShopCart extends Dialog5e {
     classes: ["simple-shop-craft-5e", "shop-cart", "standard-form"],
     window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopCart.Title", resizable: true },
     position: { width: 400 },
-    form: { handler: ShopCart.#onSubmit, closeOnSubmit: false }
+    form: { handler: ShopCart.#onSubmit, closeOnSubmit: false },
+    shopSheet: null
   };
 
   /* -------------------------------------------- */
@@ -116,7 +116,7 @@ export default class ShopCart extends Dialog5e {
    */
   static async #onSubmit(event, form, formData) {
     const state = this.#computeState();
-    await createPurchaseMessage(
+    await PurchaseMessageData.create(
       this.shopSheet, state.actor, state.lines, state.sellLines, state.total.parts, state.netCP
     );
     ui.notifications.info("SIMPLE_SHOP_CRAFT_5E.ShopCart.PurchaseRequested", { localize: true });
@@ -125,4 +125,31 @@ export default class ShopCart extends Dialog5e {
     await this.shopSheet.render();
     this.render();
   }
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Summarize a flat set of buy/sell rows into a single net total. Buying costs money (negative), selling
+ * earns money (positive).
+ * @param {{ cartQuantity?: number, priceCP: number }[]} buyRows
+ * @param {{ sellQuantity?: number, priceCP: number }[]} sellRows
+ * @returns {{ count: number, netCP: number, parts: { denomination: string, value: number }[] }}
+ */
+function summarizeNet(buyRows, sellRows) {
+  let count = 0;
+  let buyTotalCP = 0;
+  for ( const row of buyRows ) {
+    if ( !row.cartQuantity ) continue;
+    count += row.cartQuantity;
+    buyTotalCP += row.priceCP * row.cartQuantity;
+  }
+  let sellTotalCP = 0;
+  for ( const row of sellRows ) {
+    if ( !row.sellQuantity ) continue;
+    count += row.sellQuantity;
+    sellTotalCP += row.priceCP * row.sellQuantity;
+  }
+  const netCP = sellTotalCP - buyTotalCP;
+  return { count, netCP, parts: count > 0 ? breakdownCopper(Math.abs(netCP), { negative: netCP < 0 }) : [] };
 }

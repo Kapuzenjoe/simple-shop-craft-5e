@@ -1,5 +1,5 @@
-import { Shop } from "../../data/shop-data.mjs";
-import { currencyRows, goldPoolCurrencies } from "../../shop/currency.mjs";
+import { Shop } from "../../../data/shop-data.mjs";
+import { currencyRows, goldPoolCurrencies } from "../../../utils.mjs";
 
 import BaseShopConfig from "./base-shop-config.mjs";
 
@@ -28,7 +28,9 @@ export default class GoldPoolConfig extends BaseShopConfig {
   static DEFAULT_OPTIONS = {
     id: "gold-pool-config-{id}",
     window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GoldPoolMax" },
-    form: { handler: GoldPoolConfig.#onSubmit }
+    form: { handler: GoldPoolConfig.#onSubmit },
+    shopSheet: null,
+    onUpdate: null
   };
 
   /**

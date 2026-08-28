@@ -1,17 +1,34 @@
-import { MODULE_ID } from "./config.mjs";
+import { EXCLUDED_PACKS, MODULE_ID, PACKAGE_TYPE_ORDER, RARITY_DEFAULT_PRICES } from "./config.mjs";
 
 /**
- * Compendium packs excluded as shop-goods sources — monster/class "feature" packs whose weapon-typed
- * entries are combat abilities (e.g. a monster's claw), not real items.
- * @type {Set<string>}
+ * Break a copper amount down into whole-unit denominations, largest to smallest.
+ * @param {number} valueCP
+ * @param {object} [options]
+ * @param {boolean} [options.negative]  Negate the most significant part, so it renders as e.g. "-10gp 5sp"
+ *                                      (a single leading sign) instead of a separately styled symbol.
+ * @param {string} [options.capAt]      Highest denomination to break down into. Defaults to the world's
+ *                                      default currency, so nothing pricier (e.g. platinum) is shown.
+ * @returns {{ denomination: string, value: number }[]}
  */
-export const EXCLUDED_PACKS = new Set(["dnd5e.monsterfeatures", "dnd5e.monsterfeatures24", "dnd-monster-manual.features"]);
+export function breakdownCopper(valueCP, { negative=false, capAt=CONFIG.DND5E.defaultCurrency }={}) {
+  const capConversion = CONFIG.DND5E.currencies[capAt]?.conversion;
+  const ladder = Object.entries(CONFIG.DND5E.currencies)
+    .filter(([, { conversion }]) => !capConversion || (conversion >= capConversion))
+    .sort(([, a], [, b]) => a.conversion - b.conversion);
+  let remaining = valueCP;
+  const parts = [];
+  for ( const [denom, { conversion }] of ladder ) {
+    const cpPerUnit = CONFIG.DND5E.currencies.cp.conversion / conversion;
+    const amount = Math.floor(remaining / cpPerUnit);
+    if ( amount > 0 ) parts.push({ denomination: denom, value: amount });
+    remaining -= amount * cpPerUnit;
+  }
+  if ( !parts.length ) parts.push({ denomination: "gp", value: 0 });
+  if ( negative ) parts[0].value *= -1;
+  return parts;
+}
 
-/**
- * Package types, in priority order, searched when resolving an identifier-based entry.
- * @type {string[]}
- */
-const PACKAGE_TYPE_ORDER = ["module", "system", "world"];
+/* -------------------------------------------- */
 
 /**
  * Build `item-table.hbs` context (hasRows/emptyLabel/sections) from finalized type groups.
@@ -29,6 +46,69 @@ export function buildItemTableSections({ groups, emptyLabel, columns, rowTemplat
     rows: group.items.map(row => ({ ...row, template: rowTemplate }))
   }));
   return { hasRows: sections.some(s => s.rows.length > 0), emptyLabel, sections };
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Build currency-input row data for every shop-usable currency, given a source amount object.
+ * @param {Record<string, number>} [amounts]
+ * @param {string} [namePrefix]
+ * @param {Record<string, number>} [placeholders]
+ * @returns {{ denomination: string, value: number|null, name: string, label: string, icon: string }[]}
+ */
+export function currencyRows(amounts={}, namePrefix="", placeholders={}) {
+  return goldPoolCurrencies().map(denomination => ({
+    denomination, value: amounts[denomination] ?? null, name: `${namePrefix}${denomination}`,
+    label: CONFIG.DND5E.currencies[denomination].label, icon: CONFIG.DND5E.currencies[denomination].icon,
+    placeholder: placeholders[denomination]
+  }));
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Deduct currency from an actor via dnd5e's CurrencyManager, catching a shortfall into a checked result.
+ * @param {Actor5e} actor
+ * @param {number} amountCP
+ * @returns {Promise<{ ok: true }|{ ok: false, error: string }>}
+ */
+export async function deductActorCurrencyChecked(actor, amountCP) {
+  try {
+    await game.dnd5e.applications.CurrencyManager.deductActorCurrency(actor, amountCP, "cp");
+    return { ok: true };
+  } catch ( err ) {
+    return { ok: false, error: err.message };
+  }
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Resolve an item's crafting cost — `CONFIG.DND5E.crafting.exceptions`/`.scrolls` for Potion of Healing
+ * and Spell Scrolls, a copper-precise mundane-item calculation for non-magical items, otherwise
+ * `item.system.getCraftCost()`.
+ * @param {Item5e} item
+ * @returns {Promise<{ days: number, gold: number }>}
+ */
+export async function effectiveCraftCost(item) {
+  const { scrolls, exceptions } = CONFIG.DND5E.crafting;
+  if ( exceptions[item.system.identifier] ) return exceptions[item.system.identifier];
+  if ( item.system.type?.value === "scroll" ) {
+    const level = item.system.activities?.find(a => a.type === "cast")?.spell?.level;
+    if ( (level != null) && scrolls[level] ) return scrolls[level];
+  }
+  if ( !item.system.properties?.has("mgc") || !item.system.rarity ) {
+    const { mundane } = CONFIG.DND5E.crafting;
+    const priceCP = item.system.price?.value
+      ? toCopper(item.system.price.value, item.system.price.denomination) : 0;
+    const copperPerGP = toCopper(1, "gp");
+    return {
+      days: Math.ceil((priceCP / copperPerGP) * mundane.days),
+      gold: Math.floor(priceCP * mundane.gold) / copperPerGP
+    };
+  }
+  return item.system.getCraftCost();
 }
 
 /* -------------------------------------------- */
@@ -78,6 +158,44 @@ export function getCurrencyOptions({ abbreviated=false }={}) {
 /* -------------------------------------------- */
 
 /**
+ * Denominations used for a shop's gold pool, in system-configured order.
+ * @returns {string[]}
+ */
+export function goldPoolCurrencies() {
+  return Object.keys(CONFIG.DND5E.currencies);
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Whether an item's identifier is still the unedited default the system assigns at creation — the
+ * slugified type label, from an item whose name was never changed away from it.
+ * @param {Item5e} item
+ * @returns {boolean}
+ */
+export function isDefaultIdentifier(item) {
+  if ( !item?.system?.identifier ) return true;
+  const typeLabel = CONFIG.Item.typeLabels[item.type];
+  if ( !typeLabel ) return false;
+  return item.system.identifier === game.dnd5e.utils.formatIdentifier(_loc(typeLabel));
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Whether dnd5e's own Calendar Configuration is set to automatic recovery.
+ * @returns {boolean}
+ */
+export function isDnd5eAutoRecoveryEnabled() {
+  if ( !game.settings.settings.has("dnd5e.calendarConfig") ) return false;
+  const cfg = game.settings.get("dnd5e", "calendarConfig");
+  if ( !("dailyRecovery" in cfg) ) return !!cfg.enabled;
+  return !!cfg.enabled && !cfg.manualRecovery;
+}
+
+/* -------------------------------------------- */
+
+/**
  * Whether a compendium item's own pack is eligible as a shop-goods source (see {@link EXCLUDED_PACKS}).
  * @param {string} uuid
  * @returns {boolean}
@@ -112,6 +230,35 @@ export function itemRefKey(entry) {
 export function loadingTooltip(uuid) {
   if ( game.dnd5e.utils.loadingTooltip ) return game.dnd5e.utils.loadingTooltip({ uuid });
   return `<section class="loading" data-uuid="${uuid}"><i class="fas fa-spinner fa-spin-pulse" inert></i></section>`;
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Wire an element's loading-tooltip dataset attributes, keyed by its `data-uuid`. No-op if the element
+ * has no `data-uuid`.
+ * @param {HTMLElement} el
+ */
+export function applyLoadingTooltip(el) {
+  const uuid = el.dataset.uuid;
+  if ( !uuid ) return;
+  el.dataset.tooltipHtml = loadingTooltip(uuid);
+  el.dataset.tooltipClass = game.dnd5e.utils.loadingTooltip
+    ? "dnd5e2 dnd5e-tooltip item-tooltip"
+    : "dnd5e2 dnd5e-tooltip item-tooltip themed theme-light";
+  el.dataset.tooltipDirection ??= "LEFT";
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Whether an item's own price is unset, meaning a rarity-based fallback price is being shown for it
+ * instead.
+ * @param {Item5e|null} item
+ * @returns {boolean}
+ */
+export function needsDefaultPrice(item) {
+  return !!item && !item.system.price?.value;
 }
 
 /* -------------------------------------------- */
@@ -205,7 +352,7 @@ export async function resolveIdentifierIndex(identifiers) {
     for ( const pack of packsByPackageType.get(packageType) ?? [] ) {
       const index = await pack.getIndex({ fields: [
         "system.identifier", "system.source.rules", "system.price.value", "system.price.denomination",
-        "system.weight.value", "system.weight.units", "system.quantity", "system.type.value"
+        "system.weight.value", "system.weight.units", "system.quantity", "system.type.value", "system.rarity"
       ] });
       for ( const entry of index ) considerEntry(entry);
     }
@@ -214,6 +361,46 @@ export async function resolveIdentifierIndex(identifiers) {
   if ( remaining.size ) for ( const item of game.items ) considerEntry(item);
 
   return byIdentifier;
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Resolve an item's effective price: its own price if set, otherwise the rarity-based fallback.
+ * @param {Item5e|object} [item]
+ * @param {object} [overrides]
+ * @param {string} [overrides.rarity]        Rarity to use instead of `item.system.rarity` — for enchant
+ *   profiles, whose effective rarity can differ from the enchant item's own.
+ * @param {boolean} [overrides.isAmmo]        Ammo trait to use instead of `item.system.type?.value`.
+ * @param {boolean} [overrides.isConsumable]  Consumable trait to use instead of `item.type`.
+ * @returns {{ value: number, denomination: string }|null}
+ */
+export function resolveItemPrice(item, { rarity, isAmmo, isConsumable }={}) {
+  if ( !item ) return null;
+  return item.system.price?.value
+    ? { value: item.system.price.value, denomination: item.system.price.denomination }
+    : resolveRarityPrice(rarity ?? item.system.rarity, {
+      isAmmo: isAmmo ?? (item.system.type?.value === "ammo"), isConsumable: isConsumable ?? (item.type === "consumable")
+    });
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Resolve the rarity-tier default price for a given rarity. Ammunition is priced per single piece, a
+ * tenth of the consumable default, per the DMG 2024 guidance that ten pieces equal one potion of the
+ * same rarity in value.
+ * @param {string} rarity
+ * @param {object} [options]
+ * @param {boolean} [options.isAmmo]
+ * @param {boolean} [options.isConsumable]
+ * @returns {{ value: number, denomination: string }|null}  Null if the rarity has no resolvable tier.
+ */
+export function resolveRarityPrice(rarity, { isAmmo=false, isConsumable=false }={}) {
+  const row = RARITY_DEFAULT_PRICES[rarity];
+  if ( !row ) return null;
+  const value = isAmmo ? (row.consumable / 10) : (isConsumable ? row.consumable : row.durable);
+  return { value, denomination: "gp" };
 }
 
 /* -------------------------------------------- */
@@ -271,6 +458,19 @@ export function subtypeOptions(types) {
 /* -------------------------------------------- */
 
 /**
+ * Convert a value in a given denomination to a whole number of copper pieces, rounded down.
+ * @param {number} value
+ * @param {string} [denomination="gp"]
+ * @returns {number}
+ */
+export function toCopper(value, denomination="gp") {
+  const cpPerUnit = CONFIG.DND5E.currencies.cp.conversion / (CONFIG.DND5E.currencies[denomination]?.conversion ?? 1);
+  return Math.floor(game.dnd5e.utils.roundCurrency?.(value * cpPerUnit, "cp") ?? (value * cpPerUnit));
+}
+
+/* -------------------------------------------- */
+
+/**
  * Group active Item compendium packs by their owning package type.
  * @returns {Map<string, CompendiumCollection[]>}
  */
@@ -284,4 +484,25 @@ function getPacksByPackageType() {
     packsByPackageType.get(packageType).push(pack);
   }
   return packsByPackageType;
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Define a set of template paths to pre-load. Pre-loaded templates are compiled and cached for fast access when
+ * rendering.
+ * @returns {Promise}
+ */
+export async function preloadHandlebarsTemplates() {
+  return foundry.applications.handlebars.loadTemplates([
+    "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs",
+    "modules/simple-shop-craft-5e/templates/partials/currency-inputs.hbs",
+    "modules/simple-shop-craft-5e/templates/partials/item-table.hbs",
+    "modules/simple-shop-craft-5e/templates/partials/material-row.hbs",
+    "modules/simple-shop-craft-5e/templates/shop-manager/recipe-row.hbs",
+    "modules/simple-shop-craft-5e/templates/shop-manager/shop-row.hbs",
+    "modules/simple-shop-craft-5e/templates/shop-sheet/buy-row.hbs",
+    "modules/simple-shop-craft-5e/templates/shop-sheet/sell-row.hbs",
+    "modules/simple-shop-craft-5e/templates/shop-sheet/players-dialog-row.hbs"
+  ]);
 }

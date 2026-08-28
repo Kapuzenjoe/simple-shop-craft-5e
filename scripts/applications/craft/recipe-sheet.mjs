@@ -1,16 +1,13 @@
-import { MODULE_ID } from "../config.mjs";
-import { Recipe, RecipeMaterial } from "../data/recipe-data.mjs";
-import { getRecipe, updateRecipe } from "../data/recipe-store.mjs";
+import { MODULE_ID } from "../../config.mjs";
+import { Recipe, RecipeMaterial } from "../../data/recipe-data.mjs";
 import {
-  breakdownCopper, currencyRows, effectiveCraftCost, goldPoolCurrencies, resolveItemPrice, toCopper
-} from "../shop/currency.mjs";
-import {
-  buildItemTableSections, getCurrencyOptions, itemRefKey, loadingTooltip, resolveEntries, resolveIdentifierIndex,
-  subtypeOptions
-} from "../utils.mjs";
+  applyLoadingTooltip, breakdownCopper, buildItemTableSections, currencyRows, effectiveCraftCost, getCurrencyOptions,
+  goldPoolCurrencies, isDefaultIdentifier, itemRefKey, resolveEntries, resolveIdentifierIndex,
+  resolveItemPrice, subtypeOptions, toCopper
+} from "../../utils.mjs";
+import BaseShopConfig from "../shops/shop-config/base-shop-config.mjs";
 
 import MaterialCriteriaDialog from "./material-criteria-dialog.mjs";
-import BaseShopConfig from "./shop-config/base-shop-config.mjs";
 
 const { Application5e } = game.dnd5e.applications.api;
 
@@ -44,7 +41,8 @@ export default class RecipeSheet extends Application5e {
       removeTargetItem: RecipeSheet.#removeTargetItem,
       stepMaterialQuantity: RecipeSheet.#stepMaterialQuantity,
       toggleMaterialRequired: RecipeSheet.#toggleMaterialRequired
-    }
+    },
+    recipeId: null
   };
 
   /* -------------------------------------------- */
@@ -96,7 +94,7 @@ export default class RecipeSheet extends Application5e {
    * @type {Recipe}
    */
   get recipe() {
-    return getRecipe(this.recipeId);
+    return Recipe.get(this.recipeId);
   }
 
   /* -------------------------------------------- */
@@ -133,13 +131,10 @@ export default class RecipeSheet extends Application5e {
     if ( context.craftCost ) {
       for ( const part of breakdownCopper(toCopper(context.craftCost.gold, "gp")) ) craftCostBreakdown[part.denomination] = part.value;
     }
-    const materialPriceCP = Object.entries(recipe.materialPrice)
-      .reduce((sum, [denom, value]) => sum + toCopper(value ?? 0, denom), 0);
-    const thresholdCP = materialPriceCP || (context.craftCost ? toCopper(context.craftCost.gold, "gp") : 0);
+    const thresholdCP = recipe.craftThreshold(context.craftCost, targetResolved.item);
 
     const materialsResolved = await resolveEntries(recipe.materials);
-    const materialRows = materialsResolved.map((r, index) => ({ ...r, index }))
-      .filter(r => r.item || r.entry.criteria?.type).map(r => {
+    const materialRows = materialsResolved.map((r, index) => ({ ...r, index })).map(r => {
         const shared = {
           index: r.index, required: r.entry.required, requiredEditable: true,
           requiredTooltip: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.MaterialRequired",
@@ -163,9 +158,18 @@ export default class RecipeSheet extends Application5e {
             subtitle: _loc("SIMPLE_SHOP_CRAFT_5E.MaterialRule")
           };
         }
+        if ( !r.item ) {
+          return {
+            ...shared, img: "icons/svg/hazard.svg",
+            name: r.entry.identifier || r.entry.uuid || _loc("SIMPLE_SHOP_CRAFT_5E.Unknown"),
+            subtitle: r.entry.identifier || null, price: null, valueCP: 0,
+            warning: true, warningTooltip: _loc("SIMPLE_SHOP_CRAFT_5E.RecipeEditor.UnresolvedWarning")
+          };
+        }
         return {
           ...shared, img: r.item.img, name: r.item.name, subtitle: r.entry.identifier || null,
-          price, valueCP
+          price, valueCP, warning: isDefaultIdentifier(r.item),
+          warningTooltip: isDefaultIdentifier(r.item) ? _loc("SIMPLE_SHOP_CRAFT_5E.RecipeEditor.NoIdentifierWarning") : null
         };
       });
     const requiredSumCP = materialRows.filter(r => r.required)
@@ -174,10 +178,9 @@ export default class RecipeSheet extends Application5e {
     context.thresholdParts = breakdownCopper(thresholdCP);
     context.requiredValueMet = recipe.ignoreCraftValue || (requiredSumCP >= thresholdCP);
     context.materialsTable = buildItemTableSections({
-      groups: materialRows.length ? [{ label: "", items: materialRows }] : [],
+      groups: materialRows.length ? [{ label: "SIMPLE_SHOP_CRAFT_5E.Material", items: materialRows }] : [],
       emptyLabel: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.MaterialsNone",
       columns: [
-        { id: "name", label: "SIMPLE_SHOP_CRAFT_5E.Material" },
         { id: "price", label: "DND5E.Price" },
         { id: "quantity", label: "DND5E.Quantity" }, { id: "controls" }, { id: "controls" }
       ],
@@ -241,6 +244,14 @@ export default class RecipeSheet extends Application5e {
   /* -------------------------------------------- */
 
   /** @inheritDoc */
+  async _onFirstRender(context, options) {
+    await super._onFirstRender(context, options);
+    new game.dnd5e.applications.ContextMenu5e(this.element, "[data-id]", this.#materialContextOptions(), { jQuery: false });
+  }
+
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
   async _onRender(context, options) {
     await super._onRender(context, options);
     if ( this.hasFrame ) this.window.title.innerText = this.title;
@@ -255,17 +266,7 @@ export default class RecipeSheet extends Application5e {
     });
     dropArea?.addEventListener("drop", event => this.#onDropItem(event));
 
-    this.element.querySelectorAll(".item-tooltip[data-uuid]").forEach(el => {
-      const uuid = el.dataset.uuid;
-      if ( !uuid ) return;
-      el.dataset.tooltipHtml = loadingTooltip(uuid);
-      el.dataset.tooltipClass = game.dnd5e.utils.loadingTooltip
-        ? "dnd5e2 dnd5e-tooltip item-tooltip"
-        : "dnd5e2 dnd5e-tooltip item-tooltip themed theme-light";
-      el.dataset.tooltipDirection ??= "LEFT";
-    });
-
-    new game.dnd5e.applications.ContextMenu5e(this.element, "[data-id]", this.#materialContextOptions(), { jQuery: false });
+    this.element.querySelectorAll(".item-tooltip[data-uuid]").forEach(applyLoadingTooltip);
   }
 
   /* -------------------------------------------- */
@@ -293,7 +294,7 @@ export default class RecipeSheet extends Application5e {
       ...recipe.materials.map(m => m.toObject()),
       ...newEntries.filter(e => !existingKeys.has(itemRefKey(e)))
     ];
-    await updateRecipe(this.recipeId, { materials });
+    await Recipe.update(this.recipeId, { materials });
     this.render();
   }
 
@@ -308,7 +309,7 @@ export default class RecipeSheet extends Application5e {
     await new MaterialCriteriaDialog({
       onSubmit: async ({ type, subtype, value }) => {
         const materials = [...this.recipe.materials.map(m => m.toObject()), { criteria: { type, subtype }, value }];
-        await updateRecipe(this.recipeId, { materials });
+        await Recipe.update(this.recipeId, { materials });
         this.render();
       }
     }).render({ force: true });
@@ -327,7 +328,7 @@ export default class RecipeSheet extends Application5e {
     const index = Number(target.dataset.index);
     const materials = this.recipe.materials.map((m, i) => (i === index)
       ? { ...m.toObject(), required: !m.required } : m.toObject());
-    await updateRecipe(this.recipeId, { materials });
+    await Recipe.update(this.recipeId, { materials });
     this.render();
   }
 
@@ -345,7 +346,7 @@ export default class RecipeSheet extends Application5e {
     const step = Number(target.dataset.step);
     const materials = this.recipe.materials.map((m, i) => (i === index)
       ? { ...m.toObject(), quantity: Math.max(1, m.quantity + step) } : m.toObject());
-    await updateRecipe(this.recipeId, { materials });
+    await Recipe.update(this.recipeId, { materials });
     this.render();
   }
 
@@ -368,7 +369,7 @@ export default class RecipeSheet extends Application5e {
     if ( item.system.properties?.has("mgc") ) skillProficiencies.add("arc");
     const targetItem = await itemEntryRef(item);
     const targetQuantity = (item.system.quantity > 1) ? item.system.quantity : 1;
-    await updateRecipe(this.recipeId, {
+    await Recipe.update(this.recipeId, {
       targetItem, targetQuantity, img: item.img, skillProficiencies: Array.from(skillProficiencies)
     });
     this.render();
@@ -392,6 +393,7 @@ export default class RecipeSheet extends Application5e {
       if ( item ) {
         data.targetItem = await itemEntryRef(item);
         data.img = item.img;
+        data.targetQuantity = (item.system.quantity > 1) ? item.system.quantity : 1;
         const skillProficiencies = new Set(data.skillProficiencies ?? this.recipe.skillProficiencies);
         if ( item.system.properties?.has("mgc") ) skillProficiencies.add("arc");
         data.skillProficiencies = Array.from(skillProficiencies);
@@ -404,7 +406,7 @@ export default class RecipeSheet extends Application5e {
           .map(([denom, value]) => [denom, Math.max(0, Math.round(value))])
       );
     }
-    await updateRecipe(this.recipeId, data);
+    await Recipe.update(this.recipeId, data);
     this.render();
   }
 
@@ -412,7 +414,6 @@ export default class RecipeSheet extends Application5e {
 
   /**
    * Build the entries for a material row's additional-controls context menu.
-   * @this {RecipeSheet}
    * @returns {ContextMenuEntry[]}
    */
   #materialContextOptions() {
@@ -440,7 +441,6 @@ export default class RecipeSheet extends Application5e {
 
   /**
    * Handle editing a fixed material's crafting-value override.
-   * @this {RecipeSheet}
    * @param {HTMLElement} target  Row element the context menu was triggered for.
    * @returns {Promise<void>}
    */
@@ -469,7 +469,7 @@ export default class RecipeSheet extends Application5e {
             ...m.toObject(),
             value: { value: data.value ?? null, denomination: data.denomination }
           });
-          await updateRecipe(this.recipeId, { materials });
+          await Recipe.update(this.recipeId, { materials });
           this.render();
         }
       }
@@ -482,7 +482,6 @@ export default class RecipeSheet extends Application5e {
   /**
    * Handle editing a fixed material's identifier reference. Resolved the same way as any other identifier
    * (module compendiums, then system, then world compendiums, then the world's Items directory).
-   * @this {RecipeSheet}
    * @param {HTMLElement} target  Row element the context menu was triggered for.
    * @returns {Promise<void>}
    */
@@ -514,7 +513,7 @@ export default class RecipeSheet extends Application5e {
           const materials = this.recipe.materials.map((m, i) => (i !== index) ? m.toObject() : {
             ...m.toObject(), identifier, uuid: ""
           });
-          await updateRecipe(this.recipeId, { materials });
+          await Recipe.update(this.recipeId, { materials });
           this.render();
         }
       }
@@ -534,7 +533,7 @@ export default class RecipeSheet extends Application5e {
   static async #removeMaterial(event, target) {
     const index = Number(target.dataset.index);
     const materials = this.recipe.materials.filter((m, i) => i !== index).map(m => m.toObject());
-    await updateRecipe(this.recipeId, { materials });
+    await Recipe.update(this.recipeId, { materials });
     this.render();
   }
 
@@ -546,7 +545,7 @@ export default class RecipeSheet extends Application5e {
    * @returns {Promise<void>}
    */
   static async #removeTargetItem() {
-    await updateRecipe(this.recipeId, { targetItem: { identifier: "", uuid: "" }, img: Recipe.DEFAULT_ICON });
+    await Recipe.update(this.recipeId, { targetItem: { identifier: "", uuid: "" }, img: Recipe.DEFAULT_ICON });
     this.render();
   }
 
@@ -571,7 +570,7 @@ export default class RecipeSheet extends Application5e {
     const entry = await itemEntryRef(item);
     if ( recipe.materials.some(m => itemRefKey(m) === itemRefKey(entry)) ) return;
 
-    await updateRecipe(this.recipeId, { materials: [...recipe.materials.map(m => m.toObject()), entry] });
+    await Recipe.update(this.recipeId, { materials: [...recipe.materials.map(m => m.toObject()), entry] });
     this.render();
   }
 }

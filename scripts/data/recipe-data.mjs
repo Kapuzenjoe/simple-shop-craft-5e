@@ -1,3 +1,8 @@
+import { SETTING_KEYS } from "../config.mjs";
+import { toCopper } from "../utils.mjs";
+
+import { SettingCollectionMixin } from "./setting-collection.mjs";
+
 const {
   ArrayField, BooleanField, DocumentIdField, DocumentUUIDField, EmbeddedDataField, FilePathField, NumberField,
   ObjectField, SchemaField, SetField, StringField
@@ -39,7 +44,7 @@ export class RecipeMaterial extends foundry.abstract.DataModel {
  * @extends {foundry.abstract.DataModel<RecipeData>}
  * @mixes RecipeData
  */
-export class Recipe extends foundry.abstract.DataModel {
+export class Recipe extends SettingCollectionMixin(foundry.abstract.DataModel, SETTING_KEYS.RECIPES) {
 
   /**
    * Default icon used for recipes without a custom image.
@@ -76,6 +81,25 @@ export class Recipe extends foundry.abstract.DataModel {
         units: new StringField({ initial: "day", choices: ["minute", "hour", "day"] })
       })
     };
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Resolve this recipe's material-value threshold in copper — its own explicit threshold if set,
+   * otherwise the rules-based crafting cost of the target item — scaled by the ratio of the recipe's
+   * target quantity to the target item's own bundle size.
+   * @param {{ gold: number, days: number }|null} craftCost
+   * @param {Item5e} [targetItem]
+   * @returns {number}
+   */
+  craftThreshold(craftCost, targetItem) {
+    const explicit = Object.entries(this.materialPrice)
+      .reduce((sum, [denom, value]) => sum + toCopper(value ?? 0, denom), 0);
+    const targetBundleSize = (targetItem?.system?.quantity > 1) ? targetItem.system.quantity : 1;
+    const scale = this.targetQuantity / targetBundleSize;
+    if ( explicit > 0 ) return Math.ceil(explicit * scale);
+    return craftCost ? toCopper(craftCost.gold * scale, "gp") : 0;
   }
 }
 

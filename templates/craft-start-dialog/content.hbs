@@ -15,8 +15,8 @@
 
 <fieldset class="card-tray">
     <legend>{{ displayName }}</legend>
-    <ol class="targets unlist">
-        <li class="target">
+    <ol class="value-list unlist">
+        <li class="value-row">
             <img class="gold-icon" src="{{ targetItem.img }}" alt="{{ targetItem.name }}">
             <div class="name-stacked">
                 <span class="title">
@@ -36,14 +36,15 @@
     {{else}}
     <p>{{ toolLabel }}</p>
     {{/if}}
-    {{#if skillProficient}}
-    <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.SkillProficient" }}</p>
-    {{else}}
     {{#unless toolProficient}}
     <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.NotProficient" }}</p>
     {{/unless}}
     {{#unless toolOwned}}
     <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.ToolMissing" }}</p>
+    {{/unless}}
+    {{#if skillRequired}}
+    {{#unless skillProficient}}
+    <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.SkillMissing" }}</p>
     {{/unless}}
     {{/if}}
     {{#if workshopField}}

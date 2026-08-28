@@ -1,5 +1,5 @@
-import { RecipeMaterial } from "../data/recipe-data.mjs";
-import { getCurrencyOptions, subtypeOptions } from "../utils.mjs";
+import { RecipeMaterial } from "../../data/recipe-data.mjs";
+import { getCurrencyOptions, subtypeOptions } from "../../utils.mjs";
 
 const { Dialog5e } = game.dnd5e.applications.api;
 
@@ -25,7 +25,8 @@ export default class MaterialCriteriaDialog extends Dialog5e {
     buttons: [
       { action: "add", label: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.AddMaterialCriteria", icon: "fas fa-plus", default: true }
     ],
-    form: { handler: MaterialCriteriaDialog.#onSubmit }
+    form: { handler: MaterialCriteriaDialog.#onSubmit },
+    onSubmit: null
   };
 
   /** @override */

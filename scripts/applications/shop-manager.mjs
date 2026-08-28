@@ -1,18 +1,12 @@
 import { SETTLEMENT_CAPS } from "../config.mjs";
-import { createRecipe, deleteRecipe, getRecipe, getRecipes } from "../data/recipe-store.mjs";
-import { createShop, deleteShop, getShop, getShops, updateShop } from "../data/shop-store.mjs";
-import { isShopOpen, openingHoursDisplay } from "../shop/opening-hours.mjs";
+import { Recipe } from "../data/recipe-data.mjs";
+import { Shop } from "../data/shop-data.mjs";
 import { buildItemTableSections, finalizeGroups, resolveEntries } from "../utils.mjs";
 
-import CraftStartDialog from "./craft-start-dialog.mjs";
-import RecipeSheet from "./recipe-sheet.mjs";
-import ShopCreateDialog from "./shop-create-dialog.mjs";
-import ShopSheet from "./shop-sheet.mjs";
-
-/**
- * @import { Recipe } from "../data/recipe-data.mjs";
- * @import { Shop } from "../data/shop-data.mjs";
- */
+import CraftStartDialog from "./craft/craft-start-dialog.mjs";
+import RecipeSheet from "./craft/recipe-sheet.mjs";
+import ShopCreateDialog from "./shops/shop-create-dialog.mjs";
+import ShopSheet from "./shops/shop-sheet.mjs";
 
 const { Application5e } = game.dnd5e.applications.api;
 
@@ -79,16 +73,15 @@ export default class ShopManager extends Application5e {
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
     context.isGM = game.user.isGM;
-    const shops = getShops().filter(s => context.isGM || s.active);
+    const shops = Shop.getAll().filter(s => context.isGM || s.active);
     const rows = shops.toSorted((a, b) => a.name.localeCompare(b.name)).map(shop => ({
       shop,
       npc: shop.npc ? fromUuidSync(shop.npc) : null,
-      openingHours: openingHoursDisplay(shop),
+      openingHours: shop.openingHoursDisplay(),
       subtitle: [shop.location || null, ShopManager.#settlementCapLabel(shop) || null].filter(Boolean).join(" · "),
       template: "modules/simple-shop-craft-5e/templates/shop-manager/shop-row.hbs"
     }));
     const columns = [
-      { id: "name" },
       { id: "npc", label: "SIMPLE_SHOP_CRAFT_5E.Owner" },
       { id: "openingHours", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.OpeningHours" },
       { id: "active", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Status" },
@@ -105,7 +98,7 @@ export default class ShopManager extends Application5e {
       emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.None",
       sections
     };
-    const recipes = getRecipes();
+    const recipes = Recipe.getAll();
     const actor = game.user.character;
     const visibleRecipes = context.isGM
       ? recipes
@@ -131,7 +124,7 @@ export default class ShopManager extends Application5e {
     context.recipeTable = buildItemTableSections({
       groups: finalizeGroups(recipeGroups),
       emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.None",
-      columns: [{ id: "name" }, { id: "unlocked", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Unlocked" }, { id: "controls" }],
+      columns: [{ id: "unlocked", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Unlocked" }, { id: "controls" }],
       rowTemplate: "modules/simple-shop-craft-5e/templates/shop-manager/recipe-row.hbs"
     });
     return context;
@@ -155,32 +148,18 @@ export default class ShopManager extends Application5e {
     await super._onFirstRender(context, options);
     new game.dnd5e.applications.ContextMenu5e(this.element, "[data-shop-id]", [], {
       onOpen: element => {
-        const shop = getShop(element.dataset.shopId);
+        const shop = Shop.get(element.dataset.shopId);
         ui.context.menuItems = this._getShopContextOptions(shop);
       },
       jQuery: false
     });
     new game.dnd5e.applications.ContextMenu5e(this.element, "[data-recipe-id]", [], {
       onOpen: element => {
-        const recipe = getRecipe(element.dataset.recipeId);
+        const recipe = Recipe.get(element.dataset.recipeId);
         ui.context.menuItems = this._getRecipeContextOptions(recipe);
       },
       jQuery: false
     });
-  }
-
-  /* -------------------------------------------- */
-  /*  Event Listeners and Handlers                */
-  /* -------------------------------------------- */
-
-  /** @inheritDoc */
-  _attachPartListeners(partId, htmlElement, options) {
-    super._attachPartListeners(partId, htmlElement, options);
-    if ( ["shops", "recipes"].includes(partId) ) {
-      htmlElement.querySelectorAll("[data-context-menu]").forEach(control => {
-        return control.addEventListener("click", game.dnd5e.applications.ContextMenu5e.triggerEvent);
-      });
-    }
   }
 
   /* -------------------------------------------- */
@@ -191,7 +170,7 @@ export default class ShopManager extends Application5e {
    * @returns {Promise<void>}
    */
   static async #createRecipe() {
-    const created = await createRecipe({ name: "" });
+    const created = await Recipe.create({ name: "" });
     this.render();
     new RecipeSheet({ recipeId: created._id }).render({ force: true });
   }
@@ -228,8 +207,8 @@ export default class ShopManager extends Application5e {
    * @param {HTMLElement} target  Button that was clicked.
    */
   static #editShop(event, target) {
-    const shop = getShop(target.dataset.shopId);
-    if ( !game.user.isGM && !isShopOpen(shop) ) {
+    const shop = Shop.get(target.dataset.shopId);
+    if ( !game.user.isGM && !shop.isOpen() ) {
       ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Closed", { localize: true });
       return;
     }
@@ -245,7 +224,7 @@ export default class ShopManager extends Application5e {
    * @param {HTMLElement} target  Element that was clicked.
    */
   static #startCraft(event, target) {
-    const recipe = getRecipe(target.dataset.recipeId);
+    const recipe = Recipe.get(target.dataset.recipeId);
     if ( !recipe ) return;
     if ( !game.user.isGM ) {
       const actor = game.user.character;
@@ -268,7 +247,7 @@ export default class ShopManager extends Application5e {
    * @returns {Promise<void>}
    */
   static async #toggleActive(event, target) {
-    const shop = getShop(target.dataset.shopId);
+    const shop = Shop.get(target.dataset.shopId);
     await this.#setShopActive(shop, !shop.active);
   }
 
@@ -364,7 +343,7 @@ export default class ShopManager extends Application5e {
       content: `<p>${_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.DeleteConfirm")}</p>`
     });
     if ( !confirmed ) return;
-    await deleteRecipe(recipe._id);
+    await Recipe.delete(recipe._id);
     this.render();
   }
 
@@ -381,7 +360,7 @@ export default class ShopManager extends Application5e {
       content: `<p>${_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.DeleteConfirm")}</p>`
     });
     if ( !confirmed ) return;
-    await deleteShop(shop._id);
+    await Shop.delete(shop._id);
     this.render();
   }
 
@@ -396,7 +375,7 @@ export default class ShopManager extends Application5e {
     const clone = shop.toObject();
     delete clone._id;
     clone.name = _loc("DOCUMENT.CopyOf", { name: shop.name });
-    await createShop(clone);
+    await Shop.create(clone);
     this.render();
   }
 
@@ -409,7 +388,7 @@ export default class ShopManager extends Application5e {
    * @returns {Promise<void>}
    */
   async #setShopActive(shop, active) {
-    await updateShop(shop._id, { active });
+    await Shop.update(shop._id, { active });
     this.render();
   }
 }

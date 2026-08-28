@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.2.1
+
+- Fixed starting a craft with an unallocated optional material sometimes deleting it from the actor.
+- Fixed accepting a craft where the same owned item was allocated to two material slots deducting it only once.
+- Fixed a fixed material never being recognized as owned when its recipe reference had no resolvable identifier.
+- Added a warning icon in the Recipe Editor for a fixed material with no distinct identifier, since it won't reliably match an owned item during crafting.
+- Fixed the Recipe Editor's required material value not scaling with a recipe's target quantity, showing a lower threshold than the craft order actually requires.
+- Fixed the craft order occasionally computing a fractional-copper material threshold, leaving the Start button disabled despite the displayed amounts matching.
+- Fixed a bundled material's crafting value rounding to 0 in the Recipe Editor while the craft order still charged a fraction of a copper for it — both now divide before converting to copper, matching the shop's own pricing.
+- Fixed the item generator being able to roll unusable "Enspelled Weapon"/"Enspelled Armor" template items (already excluded "Enspelled Staff" - the plan is to implement a logic similar to that used in spell-scrolls here.). 
+- Fixed a recipe's tool and skill proficiency requirements being combined with OR instead of AND.
+- Fixed a required fixed material showing only its allocated count instead of how many are still needed.
+- Fixed a material quantity stepper not clamping to its maximum, making the minus button appear frozen after over-clicking plus.
+- Fixed the Recipe Editor silently hiding a material whose referenced item could no longer be found, leaving no way to remove it.
+- Fixed the Recipe Editor showing no price for a material valued only by its rarity, unlike the craft order.
+- Fixed changing a recipe's target item via its UUID field not updating its bundle-size quantity.
+- Fixed a required fixed material only counting the first matching stack, undercounting how much a player actually owns across multiple stacks.
+
 ## 0.2.0
 
 - Added an automatic Arcana suggestion under a recipe's Skill Proficiencies when the target item is magical.

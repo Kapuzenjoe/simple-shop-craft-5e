@@ -20,6 +20,24 @@ export function calendariaWeekdayOptions() {
 /* -------------------------------------------- */
 
 /**
+ * Weekday indices crossed by a Calendaria `calendaria.dayChange` hook event, or `null` for a full week
+ * or more, or `undefined` if the event doesn't represent an actual forward day change.
+ * @param {{ previous: object, current: object }} data
+ * @returns {number[]|null|undefined}
+ */
+export function calendariaWeekdaysPassed(data) {
+  const dayCount = data.current.dayOfMonth - data.previous.dayOfMonth;
+  if ( dayCount <= 0 ) return undefined;
+  const weekLength = game.time.calendar.daysInWeek;
+  const monthOrYearChanged = (data.current.month !== data.previous.month) || (data.current.year !== data.previous.year);
+  return (monthOrYearChanged || (dayCount >= weekLength))
+    ? null
+    : Array.from({ length: dayCount }, (_, i) => (calendariaDayOfWeek(data.current) - i + weekLength) % weekLength);
+}
+
+/* -------------------------------------------- */
+
+/**
  * Whether the Calendaria module is active.
  * @returns {boolean}
  */

@@ -1,9 +1,8 @@
-import { entryKey } from "../shop/entry-resolver.mjs";
-import { rollShopItems } from "../shop/generator.mjs";
-import { subtypeOptions } from "../utils.mjs";
+import { ShopItemEntry } from "../../data/shop-data.mjs";
+import { subtypeOptions } from "../../utils.mjs";
 
 /**
- * @import { ShopItemEntryData } from "../_types.mjs";
+ * @import { ShopItemEntryData } from "../../_types.mjs";
  * @import { default as ShopSheet } from "./shop-sheet.mjs";
  */
 
@@ -44,7 +43,9 @@ export default class GenerateItemDialog extends Dialog5e {
     ],
     actions: {
       generate: GenerateItemDialog.#generate
-    }
+    },
+    shopSheet: null,
+    onGenerated: null
   };
 
   /* -------------------------------------------- */
@@ -305,9 +306,9 @@ export default class GenerateItemDialog extends Dialog5e {
         classes: this.#classes.size ? this.#classes : null, levels: this.#levels.size ? this.#levels : null
       }
       : null;
-    const existingKeys = new Set(this.shopSheet.shop.items.map(i => entryKey(i)));
+    const existingKeys = new Set(this.shopSheet.shop.items.map(i => ShopItemEntry.key(i)));
 
-    const rolled = await rollShopItems({
+    const rolled = await ShopItemEntry.rollMany({
       typeConfigs, rarities: this.#rarities.size ? this.#rarities : null, magic: this.#magic,
       spellFilter, count: this.#count, existingKeys, settlementCap: this.shopSheet.shop.settlementCap
     });
