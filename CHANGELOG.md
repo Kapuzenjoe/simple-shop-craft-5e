@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.1
+
+- Fixed starting a craft with an unallocated optional material sometimes deleting it from the actor.
+- Fixed accepting a craft where the same owned item was allocated to two material slots deducting it only once.
+- Fixed a fixed material never being recognized as owned when its recipe reference had no resolvable identifier.
+- Added a warning icon in the Recipe Editor for a fixed material with no distinct identifier, since it won't reliably match an owned item during crafting.
+- Fixed the Recipe Editor's required material value not scaling with a recipe's target quantity, showing a lower threshold than the craft order actually requires.
+- Fixed the craft order occasionally computing a fractional-copper material threshold, leaving the Start button disabled despite the displayed amounts matching.
+- Fixed a bundled material's crafting value rounding to 0 in the Recipe Editor while the craft order still charged a fraction of a copper for it — both now divide before converting to copper, matching the shop's own pricing.
+- Fixed the item generator being able to roll unusable "Enspelled Weapon"/"Enspelled Armor" template items (already excluded "Enspelled Staff" - the plan is to implement a logic similar to that used in spell-scrolls here.). 
+
 ## 0.2.0
 
 - Added an automatic Arcana suggestion under a recipe's Skill Proficiencies when the target item is magical.

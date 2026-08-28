@@ -1,5 +1,5 @@
-import { RecipeMaterial } from "../data/recipe-data.mjs";
-import { getCurrencyOptions, subtypeOptions } from "../utils.mjs";
+import { RecipeMaterial } from "../../data/recipe-data.mjs";
+import { getCurrencyOptions, subtypeOptions } from "../../utils.mjs";
 
 const { Dialog5e } = game.dnd5e.applications.api;
 

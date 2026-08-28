@@ -1,11 +1,10 @@
-import { GOLD_POOL_DEFAULT } from "../config.mjs";
-import { createShop } from "../data/shop-store.mjs";
-import { getStarterItems, getStarterPackOptions } from "../data/starter-packs.mjs";
+import { GOLD_POOL_DEFAULT, STARTER_PACKS } from "../../config.mjs";
+import { Shop } from "../../data/shop-data.mjs";
 
 import ShopSheet from "./shop-sheet.mjs";
 
 /**
- * @import { default as ShopManager } from "./shop-manager.mjs";
+ * @import { default as ShopManager } from "../shop-manager.mjs";
  */
 
 const { Dialog5e } = game.dnd5e.applications.api;
@@ -103,9 +102,33 @@ export default class ShopCreateDialog extends Dialog5e {
         identifier, bundleSize, stock: { max: null, current: null }
       }))
     };
-    const created = await createShop(newShop);
+    const created = await Shop.create(newShop);
     this.shopManager.render();
     new ShopSheet({ shopId: created._id }).render({ force: true, mode: ShopSheet.MODES.EDIT });
     await this.close();
   }
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Get the item identifiers included in a starter pack.
+ * @param {string} pack  Starter pack key.
+ * @returns {{ identifier: string, bundleSize: number|null }[]}
+ */
+function getStarterItems(pack) {
+  return (STARTER_PACKS[pack]?.items ?? []).map(item => {
+    return typeof item === "string" ? { identifier: item, bundleSize: null } : { identifier: item.identifier, bundleSize: item.bundleSize ?? null };
+  }
+  );
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Get the localized label/value pairs for the starter pack selection dropdown.
+ * @returns {{ value: string, label: string }[]}
+ */
+function getStarterPackOptions() {
+  return Object.entries(STARTER_PACKS).map(([value, pack]) => ({ value, label: _loc(pack.label) }));
 }

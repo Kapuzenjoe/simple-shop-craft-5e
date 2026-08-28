@@ -3,6 +3,9 @@
         <div class="item-name item-tooltip" {{#if uuid}}data-uuid="{{ uuid }}"{{/if}}>
             {{> "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs"
                 img=img name=name subtitle=subtitle bundleSize=bundleSize }}
+            {{#if warning}}
+            <i class="fa-solid fa-triangle-exclamation warning" data-tooltip="{{ warningTooltip }}"></i>
+            {{/if}}
         </div>
         {{#if price}}
         <div class="item-detail item-price">

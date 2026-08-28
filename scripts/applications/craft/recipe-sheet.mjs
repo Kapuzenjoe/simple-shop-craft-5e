@@ -1,16 +1,13 @@
-import { MODULE_ID } from "../config.mjs";
-import { Recipe, RecipeMaterial } from "../data/recipe-data.mjs";
-import { getRecipe, updateRecipe } from "../data/recipe-store.mjs";
+import { MODULE_ID } from "../../config.mjs";
+import { Recipe, RecipeMaterial } from "../../data/recipe-data.mjs";
 import {
-  breakdownCopper, currencyRows, effectiveCraftCost, goldPoolCurrencies, resolveItemPrice, toCopper
-} from "../shop/currency.mjs";
-import {
-  buildItemTableSections, getCurrencyOptions, itemRefKey, loadingTooltip, resolveEntries, resolveIdentifierIndex,
-  subtypeOptions
-} from "../utils.mjs";
+  breakdownCopper, buildItemTableSections, currencyRows, effectiveCraftCost, getCurrencyOptions,
+  goldPoolCurrencies, isDefaultIdentifier, itemRefKey, loadingTooltip, resolveEntries, resolveIdentifierIndex,
+  resolveItemPrice, subtypeOptions, toCopper
+} from "../../utils.mjs";
+import BaseShopConfig from "../shops/shop-config/base-shop-config.mjs";
 
 import MaterialCriteriaDialog from "./material-criteria-dialog.mjs";
-import BaseShopConfig from "./shop-config/base-shop-config.mjs";
 
 const { Application5e } = game.dnd5e.applications.api;
 
@@ -96,7 +93,7 @@ export default class RecipeSheet extends Application5e {
    * @type {Recipe}
    */
   get recipe() {
-    return getRecipe(this.recipeId);
+    return Recipe.get(this.recipeId);
   }
 
   /* -------------------------------------------- */
@@ -133,9 +130,7 @@ export default class RecipeSheet extends Application5e {
     if ( context.craftCost ) {
       for ( const part of breakdownCopper(toCopper(context.craftCost.gold, "gp")) ) craftCostBreakdown[part.denomination] = part.value;
     }
-    const materialPriceCP = Object.entries(recipe.materialPrice)
-      .reduce((sum, [denom, value]) => sum + toCopper(value ?? 0, denom), 0);
-    const thresholdCP = materialPriceCP || (context.craftCost ? toCopper(context.craftCost.gold, "gp") : 0);
+    const thresholdCP = recipe.craftThreshold(context.craftCost, targetResolved.item);
 
     const materialsResolved = await resolveEntries(recipe.materials);
     const materialRows = materialsResolved.map((r, index) => ({ ...r, index }))
@@ -165,7 +160,8 @@ export default class RecipeSheet extends Application5e {
         }
         return {
           ...shared, img: r.item.img, name: r.item.name, subtitle: r.entry.identifier || null,
-          price, valueCP
+          price, valueCP, warning: isDefaultIdentifier(r.item),
+          warningTooltip: isDefaultIdentifier(r.item) ? _loc("SIMPLE_SHOP_CRAFT_5E.RecipeEditor.NoIdentifierWarning") : null
         };
       });
     const requiredSumCP = materialRows.filter(r => r.required)
@@ -293,7 +289,7 @@ export default class RecipeSheet extends Application5e {
       ...recipe.materials.map(m => m.toObject()),
       ...newEntries.filter(e => !existingKeys.has(itemRefKey(e)))
     ];
-    await updateRecipe(this.recipeId, { materials });
+    await Recipe.update(this.recipeId, { materials });
     this.render();
   }
 
@@ -308,7 +304,7 @@ export default class RecipeSheet extends Application5e {
     await new MaterialCriteriaDialog({
       onSubmit: async ({ type, subtype, value }) => {
         const materials = [...this.recipe.materials.map(m => m.toObject()), { criteria: { type, subtype }, value }];
-        await updateRecipe(this.recipeId, { materials });
+        await Recipe.update(this.recipeId, { materials });
         this.render();
       }
     }).render({ force: true });
@@ -327,7 +323,7 @@ export default class RecipeSheet extends Application5e {
     const index = Number(target.dataset.index);
     const materials = this.recipe.materials.map((m, i) => (i === index)
       ? { ...m.toObject(), required: !m.required } : m.toObject());
-    await updateRecipe(this.recipeId, { materials });
+    await Recipe.update(this.recipeId, { materials });
     this.render();
   }
 
@@ -345,7 +341,7 @@ export default class RecipeSheet extends Application5e {
     const step = Number(target.dataset.step);
     const materials = this.recipe.materials.map((m, i) => (i === index)
       ? { ...m.toObject(), quantity: Math.max(1, m.quantity + step) } : m.toObject());
-    await updateRecipe(this.recipeId, { materials });
+    await Recipe.update(this.recipeId, { materials });
     this.render();
   }
 
@@ -368,7 +364,7 @@ export default class RecipeSheet extends Application5e {
     if ( item.system.properties?.has("mgc") ) skillProficiencies.add("arc");
     const targetItem = await itemEntryRef(item);
     const targetQuantity = (item.system.quantity > 1) ? item.system.quantity : 1;
-    await updateRecipe(this.recipeId, {
+    await Recipe.update(this.recipeId, {
       targetItem, targetQuantity, img: item.img, skillProficiencies: Array.from(skillProficiencies)
     });
     this.render();
@@ -404,7 +400,7 @@ export default class RecipeSheet extends Application5e {
           .map(([denom, value]) => [denom, Math.max(0, Math.round(value))])
       );
     }
-    await updateRecipe(this.recipeId, data);
+    await Recipe.update(this.recipeId, data);
     this.render();
   }
 
@@ -469,7 +465,7 @@ export default class RecipeSheet extends Application5e {
             ...m.toObject(),
             value: { value: data.value ?? null, denomination: data.denomination }
           });
-          await updateRecipe(this.recipeId, { materials });
+          await Recipe.update(this.recipeId, { materials });
           this.render();
         }
       }
@@ -514,7 +510,7 @@ export default class RecipeSheet extends Application5e {
           const materials = this.recipe.materials.map((m, i) => (i !== index) ? m.toObject() : {
             ...m.toObject(), identifier, uuid: ""
           });
-          await updateRecipe(this.recipeId, { materials });
+          await Recipe.update(this.recipeId, { materials });
           this.render();
         }
       }
@@ -534,7 +530,7 @@ export default class RecipeSheet extends Application5e {
   static async #removeMaterial(event, target) {
     const index = Number(target.dataset.index);
     const materials = this.recipe.materials.filter((m, i) => i !== index).map(m => m.toObject());
-    await updateRecipe(this.recipeId, { materials });
+    await Recipe.update(this.recipeId, { materials });
     this.render();
   }
 
@@ -546,7 +542,7 @@ export default class RecipeSheet extends Application5e {
    * @returns {Promise<void>}
    */
   static async #removeTargetItem() {
-    await updateRecipe(this.recipeId, { targetItem: { identifier: "", uuid: "" }, img: Recipe.DEFAULT_ICON });
+    await Recipe.update(this.recipeId, { targetItem: { identifier: "", uuid: "" }, img: Recipe.DEFAULT_ICON });
     this.render();
   }
 
@@ -571,7 +567,7 @@ export default class RecipeSheet extends Application5e {
     const entry = await itemEntryRef(item);
     if ( recipe.materials.some(m => itemRefKey(m) === itemRefKey(entry)) ) return;
 
-    await updateRecipe(this.recipeId, { materials: [...recipe.materials.map(m => m.toObject()), entry] });
+    await Recipe.update(this.recipeId, { materials: [...recipe.materials.map(m => m.toObject()), entry] });
     this.render();
   }
 }

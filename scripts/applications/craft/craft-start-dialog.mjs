@@ -1,16 +1,10 @@
-import { createCraftMessage } from "../chat/craft-card.mjs";
-import { HOURS_PER_USE } from "../config.mjs";
-import { getRecipe } from "../data/recipe-store.mjs";
-import { breakdownCopper, effectiveCraftCost, resolveDefaultPrice, resolveItemPrice, toCopper } from "../shop/currency.mjs";
-import { needsDefaultPrice } from "../shop/pricing.mjs";
+import { HOURS_PER_USE } from "../../config.mjs";
+import { CraftMessageData } from "../../data/craft-message.mjs";
+import { Recipe } from "../../data/recipe-data.mjs";
 import {
-  buildItemTableSections, loadingTooltip, openItemSheet, resolveBundleSizes, resolveEntries, selectableActors,
-  subtypeOptions
-} from "../utils.mjs";
-
-/**
- * @import { Recipe } from "../data/recipe-data.mjs";
- */
+  breakdownCopper, buildItemTableSections, effectiveCraftCost, loadingTooltip, needsDefaultPrice, openItemSheet,
+  resolveBundleSizes, resolveEntries, resolveItemPrice, selectableActors, subtypeOptions, toCopper
+} from "../../utils.mjs";
 
 const { Dialog5e } = game.dnd5e.applications.api;
 
@@ -128,7 +122,7 @@ export default class CraftStartDialog extends Dialog5e {
    * @type {Recipe}
    */
   get recipe() {
-    return getRecipe(this.recipeId);
+    return Recipe.get(this.recipeId);
   }
 
   /* -------------------------------------------- */
@@ -336,8 +330,9 @@ export default class CraftStartDialog extends Dialog5e {
           priceOverride: (entry.value?.value != null) ? entry.value : null
         };
       }
-      const owned = (actor && entry.identifier)
-        ? actor.items.find(i => i.system.identifier === entry.identifier)
+      const materialIdentifier = item?.system?.identifier || entry.identifier;
+      const owned = (actor && materialIdentifier)
+        ? actor.items.find(i => i.system.identifier === materialIdentifier)
         : null;
       const maxUnits = owned ? Math.min(owned.system.quantity, entry.quantity) : 0;
       const overrideKey = owned ? `${index}:${owned.id}` : null;
@@ -358,8 +353,7 @@ export default class CraftStartDialog extends Dialog5e {
     });
     const suppliedCP = fixedLines.reduce((sum, l) => sum + l.suppliedLineCP, 0)
       + freeformItems.reduce((sum, item) => sum + materialValueCP(item, bundleSizes.get(item.id)), 0);
-    const targetBundleSize = (targetItem?.system?.quantity > 1) ? targetItem.system.quantity : 1;
-    const thresholdCP = craftThresholdCP(recipe, craftCost) * (recipe.targetQuantity / targetBundleSize);
+    const thresholdCP = recipe.craftThreshold(craftCost, targetItem);
     const shortfallCP = Math.max(0, thresholdCP - suppliedCP);
     const materialsMet = recipe.ignoreCraftValue || (suppliedCP >= thresholdCP);
     const requiredMet = fixedLines.every(l => !l.required || l.slotMet);
@@ -484,10 +478,10 @@ export default class CraftStartDialog extends Dialog5e {
       ...state.fixedLines.flatMap(l => l.criteria
         ? l.candidates.filter(c => c.selected > 0)
           .map(c => ({ item: state.actor.items.get(c.id), quantity: c.selected }))
-        : (l.item ? [{ item: l.item, quantity: l.suppliedUnits }] : [])),
+        : ((l.item && (l.suppliedUnits > 0)) ? [{ item: l.item, quantity: l.suppliedUnits }] : [])),
       ...state.freeformItems.map(item => ({ item, quantity: 1 }))
     ];
-    await createCraftMessage({
+    await CraftMessageData.create({
       actor: state.actor, recipe: state.recipe, targetItem: state.targetItem,
       materialLines,
       goldCP: state.goldCP, toolKey: state.chosenToolKey, totalHours: state.totalHours,
@@ -554,22 +548,6 @@ function buildMaterialsTable(state) {
 /* -------------------------------------------- */
 
 /**
- * Resolve a recipe's material-value threshold in copper: its own explicit threshold if set, otherwise the
- * rules-based crafting cost of the target item.
- * @param {Recipe} recipe
- * @param {{ gold: number, days: number }|null} craftCost
- * @returns {number}
- */
-function craftThresholdCP(recipe, craftCost) {
-  const explicit = Object.entries(recipe.materialPrice)
-    .reduce((sum, [denom, value]) => sum + toCopper(value ?? 0, denom), 0);
-  if ( explicit > 0 ) return explicit;
-  return craftCost ? toCopper(craftCost.gold, "gp") : 0;
-}
-
-/* -------------------------------------------- */
-
-/**
  * Resolve an owned item's contributed value in copper, per unit — via its own price or the rarity-based
  * fallback, divided by its canonical bundle size (e.g. a stack of 20 arrows priced as a whole).
  * @param {Item5e} item
@@ -577,7 +555,7 @@ function craftThresholdCP(recipe, craftCost) {
  * @returns {number}
  */
 function materialValueCP(item, bundleSize=1) {
-  const price = needsDefaultPrice(item) ? resolveDefaultPrice(item) : item.system.price;
+  const price = needsDefaultPrice(item) ? resolveItemPrice(item) : item.system.price;
   if ( !price?.value ) return 0;
-  return toCopper(price.value, price.denomination) / bundleSize;
+  return toCopper(price.value / bundleSize, price.denomination);
 }

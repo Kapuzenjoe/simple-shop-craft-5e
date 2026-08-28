@@ -1,5 +1,3 @@
-import { resolvePlayerOverride } from "../shop/pricing.mjs";
-
 /**
  * @import { default as ShopSheet } from "./shop-sheet.mjs";
  */
@@ -63,7 +61,7 @@ export default class HaggleDialog extends Dialog5e {
   async _prepareContentContext(context, options) {
     context = await super._prepareContentContext(context, options);
     context.legend = this.options.window?.title;
-    const playerOverride = resolvePlayerOverride(this.shopSheet.shop.playerDiscounts, this.shopSheet.selectedActorUuid);
+    const playerOverride = this.shopSheet.shop.resolvePlayerOverride(this.shopSheet.selectedActorUuid);
     const effectiveBuy = this.shopSheet.shop.buyModifier + (playerOverride.buy ?? 0);
     const effectiveSell = this.shopSheet.shop.sellModifier + (playerOverride.sell ?? 0);
     const chaSkills = Object.entries(CONFIG.DND5E.skills).filter(([, s]) => s.ability === "cha");

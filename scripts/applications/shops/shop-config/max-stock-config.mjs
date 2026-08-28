@@ -1,5 +1,4 @@
-import { ShopItemEntry } from "../../data/shop-data.mjs";
-import { entryKey } from "../../shop/entry-resolver.mjs";
+import { ShopItemEntry } from "../../../data/shop-data.mjs";
 
 import BaseShopConfig from "./base-shop-config.mjs";
 
@@ -66,7 +65,7 @@ export default class MaxStockConfig extends BaseShopConfig {
    * @type {ShopItemEntry}
    */
   get #entry() {
-    return this.shopSheet.shop.items.find(i => entryKey(i) === this.entryKey);
+    return this.shopSheet.shop.items.find(i => ShopItemEntry.key(i) === this.entryKey);
   }
 
   /* -------------------------------------------- */
@@ -115,7 +114,7 @@ export default class MaxStockConfig extends BaseShopConfig {
    */
   static async #onSubmit(event, form, formData) {
     const data = foundry.utils.expandObject(formData.object);
-    const items = this.shopSheet.shop.items.map(i => entryKey(i) !== this.entryKey ? i.toObject() : {
+    const items = this.shopSheet.shop.items.map(i => ShopItemEntry.key(i) !== this.entryKey ? i.toObject() : {
       ...i.toObject(),
       stock: { max: data.noRestock ? null : (data.max ?? null), current: data.current ?? null },
       noRestock: !!data.noRestock

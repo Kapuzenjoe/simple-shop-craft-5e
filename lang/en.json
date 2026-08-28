@@ -132,6 +132,7 @@
       "ChangeIdentifierHint": "Must match an existing item's identifier.",
       "IdentifierRequired": "Enter an identifier.",
       "IdentifierNotFound": "No item with this identifier could be found.",
+      "NoIdentifierWarning": "This item has no distinct identifier — it may not be recognized as owned when crafting.",
       "RequiredMaterialsValue": "Required Materials Value",
       "CraftValueIgnored": "Crafting value is ignored for this recipe.",
       "MaterialCriteriaTypeRequired": "Choose an item type.",

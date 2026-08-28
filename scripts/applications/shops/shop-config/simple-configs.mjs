@@ -1,6 +1,5 @@
-import { Shop, ShopItemEntry } from "../../data/shop-data.mjs";
-import { entryKey, resolveShopItems } from "../../shop/entry-resolver.mjs";
-import { getCurrencyOptions } from "../../utils.mjs";
+import { Shop, ShopItemEntry } from "../../../data/shop-data.mjs";
+import { getCurrencyOptions } from "../../../utils.mjs";
 
 import BaseShopConfig from "./base-shop-config.mjs";
 
@@ -18,7 +17,7 @@ import BaseShopConfig from "./base-shop-config.mjs";
  */
 export async function openDiscountConfig(shopSheet, target, playerOverride, onUpdate) {
   const key = target.dataset.key;
-  const entry = shopSheet.shop.items.find(i => entryKey(i) === key);
+  const entry = shopSheet.shop.items.find(i => ShopItemEntry.key(i) === key);
   const effectiveDefault = shopSheet.shop.buyModifier + (playerOverride.buy ?? 0);
 
   const dialog = new BaseShopConfig({
@@ -35,7 +34,7 @@ export async function openDiscountConfig(shopSheet, target, playerOverride, onUp
     form: {
       handler: async (event, form, formData) => {
         const data = foundry.utils.expandObject(formData.object);
-        const items = shopSheet.shop.items.map(i => entryKey(i) !== key ? i.toObject() : {
+        const items = shopSheet.shop.items.map(i => ShopItemEntry.key(i) !== key ? i.toObject() : {
           ...i.toObject(),
           discount: data.discount ?? null
         });
@@ -128,8 +127,8 @@ export async function openOwnerConfig(shopSheet, onUpdate) {
  */
 export async function openPriceConfig(shopSheet, target, onUpdate) {
   const key = target.dataset.key;
-  const entry = shopSheet.shop.items.find(i => entryKey(i) === key);
-  const item = (await resolveShopItems([entry]))[0]?.item;
+  const entry = shopSheet.shop.items.find(i => ShopItemEntry.key(i) === key);
+  const item = (await ShopItemEntry.resolveMany([entry]))[0]?.item;
   const priceFields = ShopItemEntry.schema.fields.price.fields;
   const bundleSizeField = ShopItemEntry.schema.fields.bundleSize;
 
@@ -156,7 +155,7 @@ export async function openPriceConfig(shopSheet, target, onUpdate) {
     form: {
       handler: async (event, form, formData) => {
         const data = foundry.utils.expandObject(formData.object);
-        const items = shopSheet.shop.items.map(i => entryKey(i) !== key ? i.toObject() : {
+        const items = shopSheet.shop.items.map(i => ShopItemEntry.key(i) !== key ? i.toObject() : {
           ...i.toObject(),
           price: { value: data.value ?? null, denomination: data.denomination },
           bundleSize: data.bundleSize ?? null

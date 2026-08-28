@@ -1,5 +1,5 @@
-import { Shop } from "../../data/shop-data.mjs";
-import { currencyRows, goldPoolCurrencies } from "../../shop/currency.mjs";
+import { Shop } from "../../../data/shop-data.mjs";
+import { currencyRows, goldPoolCurrencies } from "../../../utils.mjs";
 
 import BaseShopConfig from "./base-shop-config.mjs";
 

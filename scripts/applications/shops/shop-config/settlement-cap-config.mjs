@@ -1,6 +1,6 @@
-import { SETTLEMENT_CAPS } from "../../config.mjs";
-import { Shop } from "../../data/shop-data.mjs";
-import { getCurrencyOptions } from "../../utils.mjs";
+import { SETTLEMENT_CAPS } from "../../../config.mjs";
+import { Shop } from "../../../data/shop-data.mjs";
+import { getCurrencyOptions } from "../../../utils.mjs";
 
 import BaseShopConfig from "./base-shop-config.mjs";
 
