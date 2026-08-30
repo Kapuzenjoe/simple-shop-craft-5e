@@ -64,11 +64,15 @@ export default class CraftStartDialog extends Dialog5e {
    */
   recipeId;
 
+  /* -------------------------------------------- */
+
   /**
    * UUID of the selected crafting actor, or "" if none chosen.
    * @type {string}
    */
   selectedActorUuid;
+
+  /* -------------------------------------------- */
 
   /**
    * Ids of owned items added as freeform materials.
@@ -76,11 +80,15 @@ export default class CraftStartDialog extends Dialog5e {
    */
   #freeformIds = new Set();
 
+  /* -------------------------------------------- */
+
   /**
    * Chosen tool proficiency key, when the recipe allows more than one.
    * @type {string|null}
    */
   #toolKey = null;
+
+  /* -------------------------------------------- */
 
   /**
    * Whether the player has claimed workshop access in place of owning the tool.
@@ -88,17 +96,23 @@ export default class CraftStartDialog extends Dialog5e {
    */
   #workshopClaimed = false;
 
+  /* -------------------------------------------- */
+
   /**
    * Whether the shortfall between supplied material value and the threshold should be filled with gold.
    * @type {boolean}
    */
   #fillWithGold = false;
 
+  /* -------------------------------------------- */
+
   /**
    * Selected quantity per criteria-slot candidate, keyed by `{index}:{itemId}`.
    * @type {Map<string, number>}
    */
   #materialQuantities = new Map();
+
+  /* -------------------------------------------- */
 
   /**
    * Name of the resolved target item, cached as a title fallback once known.
@@ -453,6 +467,7 @@ export default class CraftStartDialog extends Dialog5e {
 
   /**
    * Handle opening a criteria candidate's item sheet.
+   * @this {CraftStartDialog}
    * @param {Event} event         Triggering click event.
    * @param {HTMLElement} target  Button that was clicked.
    * @returns {Promise<void>}

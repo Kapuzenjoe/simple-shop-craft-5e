@@ -36,17 +36,23 @@ export default class MaxStockConfig extends BaseShopConfig {
     onUpdate: null
   };
 
+  /* -------------------------------------------- */
+
   /**
    * The shop editor this config belongs to.
    * @type {ShopSheet}
    */
   shopSheet;
 
+  /* -------------------------------------------- */
+
   /**
    * Entry key of the item being edited.
    * @type {string}
    */
   entryKey;
+
+  /* -------------------------------------------- */
 
   /**
    * Callback receiving the shop update.

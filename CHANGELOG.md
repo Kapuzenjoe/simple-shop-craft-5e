@@ -2,6 +2,7 @@
 
 ## 0.3.0
 
+- Added a "Fill from Table" action to a shop's Buy tab, drawing items from a RollTable into its stock.
 - Added a "Magical Items" rule to a shop's Vendor Settings dialog, controlling which magic items skip the default stock and are excluded from restock instead.
 - Added a "Purchase Only" toggle to a shop's Vendor Settings dialog, disabling its Sell tab.
 - Added default max stock per item type, set in the Vendor Settings dialog.

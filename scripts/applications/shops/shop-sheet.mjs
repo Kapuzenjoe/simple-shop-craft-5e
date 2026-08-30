@@ -6,6 +6,7 @@ import {
   needsDefaultPrice, openItemSheet, resolveItemPrice, selectableActors, toCopper
 } from "../../utils.mjs";
 
+import FillFromTableDialog from "./fill-from-table-dialog.mjs";
 import GenerateItemDialog from "./generate-item-dialog.mjs";
 import HaggleDialog from "./haggle-dialog.mjs";
 import ShopCart from "./shop-cart.mjs";
@@ -118,6 +119,7 @@ export default class ShopSheet extends Application5e {
       editPrice: ShopSheet.#editPrice,
       editSettlementCap: ShopSheet.#editSettlementCap,
       editVendorSettings: ShopSheet.#editVendorSettings,
+      fillFromTable: ShopSheet.#fillFromTable,
       generateItem: ShopSheet.#generateItem,
       haggle: ShopSheet.#haggle,
       openCart: ShopSheet.#openCart,
@@ -552,7 +554,15 @@ export default class ShopSheet extends Application5e {
     generateButton.dataset.action = "generateItem";
     generateButton.innerHTML = '<i class="fas fa-wand-magic-sparkles" inert></i>';
 
-    actions.append(button, generateButton);
+    const fillButton = document.createElement("button");
+    fillButton.type = "button";
+    fillButton.dataset.tooltip = "SIMPLE_SHOP_CRAFT_5E.ShopEditor.FillFromTable";
+    fillButton.ariaLabel = _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.FillFromTable");
+    fillButton.classList.add("gold-button", "always-interactive");
+    fillButton.dataset.action = "fillFromTable";
+    fillButton.innerHTML = '<i class="fas fa-table-list" inert></i>';
+
+    actions.append(button, generateButton, fillButton);
     this.element.querySelector(".window-content").append(actions);
   }
 
@@ -823,6 +833,17 @@ export default class ShopSheet extends Application5e {
    */
   static async #editVendorSettings() {
     await new VendorConfig({ shopSheet: this, onUpdate: updateData => this.#updateShop(updateData) })
+      .render({ force: true });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle opening the fill-from-table dialog.
+   * @this {ShopSheet}
+   */
+  static async #fillFromTable() {
+    await new FillFromTableDialog({ shopSheet: this, onFilled: entries => this.#mergeItemEntries(entries) })
       .render({ force: true });
   }
 

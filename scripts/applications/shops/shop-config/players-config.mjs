@@ -36,6 +36,8 @@ export default class PlayersConfig extends BaseShopConfig {
     onUpdatePlayerDiscount: null
   };
 
+  /* -------------------------------------------- */
+
   /** @override */
   static PARTS = {
     ...super.PARTS,
@@ -48,11 +50,15 @@ export default class PlayersConfig extends BaseShopConfig {
    */
   shopSheet;
 
+  /* -------------------------------------------- */
+
   /**
    * Callback receiving the shop update.
    * @type {(updateData: object) => Promise<void>}
    */
   onUpdate;
+
+  /* -------------------------------------------- */
 
   /**
    * Callback receiving a haggling-lock update for one actor.

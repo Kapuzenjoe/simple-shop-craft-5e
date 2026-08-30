@@ -51,6 +51,8 @@ export default class VendorConfig extends BaseShopConfig {
    */
   shopSheet;
 
+  /* -------------------------------------------- */
+
   /**
    * Callback receiving the shop update.
    * @type {(updateData: object) => Promise<void>}
