@@ -18,7 +18,9 @@ const {
 } = foundry.data.fields;
 
 /**
- * @import { ShopPlayerDiscountData, ShopItemEntryData, ShopData, GeneratorCandidate, SpellFilter } from "../_types.mjs";
+ * @import {
+ *   ShopPlayerDiscountData, ShopItemEntryData, ShopData, GeneratorCandidate, SpellFilter
+ * } from "../_types.mjs";
  */
 
 /**
@@ -116,7 +118,9 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
    *   default stock configuration, applied to non-magic-exempt mundane candidates.
    * @returns {Promise<{ entry: ShopItemEntryData, label: string }[]>}
    */
-  static async rollMany({ typeConfigs, rarities, magic, spellFilter, count, existingKeys, settlementCap, stockDefaults }) {
+  static async rollMany({
+    typeConfigs, rarities, magic, spellFilter, count, existingKeys, settlementCap, stockDefaults
+  }) {
     const candidatePool = await ShopItemEntry.#buildCandidatePool({ typeConfigs, rarities, spellFilter });
     const capCP = settlementCap?.value != null ? toCopper(settlementCap.value, settlementCap.denomination) : null;
     const keys = new Set(existingKeys);
@@ -485,7 +489,8 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
       const obj = entry.toObject();
       if ( obj.restockMode === "normal" ) {
         const item = resolved[index]?.item;
-        obj.stock = { ...obj.stock, current: obj.stock.max ?? (item ? Shop.defaultStockMax(item, this.stockDefaults) : null) };
+        const defaultMax = item ? Shop.defaultStockMax(item, this.stockDefaults) : null;
+        obj.stock = { ...obj.stock, current: obj.stock.max ?? defaultMax };
       }
       return obj;
     });
