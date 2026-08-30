@@ -1,4 +1,5 @@
-import { ShopItemEntry } from "../../../data/shop-data.mjs";
+import { RESTOCK_MODES } from "../../../config.mjs";
+import { Shop, ShopItemEntry } from "../../../data/shop-data.mjs";
 
 import BaseShopConfig from "./base-shop-config.mjs";
 
@@ -19,7 +20,7 @@ export default class MaxStockConfig extends BaseShopConfig {
     this.shopSheet = shopSheet;
     this.entryKey = key;
     this.onUpdate = onUpdate;
-    this.#noRestock = !!this.#entry.noRestock;
+    this.#restockMode = this.#entry.restockMode;
   }
 
   /* -------------------------------------------- */
@@ -56,10 +57,10 @@ export default class MaxStockConfig extends BaseShopConfig {
   /* -------------------------------------------- */
 
   /**
-   * Whether restocking is disabled for this item, toggled live before submit.
-   * @type {boolean}
+   * Restock behavior for this item, toggled live before submit.
+   * @type {string}
    */
-  #noRestock;
+  #restockMode;
 
   /* -------------------------------------------- */
 
@@ -78,18 +79,23 @@ export default class MaxStockConfig extends BaseShopConfig {
     const context = await super._prepareContext(options);
     const entry = this.#entry;
     const stockFields = ShopItemEntry.schema.fields.stock.fields;
+    const [resolved] = await ShopItemEntry.resolveMany([entry]);
+    const typeDefault = resolved.item ? Shop.defaultStockMax(resolved.item, this.shopSheet.shop.stockDefaults) : null;
+    const currentPlaceholder = (this.#restockMode === "unlimited") ? "∞" : 0;
     context.fields = [
       {
-        field: stockFields.max, name: "max", value: entry.stock.max, placeholder: "∞", disabled: this.#noRestock,
+        field: stockFields.max, name: "max", value: entry.stock.max,
+        placeholder: typeDefault ?? "∞", disabled: this.#restockMode !== "normal",
         label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StockMax"), hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StockMaxHint")
       },
       {
-        field: stockFields.current, name: "current", value: entry.stock.current, placeholder: "∞",
-        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StockCurrent")
+        field: stockFields.current, name: "current", value: entry.stock.current, placeholder: currentPlaceholder,
+        disabled: this.#restockMode === "unlimited", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StockCurrent")
       },
       {
-        field: ShopItemEntry.schema.fields.noRestock, name: "noRestock", value: this.#noRestock,
-        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoRestock"), hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoRestockHint")
+        field: ShopItemEntry.schema.fields.restockMode, name: "restockMode", value: this.#restockMode,
+        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.RestockMode"),
+        options: Object.entries(RESTOCK_MODES).map(([value, { label }]) => ({ value, label: _loc(label) }))
       }
     ];
     return context;
@@ -100,8 +106,8 @@ export default class MaxStockConfig extends BaseShopConfig {
   /** @inheritDoc */
   _onChangeForm(formConfig, event) {
     super._onChangeForm(formConfig, event);
-    if ( event.target.name !== "noRestock" ) return;
-    this.#noRestock = event.target.checked;
+    if ( event.target.name !== "restockMode" ) return;
+    this.#restockMode = event.target.value;
     this.render({ parts: ["content"] });
   }
 
@@ -117,10 +123,17 @@ export default class MaxStockConfig extends BaseShopConfig {
    */
   static async #onSubmit(event, form, formData) {
     const data = foundry.utils.expandObject(formData.object);
-    const items = this.shopSheet.shop.items.map(i => ShopItemEntry.key(i) !== this.entryKey ? i.toObject() : {
-      ...i.toObject(),
-      stock: { max: data.noRestock ? null : (data.max ?? null), current: data.current ?? null },
-      noRestock: !!data.noRestock
+    const restockMode = data.restockMode ?? "normal";
+    const items = this.shopSheet.shop.items.map(i => {
+      if ( ShopItemEntry.key(i) !== this.entryKey ) return i.toObject();
+      return {
+        ...i.toObject(),
+        stock: {
+          max: (restockMode === "normal") ? (data.max ?? null) : (i.stock.max ?? null),
+          current: (restockMode === "unlimited") ? null : (data.current ?? 0)
+        },
+        restockMode
+      };
     });
     await this.onUpdate({ items });
   }

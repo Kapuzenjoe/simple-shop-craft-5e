@@ -23,7 +23,8 @@
  * @property {number|null} stock.current  Current stock, or `null` for unlimited.
  * @property {number|null} discount      Percent discount (negative) or markup (positive). `null` inherits the
  *                                       shop's buyModifier.
- * @property {boolean} noRestock         Whether this entry is excluded from stock resets.
+ * @property {string} restockMode        `"normal"` | `"unlimited"` | `"exclude"` — how this entry behaves on
+ *                                       restock.
  * @property {object} price
  * @property {number|null} price.value        Price override. `null` means use the compendium item's price.
  * @property {string} price.denomination      Currency denomination of the override.
@@ -64,6 +65,13 @@
  * @property {Record<string, number>} goldPool.max      Maximum gold pool, per denomination.
  * @property {Record<string, number>} goldPool.current  Current gold pool, per denomination.
  * @property {boolean} goldPool.unlimited                Whether this shop's buy-back funds are unlimited.
+ * @property {boolean} goldPool.sellDisabled             Whether this shop is purchase-only (doesn't buy from
+ *                                                       players at all).
+ * @property {object} stockDefaults
+ * @property {Record<string, number|null>} stockDefaults.byType  Default max stock per item type, for entries
+ *                                                    with no per-item override. `null` per type = unlimited.
+ * @property {string} stockDefaults.magicRule         `"all"` | `"none"` | `"gear"` — which magic items skip
+ *                                                    the type default above and start unlimited instead.
  * @property {Set<number>} restockWeekdays   Weekday indices (`dayOfWeek`) this shop restocks on automatically.
  *                                           Empty = disabled.
  * @property {Set<number>} closedWeekdays    Weekday indices (`dayOfWeek`) this shop is closed on. Empty = never.

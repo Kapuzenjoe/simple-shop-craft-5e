@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0
+
+- Added a "Magical Items" rule to a shop's Vendor Settings dialog, controlling which magic items skip the default stock and are excluded from restock instead.
+- Added a "Purchase Only" toggle to a shop's Vendor Settings dialog, disabling its Sell tab.
+- Added default max stock per item type, set in the Vendor Settings dialog.
+- Changed a shop item's "Exclude from Restock" toggle to a Normal/Unlimited/Exclude stock mode.
+- Fixed the Vendor Settings dialog's currency fields never appearing.
+- Renamed the shop's Max. Shop Money dialog to Vendor Settings.
+
 ## 0.2.1
 
 - Fixed starting a craft with an unallocated optional material sometimes deleting it from the actor.

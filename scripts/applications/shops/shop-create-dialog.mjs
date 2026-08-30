@@ -1,5 +1,6 @@
 import { GOLD_POOL_DEFAULT, STARTER_PACKS } from "../../config.mjs";
-import { Shop } from "../../data/shop-data.mjs";
+import { newEntryStock, Shop } from "../../data/shop-data.mjs";
+import { resolveIdentifierIndex } from "../../utils.mjs";
 
 import ShopSheet from "./shop-sheet.mjs";
 
@@ -95,13 +96,20 @@ export default class ShopCreateDialog extends Dialog5e {
   static async #onSubmit(event, form, formData) {
     const data = foundry.utils.expandObject(formData.object);
     const packs = getStarterPackOptions();
+    const starterItems = getStarterItems(data.starterPack);
+    const byIdentifier = await resolveIdentifierIndex(new Set(starterItems.map(i => i.identifier)));
+    const resolvedItems = await Promise.all(starterItems.map(({ identifier }) => {
+      const uuid = byIdentifier.get(identifier)?.uuid;
+      return uuid ? fromUuid(uuid) : null;
+    }));
+    const stockDefaults = Shop.schema.fields.stockDefaults.getInitialValue({});
     const newShop = {
       name: data.name || packs.find(p => p.value === data.starterPack)?.label
         || _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Create"),
       goldPool: { max: { gp: GOLD_POOL_DEFAULT }, current: { gp: GOLD_POOL_DEFAULT }, unlimited: false },
-      items: getStarterItems(data.starterPack).map(({ identifier, bundleSize }) => ({
-        identifier, bundleSize, stock: { max: null, current: null }
-      }))
+      items: starterItems.map(({ identifier, bundleSize }, index) => {
+        return { identifier, bundleSize, ...newEntryStock(resolvedItems[index], stockDefaults) };
+      })
     };
     const created = await Shop.create(newShop);
     this.shopManager.render();

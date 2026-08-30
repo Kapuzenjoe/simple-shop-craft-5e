@@ -352,7 +352,8 @@ export async function resolveIdentifierIndex(identifiers) {
     for ( const pack of packsByPackageType.get(packageType) ?? [] ) {
       const index = await pack.getIndex({ fields: [
         "system.identifier", "system.source.rules", "system.price.value", "system.price.denomination",
-        "system.weight.value", "system.weight.units", "system.quantity", "system.type.value", "system.rarity"
+        "system.weight.value", "system.weight.units", "system.quantity", "system.type.value", "system.rarity",
+        "system.properties"
       ] });
       for ( const entry of index ) considerEntry(entry);
     }

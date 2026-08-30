@@ -61,7 +61,7 @@
             <div class="stock-display">
                 {{#if stockTracked}}
                 <span class="value">
-                    {{ entry.stock.current }}{{#unless entry.noRestock}} / {{ entry.stock.max }}{{/unless}}
+                    {{ stockCurrent }}{{#if (eq entry.restockMode "normal")}} / {{ stockMax }}{{/if}}
                 </span>
                 {{else}}
                 <i class="fas fa-infinity" inert></i>

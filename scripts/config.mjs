@@ -47,6 +47,45 @@ export const SETTLEMENT_CAPS = {
 export const GOLD_POOL_DEFAULT = 100;
 
 /**
+ * Suggested default max stock per item type for newly created shops, editable per shop afterward.
+ * @type {Record<string, number>}
+ */
+export const DEFAULT_STOCK_BY_TYPE = {
+  weapon: 2,
+  equipment: 2,
+  tool: 2,
+  consumable: 5,
+  loot: 3,
+  container: 1
+};
+
+/**
+ * Item types eligible for the magic-item stock exemption.
+ * @type {Set<string>}
+ */
+export const MAGIC_EXEMPT_TYPES = new Set(["weapon", "equipment", "tool", "container"]);
+
+/**
+ * Magic-item stock exemption rules for a shop's default stock.
+ * @type {Record<string, { label: string }>}
+ */
+export const STOCK_MAGIC_RULES = {
+  gear: { label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.StockMagicRuleGear" },
+  all: { label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.StockMagicRuleAll" },
+  none: { label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.StockMagicRuleNone" }
+};
+
+/**
+ * Restock behaviors for a shop item entry.
+ * @type {Record<string, { label: string }>}
+ */
+export const RESTOCK_MODES = {
+  normal: { label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.RestockModeNormal" },
+  unlimited: { label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.RestockModeUnlimited" },
+  exclude: { label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.RestockModeExclude" }
+};
+
+/**
  * Hours of progress granted per use of the "Progress Craft" activity (one downtime workday), per DMG
  * 2024 crafting rules.
  * @type {number}
