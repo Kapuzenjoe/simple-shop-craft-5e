@@ -2,6 +2,26 @@
     {{#if showNoActor}}
     <p class="hint">{{ localize noActorLabel }}</p>
     {{else}}
+    <search>
+        <input type="search" class="item-search always-interactive"
+               placeholder="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.SearchItems' }}">
+        <button type="button" class="filter-control clear-control unbutton always-interactive" data-tooltip
+                aria-label="{{ localize 'DND5E.FilterClear' }}">
+            <i class="fa-solid fa-xmark" inert></i>
+        </button>
+        <label class="filter-control" data-tooltip="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.AllTypes' }}">
+            <select class="item-type-filter always-interactive">
+                <option value="">{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.AllTypes' }}</option>
+                {{#each table.sections}}
+                <option value="{{ this.type }}">{{ localize this.label }}</option>
+                {{/each}}
+            </select>
+        </label>
+        <button type="button" class="filter-control sort-control always-interactive" data-tooltip
+                aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.SortByName' }}">
+            <i class="fa-solid fa-arrow-down-a-z" inert></i>
+        </button>
+    </search>
     {{> "modules/simple-shop-craft-5e/templates/partials/item-table.hbs" table}}
     {{/if}}
 </section>

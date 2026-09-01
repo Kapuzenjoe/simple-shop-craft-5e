@@ -19,7 +19,11 @@
           "hint": "Loot subtypes never subject to the Buy/Sell modifiers above (e.g. gemstones, art objects always sell at their listed value)."
         },
         "goldPool": {
-          "unlimited": { "label": "Unlimited" }
+          "unlimited": { "label": "Unlimited" },
+          "sellDisabled": { "label": "Purchase Only" }
+        },
+        "stockDefaults": {
+          "magicRule": { "label": "Magical Items" }
         }
       }
     },
@@ -100,6 +104,8 @@
         "Create": "New Shop",
         "Delete": "Delete Shop",
         "Duplicate": "Duplicate Shop",
+        "SearchShops": "Search Shops",
+        "SortBySettlementCap": "Sort by Settlement Cap",
         "DeleteConfirm": "Delete this shop? This cannot be undone."
       },
       "Recipes": {
@@ -109,6 +115,9 @@
         "DeleteConfirm": "Delete this recipe? This cannot be undone.",
         "Unlocked": "Unlocked",
         "UnlockedAll": "All",
+        "SearchRecipes": "Search Recipes",
+        "MaterialValue": "Material Value",
+        "SortByMaterialValue": "Sort by Material Value",
         "Locked": "You haven't unlocked this recipe yet."
       }
     },
@@ -142,6 +151,10 @@
     "ShopEditor": {
       "Title": "Edit Shop",
       "AddItems": "Add Items",
+      "SearchItems": "Search Items",
+      "AllTypes": "All Types",
+      "SortByName": "Sort by Name",
+      "SortByPrice": "Sort by Price",
       "GenerateItem": "Generate Item",
       "GenerateItemType": "Item Type",
       "GenerateItemMundane": "Mundane",
@@ -158,6 +171,14 @@
       "GenerateItemRitualOnly": "Ritual Only",
       "GenerateItemCount": "Count",
       "GenerateItemClass": "Class",
+      "FillFromTable": "Fill from Table",
+      "FillFromTableTable": "Roll Table",
+      "FillFromTableCount": "Draws",
+      "FillFromTableCountHint": "How many times to draw from the table — accepts a dice formula, e.g. 1d4.",
+      "FillFromTableNone": "No items found in that table's results.",
+      "FillFromTableResult": "Added {name}.",
+      "FillFromTableResultMultiple": "Added {count} items.",
+      "FillFromTablePartial": "Added {count} items ({skipped} results weren't usable items).",
       "Tabs": {
         "Buy": "Buy",
         "Sell": "Sell",
@@ -207,11 +228,21 @@
       "Town": "Town",
       "City": "City",
       "GoldPool": "Shop Money",
-      "GoldPoolMax": "Max. Shop Money",
+      "VendorSettings": "Vendor Settings",
       "GoldPoolMaxHint": "Restored to this amount when the shop is restocked.",
+      "SellDisabledHint": "Players can't sell items back to this shop.",
+      "PurchaseOnlyShop": "Purchase Only Shop",
+      "PurchaseOnlyShopHint": "This shop won't buy anything.",
       "ResetRestock": "Reset Stock & Shop Money",
-      "NoRestock": "Exclude from Restock",
-      "NoRestockHint": "This item stays depleted after being bought out — Reset won't restock it.",
+      "RestockMode": "Restock",
+      "RestockModeNormal": "Normal Stock",
+      "RestockModeUnlimited": "Unlimited Stock",
+      "RestockModeExclude": "Exclude from Stock",
+      "StockDefaultHint": "Empty means unlimited stock for that type.",
+      "StockMagicRuleGear": "Weapons, Armor, Tools & Containers",
+      "StockMagicRuleAll": "All Types",
+      "StockMagicRuleNone": "None",
+      "StockMagicRuleHint": "Which Magical items skip the default stock below and are excluded from restock instead.",
       "RestockDays": "Restock Days",
       "RestockDaysHint": "On the selected weekdays, this shop's stock and gold pool reset to their maximum at the next in-game day change.",
       "AutoRestockNoCalendarHint": "Requires an active calendar (dnd5e's own or Calendaria) to track elapsed days.",
@@ -229,10 +260,8 @@
       "Stock": "Stock",
       "StockTooltip": "Edit Stock",
       "StockMax": "Max Stock",
-      "StockMaxHint": "Empty means unlimited stock.",
+      "StockMaxHint": "Empty uses the shop's default for this item type.",
       "StockCurrent": "Current Stock",
-      "CartQuantity": "Buy",
-      "SellQuantity": "Sell",
       "IncreaseQuantity": "Increase Quantity",
       "DecreaseQuantity": "Decrease Quantity",
       "NoSellableItems": "Nothing to sell.",
@@ -256,6 +285,7 @@
       "InsufficientStock": "Not enough stock left for one or more items — purchase not completed.",
       "InsufficientSellQuantity": "The seller no longer has enough of one or more items — sale not completed.",
       "InsufficientShopGold": "The shop doesn't have enough gold to buy these items — sale not completed.",
+      "SellDisabled": "This shop doesn't buy items back — sale not completed.",
       "MissingActor": "The buying character could no longer be found.",
       "MissingShop": "The shop this purchase belongs to could no longer be found.",
       "MissingItem": "One of the purchased items could no longer be resolved."

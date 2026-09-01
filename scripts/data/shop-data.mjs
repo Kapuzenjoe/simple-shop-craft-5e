@@ -1,4 +1,6 @@
-import { SETTING_KEYS, SPELL_SCROLL_LEVELS } from "../config.mjs";
+import {
+  DEFAULT_STOCK_BY_TYPE, MAGIC_EXEMPT_TYPES, RESTOCK_MODES, SETTING_KEYS, SPELL_SCROLL_LEVELS, STOCK_MAGIC_RULES
+} from "../config.mjs";
 import { calendariaDayOfWeek, calendariaWeekdaysPassed, isCalendariaActive } from "../integrations/calendaria.mjs";
 import {
   breakdownCopper, currencyRows, deductActorCurrencyChecked, excludeFilter, isDnd5eAutoRecoveryEnabled,
@@ -6,16 +8,19 @@ import {
 } from "../utils.mjs";
 
 import { EnchantedItemBlueprint } from "./enchanted-item-blueprint.mjs";
+import { migrateRestockMode } from "./migration.mjs";
 import { SettingCollectionMixin } from "./setting-collection.mjs";
 import { SpellScrollBlueprint } from "./spell-scroll-blueprint.mjs";
 
 const {
   ArrayField, BooleanField, DocumentIdField, DocumentUUIDField, EmbeddedDataField, FilePathField, HTMLField,
-  NumberField, ObjectField, SchemaField, SetField, StringField
+  NumberField, ObjectField, SchemaField, SetField, StringField, TypedObjectField
 } = foundry.data.fields;
 
 /**
- * @import { ShopPlayerDiscountData, ShopItemEntryData, ShopData, GeneratorCandidate, SpellFilter } from "../_types.mjs";
+ * @import {
+ *   ShopPlayerDiscountData, ShopItemEntryData, ShopData, GeneratorCandidate, SpellFilter
+ * } from "../_types.mjs";
  */
 
 /**
@@ -36,7 +41,7 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
         current: new NumberField({ initial: null, nullable: true, integer: true, min: 0 })
       }),
       discount: new NumberField({ initial: null, nullable: true, integer: true, min: -100, max: 1000 }),
-      noRestock: new BooleanField({ initial: false }),
+      restockMode: new StringField({ initial: "normal", choices: Object.keys(RESTOCK_MODES), required: true }),
       price: new SchemaField({
         value: new NumberField({ initial: null, nullable: true, min: 0 }),
         denomination: new StringField({ initial: () => CONFIG.DND5E.defaultCurrency })
@@ -45,6 +50,17 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
       generated: new EmbeddedDataField(EnchantedItemBlueprint, { nullable: true, initial: null }),
       spellScroll: new EmbeddedDataField(SpellScrollBlueprint, { nullable: true, initial: null })
     };
+  }
+
+  /* -------------------------------------------- */
+  /*  Data Migration                               */
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  static _migrateData(source) {
+    super._migrateData(source);
+    migrateRestockMode(source);
+    return source;
   }
 
   /* -------------------------------------------- */
@@ -98,16 +114,20 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
    * @param {Set<string>} options.existingKeys  Entry keys already present in the shop, to skip duplicates.
    * @param {{ value: number|null, denomination: string }} [options.settlementCap]  Skip plain-item candidates
    *   or enchant-generated items whose resolved price exceeds this. Spell scrolls are unaffected.
+   * @param {{ byType: Record<string, number|null>, magicRule: string }} options.stockDefaults  The shop's
+   *   default stock configuration, applied to non-magic-exempt mundane candidates.
    * @returns {Promise<{ entry: ShopItemEntryData, label: string }[]>}
    */
-  static async rollMany({ typeConfigs, rarities, magic, spellFilter, count, existingKeys, settlementCap }) {
+  static async rollMany({
+    typeConfigs, rarities, magic, spellFilter, count, existingKeys, settlementCap, stockDefaults
+  }) {
     const candidatePool = await ShopItemEntry.#buildCandidatePool({ typeConfigs, rarities, spellFilter });
     const capCP = settlementCap?.value != null ? toCopper(settlementCap.value, settlementCap.denomination) : null;
     const keys = new Set(existingKeys);
     const rolled = [];
     for ( let i = 0; i < count; i++ ) {
       const result = await ShopItemEntry.#drawFromPool(
-        candidatePool, typeConfigs, { rarities, magic, existingKeys: keys, capCP }
+        candidatePool, typeConfigs, { rarities, magic, existingKeys: keys, capCP, stockDefaults }
       );
       if ( !result ) break;
       keys.add(ShopItemEntry.key(result.entry));
@@ -189,15 +209,19 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
    * @param {"any"|"magic"|"mundane"} options.magic
    * @param {Set<string>} options.existingKeys
    * @param {number|null} options.capCP  Settlement cap in copper pieces, or `null` if unset.
+   * @param {{ byType: Record<string, number|null>, magicRule: string }} options.stockDefaults  The shop's
+   *   default stock configuration, applied to non-magic-exempt mundane candidates.
    * @returns {Promise<{ entry: ShopItemEntryData, label: string }|null>}
    */
-  static async #drawFromPool(candidatePool, typeConfigs, { rarities, magic, existingKeys, capCP }) {
+  static async #drawFromPool(candidatePool, typeConfigs, { rarities, magic, existingKeys, capCP, stockDefaults }) {
     const pool = [...candidatePool];
     while ( pool.length ) {
       const [candidate] = pool.splice(Math.floor(Math.random() * pool.length), 1);
 
       if ( candidate.kind === "spell" ) {
-        const entry = { spellScroll: { spellUuid: candidate.index.uuid }, stock: { max: null, current: null } };
+        const entry = {
+          spellScroll: { spellUuid: candidate.index.uuid }, stock: { max: null, current: 1 }, restockMode: "exclude"
+        };
         if ( existingKeys.has(ShopItemEntry.key(entry)) ) continue;
         return { entry, label: candidate.index.name };
       }
@@ -220,7 +244,9 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
         const entry = candidateItem.system.identifier
           ? { identifier: candidateItem.system.identifier } : { uuid: candidateItem.uuid };
         if ( existingKeys.has(ShopItemEntry.key(entry)) ) continue;
-        return { entry: { ...entry, stock: { max: null, current: null } }, label: candidateItem.name };
+        return {
+          entry: { ...entry, ...newEntryStock(candidateItem, stockDefaults) }, label: candidateItem.name
+        };
       }
 
       const matching = EnchantedItemBlueprint.getEnchantmentProfiles(candidateItem).filter(profile => {
@@ -247,7 +273,7 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
       };
       if ( existingKeys.has(ShopItemEntry.key({ generated })) ) continue;
       return {
-        entry: { generated, stock: { max: null, current: null } },
+        entry: { generated, stock: { max: null, current: 1 }, restockMode: "exclude" },
         label: `${baseItem.name} (${candidateItem.name})`
       };
     }
@@ -321,7 +347,14 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
       goldPool: new SchemaField({
         max: new ObjectField({ initial: {} }),
         current: new ObjectField({ initial: {} }),
-        unlimited: new BooleanField({ initial: false })
+        unlimited: new BooleanField({ initial: false }),
+        sellDisabled: new BooleanField({ initial: false })
+      }),
+      stockDefaults: new SchemaField({
+        byType: new TypedObjectField(new NumberField({ nullable: true, integer: true, min: 0 }), {
+          initial: () => ({ ...DEFAULT_STOCK_BY_TYPE })
+        }),
+        magicRule: new StringField({ initial: "gear", choices: Object.keys(STOCK_MAGIC_RULES), required: true })
       }),
       restockWeekdays: new SetField(new NumberField({ integer: true, min: 0 })),
       closedWeekdays: new SetField(new NumberField({ integer: true, min: 0 })),
@@ -343,6 +376,24 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
     return Object.entries(this.goldPool.current ?? {}).reduce((sum, [denom, value]) => {
       return value ? sum + toCopper(value, denom) : sum;
     }, 0);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Resolve a shop's default max stock for an item with no per-item override, from its per-type defaults
+   * and magic-item rule.
+   * @param {Item5e|object} item
+   * @param {{ byType: Record<string, number|null>, magicRule: string }} stockDefaults
+   * @returns {number|null}  Default max stock, or `null` for unlimited.
+   */
+  static defaultStockMax(item, stockDefaults) {
+    const props = item.system.properties;
+    const isMagic = props?.has?.("mgc") ?? props?.includes?.("mgc") ?? false;
+    const { magicRule, byType } = stockDefaults;
+    const exempt = isMagic
+      && ((magicRule === "none") || ((magicRule === "gear") && MAGIC_EXEMPT_TYPES.has(item.type)));
+    return exempt ? null : (byType[item.type] ?? null);
   }
 
   /* -------------------------------------------- */
@@ -427,13 +478,20 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
   /* -------------------------------------------- */
 
   /**
-   * Resolve this shop's restock updates: full stock (except `noRestock` items) and gold pool.
-   * @returns {{ items: object[], goldPool: object }}
+   * Resolve this shop's restock updates: full stock for normal-mode items (falling back to the shop's
+   * per-type default when uncapped) and gold pool.
+   * @returns {Promise<{ items: object[], goldPool: object }>}
    */
-  restockUpdates() {
-    const items = this.items.map(entry => {
+  async restockUpdates() {
+    const needsDefaults = this.items.some(e => (e.restockMode === "normal") && (e.stock.max === null));
+    const resolved = needsDefaults ? await ShopItemEntry.resolveMany(this.items) : [];
+    const items = this.items.map((entry, index) => {
       const obj = entry.toObject();
-      if ( !obj.noRestock ) obj.stock = { ...obj.stock, current: obj.stock.max };
+      if ( obj.restockMode === "normal" ) {
+        const item = resolved[index]?.item;
+        const defaultMax = item ? Shop.defaultStockMax(item, this.stockDefaults) : null;
+        obj.stock = { ...obj.stock, current: obj.stock.max ?? defaultMax };
+      }
       return obj;
     });
     const goldPool = { ...this.goldPool };
@@ -457,9 +515,14 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
     const shop = shops.find(s => s._id === purchase.shopId);
     if ( !shop ) return { ok: false, error: "SIMPLE_SHOP_CRAFT_5E.PurchaseCard.MissingShop" };
 
+    if ( shop.goldPool.sellDisabled && purchase.sellLines.length ) {
+      return { ok: false, error: "SIMPLE_SHOP_CRAFT_5E.PurchaseCard.SellDisabled" };
+    }
+
     for ( const line of purchase.buyLines ) {
       const entry = shop.items.find(i => ShopItemEntry.key(i) === ShopItemEntry.key(line));
-      if ( (entry?.stock.current !== null) && (entry?.stock.current < line.quantity) ) {
+      const current = (entry && (entry.restockMode !== "unlimited")) ? (entry.stock.current ?? 0) : null;
+      if ( (current !== null) && (current < line.quantity) ) {
         return { ok: false, error: "SIMPLE_SHOP_CRAFT_5E.PurchaseCard.InsufficientStock" };
       }
     }
@@ -538,8 +601,8 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
 
     const items = shop.items.map(entry => {
       const line = purchase.buyLines.find(l => ShopItemEntry.key(l) === ShopItemEntry.key(entry));
-      if ( !line || (entry.stock.current === null) ) return entry.toObject();
-      return { ...entry.toObject(), stock: { ...entry.stock, current: entry.stock.current - line.quantity } };
+      if ( !line || (entry.restockMode === "unlimited") ) return entry.toObject();
+      return { ...entry.toObject(), stock: { ...entry.stock, current: (entry.stock.current ?? 0) - line.quantity } };
     });
     for ( const line of purchase.sellLines ) {
       if ( !line.identifier ) continue;
@@ -577,7 +640,7 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
       const restockDue = weekdaysPassed === null
         ? (shop.restockWeekdays.size > 0)
         : weekdaysPassed.some(d => shop.restockWeekdays.has(d));
-      if ( restockDue ) Object.assign(updateData, shop.restockUpdates());
+      if ( restockDue ) Object.assign(updateData, await shop.restockUpdates());
 
       let hagglingChanged = false;
       const playerDiscounts = shop.playerDiscounts.map(pd => {
@@ -625,6 +688,29 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
       : Array.from({ length: midnights }, (_, i) => (dayOfWeek - i + weekLength) % weekLength);
     await Shop.handleDayChange(worldTime, weekdaysPassed);
   }
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Build the stock/restock fields for a newly added shop item entry: excluded from restock at a single
+ * unit when magic-exempt, unlimited when its type has no configured default, otherwise its type's default
+ * max stock as a starting count (with `max` itself left unset, following the shop's default going forward).
+ * @param {Item5e|object|null} item
+ * @param {{ byType: Record<string, number|null>, magicRule: string }} stockDefaults
+ * @returns {{ stock?: { max: null, current: number }, restockMode?: "exclude"|"unlimited" }}
+ */
+export function newEntryStock(item, stockDefaults) {
+  if ( !item ) return {};
+  const isMagic = item.system.properties?.has("mgc") ?? false;
+  if ( isMagic ) {
+    const { magicRule } = stockDefaults;
+    const exempt = (magicRule === "none") || ((magicRule === "gear") && MAGIC_EXEMPT_TYPES.has(item.type));
+    if ( exempt ) return { stock: { max: null, current: 1 }, restockMode: "exclude" };
+  }
+  const max = Shop.defaultStockMax(item, stockDefaults);
+  if ( max === null ) return { restockMode: "unlimited" };
+  return { stock: { max: null, current: max } };
 }
 
 /* -------------------------------------------- */

@@ -1,15 +1,15 @@
 import { MODULE_ID } from "../../config.mjs";
-import { Shop, ShopItemEntry } from "../../data/shop-data.mjs";
+import { newEntryStock, Shop, ShopItemEntry } from "../../data/shop-data.mjs";
 import { calendariaWeekdayOptions, isCalendariaActive } from "../../integrations/calendaria.mjs";
 import {
-  applyLoadingTooltip, breakdownCopper, buildItemTableSections, finalizeGroups, isDnd5eAutoRecoveryEnabled,
-  needsDefaultPrice, openItemSheet, resolveItemPrice, selectableActors, toCopper
+  applyItemFilters, applyItemSort, applyLoadingTooltip, breakdownCopper, buildItemTableSections, finalizeGroups,
+  isDnd5eAutoRecoveryEnabled, needsDefaultPrice, openItemSheet, resolveItemPrice, selectableActors, toCopper
 } from "../../utils.mjs";
 
+import FillFromTableDialog from "./fill-from-table-dialog.mjs";
 import GenerateItemDialog from "./generate-item-dialog.mjs";
 import HaggleDialog from "./haggle-dialog.mjs";
 import ShopCart from "./shop-cart.mjs";
-import GoldPoolConfig from "./shop-config/gold-pool-config.mjs";
 import MaxStockConfig from "./shop-config/max-stock-config.mjs";
 import PlayersConfig from "./shop-config/players-config.mjs";
 import SettlementCapConfig from "./shop-config/settlement-cap-config.mjs";
@@ -17,6 +17,7 @@ import {
   openDiscountConfig, openModifiersConfig,
   openOwnerConfig, openPriceConfig, openRenameConfig
 } from "./shop-config/simple-configs.mjs";
+import VendorConfig from "./shop-config/vendor-config.mjs";
 
 /**
  * @import { ShopItemEntryData } from "../../_types.mjs";
@@ -29,7 +30,7 @@ const { Application5e } = game.dnd5e.applications.api;
  * @type {{ id: string, label?: string }[]}
  */
 const BUY_COLUMNS = [
-  { id: "cart", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.CartQuantity" },
+  { id: "cart" },
   { id: "discount", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.PriceModifier" },
   { id: "price", label: "DND5E.Price" },
   { id: "weight", label: "DND5E.Weight" },
@@ -42,7 +43,7 @@ const BUY_COLUMNS = [
  * @type {{ id: string, label?: string }[]}
  */
 const SELL_COLUMNS = [
-  { id: "cart", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SellQuantity" },
+  { id: "cart" },
   { id: "discount", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.PriceModifier" },
   { id: "price", label: "DND5E.Price" },
   { id: "weight", label: "DND5E.Weight" },
@@ -51,16 +52,13 @@ const SELL_COLUMNS = [
 ];
 
 /**
- * Festival options for the active calendar, if it supports festivals. Empty otherwise.
- * @returns {{ value: string, label: string }[]}
+ * Cycle-able Buy/Sell sort modes, in cycle order.
+ * @type {Record<string, { icon: string, label: string }>}
  */
-function festivalOptions() {
-  const calendar = game.time.calendar;
-  const festivals = calendar.festivalsArray ?? calendar.festivals ?? [];
-  return festivals.map(f => ({ value: f.name, label: _loc(f.name) }));
-}
-
-/* -------------------------------------------- */
+const SORT_MODES = {
+  name: { icon: "fa-solid fa-arrow-down-a-z", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SortByName" },
+  price: { icon: "fa-solid fa-arrow-down-1-9", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SortByPrice" }
+};
 
 /**
  * Application for viewing and, in Edit mode, configuring a single shop.
@@ -110,7 +108,6 @@ export default class ShopSheet extends Application5e {
       adjustSellQuantity: ShopSheet.#adjustSellQuantity,
       changeMode: ShopSheet.#changeMode,
       editDiscount: ShopSheet.#editDiscount,
-      editGoldPool: ShopSheet.#editGoldPool,
       editImage: ShopSheet.#editImage,
       editMaxStock: ShopSheet.#editMaxStock,
       editModifiers: ShopSheet.#editModifiers,
@@ -118,6 +115,8 @@ export default class ShopSheet extends Application5e {
       editPlayers: ShopSheet.#editPlayers,
       editPrice: ShopSheet.#editPrice,
       editSettlementCap: ShopSheet.#editSettlementCap,
+      editVendorSettings: ShopSheet.#editVendorSettings,
+      fillFromTable: ShopSheet.#fillFromTable,
       generateItem: ShopSheet.#generateItem,
       haggle: ShopSheet.#haggle,
       openCart: ShopSheet.#openCart,
@@ -268,6 +267,54 @@ export default class ShopSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
+   * Current Buy-tab search query, kept live across re-renders.
+   * @type {string}
+   */
+  #buySearch = "";
+
+  /* -------------------------------------------- */
+
+  /**
+   * Current Sell-tab search query, kept live across re-renders.
+   * @type {string}
+   */
+  #sellSearch = "";
+
+  /* -------------------------------------------- */
+
+  /**
+   * Current Buy-tab type filter, kept live across re-renders. Empty string means no filter.
+   * @type {string}
+   */
+  #buyTypeFilter = "";
+
+  /* -------------------------------------------- */
+
+  /**
+   * Current Sell-tab type filter, kept live across re-renders. Empty string means no filter.
+   * @type {string}
+   */
+  #sellTypeFilter = "";
+
+  /* -------------------------------------------- */
+
+  /**
+   * Current Buy-tab sort, kept live across re-renders. "type" is the default server-rendered order.
+   * @type {"type"|"name"}
+   */
+  #buySort = "name";
+
+  /* -------------------------------------------- */
+
+  /**
+   * Current Sell-tab sort, kept live across re-renders. "type" is the default server-rendered order.
+   * @type {"type"|"name"}
+   */
+  #sellSort = "name";
+
+  /* -------------------------------------------- */
+
+  /**
    * Rows currently selected in the shopping cart, resolved from the last render.
    * @type {object[]}
    */
@@ -394,11 +441,11 @@ export default class ShopSheet extends Application5e {
     context.groups = await groupByType({
       rows: resolved, settlementCap: context.shop.settlementCap, buyModifier: context.shop.buyModifier,
       cart: this.cart, fixedValueLootTypes: context.shop.fixedValueLootTypes, playerBuyModifier: playerOverride.buy,
-      actorName: context.actor?.name, renderDiscountTooltip
+      actorName: context.actor?.name, renderDiscountTooltip, stockDefaults: context.shop.stockDefaults
     });
     this.#lastGroups = context.groups;
 
-    context.sellGroups = await groupSellItems({
+    context.sellGroups = context.shop.goldPool.sellDisabled ? [] : await groupSellItems({
       items: context.actor?.items ?? [], sellModifier: context.shop.sellModifier, sellCart: this.sellCart,
       fixedValueLootTypes: context.shop.fixedValueLootTypes, playerSellModifier: playerOverride.sell,
       actorName: context.actor?.name, renderDiscountTooltip, settlementCap: context.shop.settlementCap
@@ -516,7 +563,10 @@ export default class ShopSheet extends Application5e {
     context.showNoActor = !context.actor;
     context.noActorLabel = "SIMPLE_SHOP_CRAFT_5E.NoActorSelectedHint";
     context.table = buildItemTableSections({
-      groups: context.sellGroups, emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoSellableItems",
+      groups: context.sellGroups,
+      emptyLabel: context.shop.goldPool.sellDisabled
+        ? "SIMPLE_SHOP_CRAFT_5E.ShopEditor.PurchaseOnlyShopHint"
+        : "SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoSellableItems",
       columns: SELL_COLUMNS, rowTemplate: "modules/simple-shop-craft-5e/templates/shop-sheet/sell-row.hbs"
     });
     return context;
@@ -549,7 +599,15 @@ export default class ShopSheet extends Application5e {
     generateButton.dataset.action = "generateItem";
     generateButton.innerHTML = '<i class="fas fa-wand-magic-sparkles" inert></i>';
 
-    actions.append(button, generateButton);
+    const fillButton = document.createElement("button");
+    fillButton.type = "button";
+    fillButton.dataset.tooltip = "SIMPLE_SHOP_CRAFT_5E.ShopEditor.FillFromTable";
+    fillButton.ariaLabel = _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.FillFromTable");
+    fillButton.classList.add("gold-button", "always-interactive");
+    fillButton.dataset.action = "fillFromTable";
+    fillButton.innerHTML = '<i class="fas fa-table-list" inert></i>';
+
+    actions.append(button, generateButton, fillButton);
     this.element.querySelector(".window-content").append(actions);
   }
 
@@ -621,8 +679,56 @@ export default class ShopSheet extends Application5e {
           const item = await fromUuid(data.uuid);
           if ( !item || !CONFIG.Item.dataModels[item.type]?.inventorySection ) return;
           await this.#mergeItemEntries([
-            { uuid: data.uuid, stock: { max: null, current: null } }
+            { uuid: data.uuid, ...newEntryStock(item, this.shop.stockDefaults) }
           ]);
+        });
+      }
+    }
+
+    if ( (partId === "buy") || (partId === "sell") ) {
+      const content = htmlElement.querySelector(".items-list");
+      if ( content ) {
+        const typeSelect = htmlElement.querySelector(".item-type-filter");
+        const sortButton = htmlElement.querySelector(".sort-control");
+        const clearButton = htmlElement.querySelector(".clear-control");
+        if ( typeSelect ) typeSelect.value = (partId === "buy") ? this.#buyTypeFilter : this.#sellTypeFilter;
+        const sortKey = (partId === "buy") ? this.#buySort : this.#sellSort;
+        if ( sortButton ) {
+          sortButton.querySelector("i").className = SORT_MODES[sortKey].icon;
+          sortButton.setAttribute("aria-label", _loc(SORT_MODES[sortKey].label));
+        }
+        applyItemSort(sortKey, content);
+        typeSelect?.closest(".filter-control")?.classList.toggle("active", !!typeSelect?.value);
+        const searchFilter = new foundry.applications.ux.SearchFilter({
+          inputSelector: ".item-search", contentSelector: ".items-list",
+          initial: (partId === "buy") ? this.#buySearch : this.#sellSearch,
+          callback: (event, query, rgx) => {
+            if ( partId === "buy" ) this.#buySearch = query;
+            else this.#sellSearch = query;
+            applyItemFilters(rgx, typeSelect?.value, content);
+          }
+        });
+        searchFilter.bind(htmlElement);
+        typeSelect?.addEventListener("change", () => {
+          if ( partId === "buy" ) this.#buyTypeFilter = typeSelect.value;
+          else this.#sellTypeFilter = typeSelect.value;
+          typeSelect.closest(".filter-control").classList.toggle("active", !!typeSelect.value);
+          applyItemFilters(searchFilter.rgx, typeSelect.value, content);
+        });
+        sortButton?.addEventListener("click", () => {
+          const modes = Object.keys(SORT_MODES);
+          const current = (partId === "buy") ? this.#buySort : this.#sellSort;
+          const next = modes[(modes.indexOf(current) + 1) % modes.length];
+          if ( partId === "buy" ) this.#buySort = next;
+          else this.#sellSort = next;
+          this.render();
+        });
+        clearButton?.addEventListener("click", () => {
+          searchFilter.filter(null, "");
+          if ( typeSelect ) {
+            typeSelect.value = "";
+            typeSelect.dispatchEvent(new Event("change"));
+          }
         });
       }
     }
@@ -644,7 +750,7 @@ export default class ShopSheet extends Application5e {
     const items = await Promise.all(Array.from(selection).map(uuid => fromUuid(uuid)));
     const entries = items
       .filter(item => item?.system?.identifier)
-      .map(item => ({ identifier: item.system.identifier, stock: { max: null, current: null } }));
+      .map(item => ({ identifier: item.system.identifier, ...newEntryStock(item, this.shop.stockDefaults) }));
     if ( !entries.length ) return;
 
     await this.#mergeItemEntries(entries);
@@ -714,17 +820,6 @@ export default class ShopSheet extends Application5e {
   static async #editDiscount(event, target) {
     const playerOverride = this.shop.resolvePlayerOverride(this.selectedActorUuid);
     await openDiscountConfig(this, target, playerOverride, updateData => this.#updateShop(updateData));
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Handle opening a dialog to edit the shop's maximum money pool.
-   * @this {ShopSheet}
-   */
-  static async #editGoldPool() {
-    await new GoldPoolConfig({ shopSheet: this, onUpdate: updateData => this.#updateShop(updateData) })
-      .render({ force: true });
   }
 
   /* -------------------------------------------- */
@@ -820,6 +915,28 @@ export default class ShopSheet extends Application5e {
    */
   static async #editSettlementCap() {
     await new SettlementCapConfig({ shopSheet: this, onUpdate: updateData => this.#updateShop(updateData) })
+      .render({ force: true });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle opening a dialog to edit the shop's money pool and default stock per item type.
+   * @this {ShopSheet}
+   */
+  static async #editVendorSettings() {
+    await new VendorConfig({ shopSheet: this, onUpdate: updateData => this.#updateShop(updateData) })
+      .render({ force: true });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle opening the fill-from-table dialog.
+   * @this {ShopSheet}
+   */
+  static async #fillFromTable() {
+    await new FillFromTableDialog({ shopSheet: this, onFilled: entries => this.#mergeItemEntries(entries) })
       .render({ force: true });
   }
 
@@ -948,12 +1065,12 @@ export default class ShopSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
-   * Handle resetting this shop's stock (to each item's configured max, skipping items excluded via
-   * `noRestock`) and gold pool (to its max, falling back to the default gold pool unless unlimited).
+   * Handle resetting this shop's stock (to each item's max, per-type default, or unchanged depending on
+   * its restock mode) and gold pool (to its max, falling back to the default gold pool unless unlimited).
    * @this {ShopSheet}
    */
   static async #resetShop() {
-    await this.#updateShop(this.shop.restockUpdates());
+    await this.#updateShop(await this.shop.restockUpdates());
   }
 
   /* -------------------------------------------- */
@@ -1063,7 +1180,7 @@ export default class ShopSheet extends Application5e {
     if ( game.user.isGM ) await Shop.update(this.shopId, updateData);
     else {
       const gm = game.users.activeGM;
-      if ( !gm ) return ui.notifications.warn(_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoActiveGM"));
+      if ( !gm ) return ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoActiveGM", { localize: true });
       await gm.query(`${MODULE_ID}.updateShop`, { shopId: this.shopId, updateData });
     }
     this.render();
@@ -1087,6 +1204,18 @@ function additiveSource(label, value) {
 /* -------------------------------------------- */
 
 /**
+ * Festival options for the active calendar, if it supports festivals. Empty otherwise.
+ * @returns {{ value: string, label: string }[]}
+ */
+function festivalOptions() {
+  const calendar = game.time.calendar;
+  const festivals = calendar.festivalsArray ?? calendar.festivals ?? [];
+  return festivals.map(f => ({ value: f.name, label: _loc(f.name) }));
+}
+
+/* -------------------------------------------- */
+
+/**
  * Group resolved item rows by their item type.
  * @param {object} options
  * @param {{ entry: ShopItemEntryData, item: object|null }[]} options.rows
@@ -1099,10 +1228,13 @@ function additiveSource(label, value) {
  *   no override.
  * @param {string} [options.actorName]  Acting actor's name, used to label the player row.
  * @param {(sources: object[], total: string) => Promise<string>} options.renderDiscountTooltip
+ * @param {{ byType: Record<string, number|null>, magicRule: string }} options.stockDefaults  The shop's
+ *   default stock configuration, used to resolve a row's default max stock for display.
  * @returns {Promise<{ type: string, label: string, items: object[] }[]>}
  */
 async function groupByType({
-  rows, settlementCap, buyModifier, cart, fixedValueLootTypes, playerBuyModifier, actorName, renderDiscountTooltip
+  rows, settlementCap, buyModifier, cart, fixedValueLootTypes, playerBuyModifier, actorName, renderDiscountTooltip,
+  stockDefaults
 }) {
   const targetUnit = game.settings.get("dnd5e", "metricWeightUnits") ? "kg" : "lb";
   const capCP = settlementCap?.value != null ? toCopper(settlementCap.value, settlementCap.denomination) : null;
@@ -1131,11 +1263,15 @@ async function groupByType({
       ?? ((row.item?.system?.quantity > 1) ? row.item.system.quantity : 1);
     row.bundleSize = bundleSize > 1 ? bundleSize : null;
     row.weight = resolveWeight(row.item?.system, targetUnit);
-    row.stockTracked = row.entry.stock.current !== null;
+    row.stockTracked = row.entry.restockMode !== "unlimited";
+    row.stockCurrent = row.stockTracked ? (row.entry.stock.current ?? 0) : null;
+    row.stockMax = (row.entry.restockMode === "normal")
+      ? (row.entry.stock.max ?? (row.item ? Shop.defaultStockMax(row.item, stockDefaults) : null))
+      : null;
 
     const reasons = [];
     if ( !row.item ) reasons.push(_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SuppressedNotFound"));
-    if ( row.entry.stock.current === 0 ) reasons.push(_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SuppressedStock"));
+    if ( row.stockCurrent === 0 ) reasons.push(_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SuppressedStock"));
     if ( (capCP != null) && (baseCP > capCP) ) reasons.push(_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SuppressedCap"));
     row.suppressed = reasons.length > 0;
     row.suppressReason = reasons.join(", ");

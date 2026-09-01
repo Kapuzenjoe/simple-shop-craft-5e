@@ -37,6 +37,8 @@ export default class SettlementCapConfig extends BaseShopConfig {
     onUpdate: null
   };
 
+  /* -------------------------------------------- */
+
   /** @override */
   static PARTS = {
     ...super.PARTS,
@@ -48,6 +50,8 @@ export default class SettlementCapConfig extends BaseShopConfig {
    * @type {ShopSheet}
    */
   shopSheet;
+
+  /* -------------------------------------------- */
 
   /**
    * Callback receiving the shop update.

@@ -2,17 +2,12 @@ import { HOURS_PER_USE } from "../../config.mjs";
 import { CraftMessageData } from "../../data/craft-message.mjs";
 import { Recipe } from "../../data/recipe-data.mjs";
 import {
-  applyLoadingTooltip, breakdownCopper, buildItemTableSections, effectiveCraftCost, needsDefaultPrice, openItemSheet,
-  resolveBundleSizes, resolveEntries, resolveItemPrice, selectableActors, subtypeOptions, toCopper
+  applyDropArea, applyLoadingTooltip, breakdownCopper, buildItemTableSections, effectiveCraftCost, needsDefaultPrice,
+  openItemSheet, resolveBundleSizes, resolveEntries, resolveItemPrice, resolveTotalHours, selectableActors,
+  subtypeOptions, toCopper
 } from "../../utils.mjs";
 
 const { Dialog5e } = game.dnd5e.applications.api;
-
-/**
- * Hours per duration unit, for converting a recipe's duration override to total progress hours.
- * @type {Record<string, number>}
- */
-const HOURS_PER_UNIT = { minute: 1 / 60, hour: 1, day: HOURS_PER_USE };
 
 /**
  * Player-facing dialog to request starting a craft: tool/material selection against a recipe's
@@ -64,11 +59,15 @@ export default class CraftStartDialog extends Dialog5e {
    */
   recipeId;
 
+  /* -------------------------------------------- */
+
   /**
    * UUID of the selected crafting actor, or "" if none chosen.
    * @type {string}
    */
   selectedActorUuid;
+
+  /* -------------------------------------------- */
 
   /**
    * Ids of owned items added as freeform materials.
@@ -76,11 +75,15 @@ export default class CraftStartDialog extends Dialog5e {
    */
   #freeformIds = new Set();
 
+  /* -------------------------------------------- */
+
   /**
    * Chosen tool proficiency key, when the recipe allows more than one.
    * @type {string|null}
    */
   #toolKey = null;
+
+  /* -------------------------------------------- */
 
   /**
    * Whether the player has claimed workshop access in place of owning the tool.
@@ -88,17 +91,23 @@ export default class CraftStartDialog extends Dialog5e {
    */
   #workshopClaimed = false;
 
+  /* -------------------------------------------- */
+
   /**
    * Whether the shortfall between supplied material value and the threshold should be filled with gold.
    * @type {boolean}
    */
   #fillWithGold = false;
 
+  /* -------------------------------------------- */
+
   /**
    * Selected quantity per criteria-slot candidate, keyed by `{index}:{itemId}`.
    * @type {Map<string, number>}
    */
   #materialQuantities = new Map();
+
+  /* -------------------------------------------- */
 
   /**
    * Name of the resolved target item, cached as a title fallback once known.
@@ -156,14 +165,7 @@ export default class CraftStartDialog extends Dialog5e {
       this.render({ parts: ["content", "footer"] });
     });
 
-    const dropArea = this.element.querySelector("[data-drop-area]");
-    dropArea?.addEventListener("dragover", event => event.preventDefault());
-    dropArea?.addEventListener("dragenter", () => dropArea.classList.add("is-dragover"));
-    dropArea?.addEventListener("dragleave", event => {
-      if ( event.currentTarget.contains(event.relatedTarget) ) return;
-      dropArea.classList.remove("is-dragover");
-    });
-    dropArea?.addEventListener("drop", event => this.#onDropItem(event));
+    applyDropArea(this.element.querySelector("[data-drop-area]"), event => this.#onDropItem(event));
 
     this.element.querySelectorAll(".item-tooltip[data-uuid]").forEach(applyLoadingTooltip);
   }
@@ -385,9 +387,7 @@ export default class CraftStartDialog extends Dialog5e {
     const canStart = !!actor && !!targetItem && toolEligible && skillEligible && requiredMet
       && (materialsMet || (this.#fillWithGold && !goldInsufficient));
 
-    const totalHours = recipe.durationOverride.value != null
-      ? recipe.durationOverride.value * HOURS_PER_UNIT[recipe.durationOverride.units]
-      : (craftCost?.days ?? 0) * HOURS_PER_USE;
+    const totalHours = resolveTotalHours(recipe, craftCost);
     const hoursPerUse = Math.min(HOURS_PER_USE, totalHours);
 
     return {
@@ -453,6 +453,7 @@ export default class CraftStartDialog extends Dialog5e {
 
   /**
    * Handle opening a criteria candidate's item sheet.
+   * @this {CraftStartDialog}
    * @param {Event} event         Triggering click event.
    * @param {HTMLElement} target  Button that was clicked.
    * @returns {Promise<void>}

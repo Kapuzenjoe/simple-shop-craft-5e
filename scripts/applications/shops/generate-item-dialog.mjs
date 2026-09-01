@@ -310,7 +310,8 @@ export default class GenerateItemDialog extends Dialog5e {
 
     const rolled = await ShopItemEntry.rollMany({
       typeConfigs, rarities: this.#rarities.size ? this.#rarities : null, magic: this.#magic,
-      spellFilter, count: this.#count, existingKeys, settlementCap: this.shopSheet.shop.settlementCap
+      spellFilter, count: this.#count, existingKeys, settlementCap: this.shopSheet.shop.settlementCap,
+      stockDefaults: this.shopSheet.shop.stockDefaults
     });
 
     if ( !rolled.length ) {

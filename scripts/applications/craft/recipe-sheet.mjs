@@ -1,8 +1,8 @@
 import { MODULE_ID } from "../../config.mjs";
 import { Recipe, RecipeMaterial } from "../../data/recipe-data.mjs";
 import {
-  applyLoadingTooltip, breakdownCopper, buildItemTableSections, currencyRows, effectiveCraftCost, getCurrencyOptions,
-  goldPoolCurrencies, isDefaultIdentifier, itemRefKey, resolveEntries, resolveIdentifierIndex,
+  applyDropArea, applyLoadingTooltip, breakdownCopper, buildItemTableSections, currencyRows, effectiveCraftCost,
+  getCurrencyOptions, goldPoolCurrencies, isDefaultIdentifier, itemRefKey, resolveEntries, resolveIdentifierIndex,
   resolveItemPrice, subtypeOptions, toCopper
 } from "../../utils.mjs";
 import BaseShopConfig from "../shops/shop-config/base-shop-config.mjs";
@@ -135,43 +135,43 @@ export default class RecipeSheet extends Application5e {
 
     const materialsResolved = await resolveEntries(recipe.materials);
     const materialRows = materialsResolved.map((r, index) => ({ ...r, index })).map(r => {
-        const shared = {
-          index: r.index, required: r.entry.required, requiredEditable: true,
-          requiredTooltip: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.MaterialRequired",
-          showQuantity: true, quantity: r.entry.quantity, quantityLabel: r.entry.quantity,
-          hasContextMenu: true, uuid: r.item?.uuid ?? null
-        };
-        const bundleSize = (r.item?.system?.quantity > 1) ? r.item.system.quantity : 1;
-        const rawPrice = (!r.entry.criteria?.type && r.item) ? resolveItemPrice(r.item) : null;
-        const itemPrice = (r.entry.value?.value != null)
-          ? r.entry.value
-          : (rawPrice ? { value: rawPrice.value / bundleSize, denomination: rawPrice.denomination } : null);
-        const price = (itemPrice?.value != null) ? [itemPrice] : null;
-        const valueCP = (itemPrice?.value != null) ? toCopper(itemPrice.value, itemPrice.denomination) : 0;
-        if ( r.entry.criteria?.type ) {
-          const subtypeLabel = r.entry.criteria.subtype
-            ? subtypeOptions([r.entry.criteria.type]).find(o => o.value === r.entry.criteria.subtype)?.label
-            : null;
-          const name = subtypeLabel ?? _loc(`TYPES.Item.${r.entry.criteria.type}Pl`);
-          return {
-            ...shared, img: "systems/dnd5e/icons/svg/item-choice.svg", name, price, valueCP,
-            subtitle: _loc("SIMPLE_SHOP_CRAFT_5E.MaterialRule")
-          };
-        }
-        if ( !r.item ) {
-          return {
-            ...shared, img: "icons/svg/hazard.svg",
-            name: r.entry.identifier || r.entry.uuid || _loc("SIMPLE_SHOP_CRAFT_5E.Unknown"),
-            subtitle: r.entry.identifier || null, price: null, valueCP: 0,
-            warning: true, warningTooltip: _loc("SIMPLE_SHOP_CRAFT_5E.RecipeEditor.UnresolvedWarning")
-          };
-        }
+      const shared = {
+        index: r.index, required: r.entry.required, requiredEditable: true,
+        requiredTooltip: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.MaterialRequired",
+        showQuantity: true, quantity: r.entry.quantity, quantityLabel: r.entry.quantity,
+        hasContextMenu: true, uuid: r.item?.uuid ?? null
+      };
+      const bundleSize = (r.item?.system?.quantity > 1) ? r.item.system.quantity : 1;
+      const rawPrice = (!r.entry.criteria?.type && r.item) ? resolveItemPrice(r.item) : null;
+      const itemPrice = (r.entry.value?.value != null)
+        ? r.entry.value
+        : (rawPrice ? { value: rawPrice.value / bundleSize, denomination: rawPrice.denomination } : null);
+      const price = (itemPrice?.value != null) ? [itemPrice] : null;
+      const valueCP = (itemPrice?.value != null) ? toCopper(itemPrice.value, itemPrice.denomination) : 0;
+      if ( r.entry.criteria?.type ) {
+        const subtypeLabel = r.entry.criteria.subtype
+          ? subtypeOptions([r.entry.criteria.type]).find(o => o.value === r.entry.criteria.subtype)?.label
+          : null;
+        const name = subtypeLabel ?? _loc(`TYPES.Item.${r.entry.criteria.type}Pl`);
         return {
-          ...shared, img: r.item.img, name: r.item.name, subtitle: r.entry.identifier || null,
-          price, valueCP, warning: isDefaultIdentifier(r.item),
-          warningTooltip: isDefaultIdentifier(r.item) ? _loc("SIMPLE_SHOP_CRAFT_5E.RecipeEditor.NoIdentifierWarning") : null
+          ...shared, img: "systems/dnd5e/icons/svg/item-choice.svg", name, price, valueCP,
+          subtitle: _loc("SIMPLE_SHOP_CRAFT_5E.MaterialRule")
         };
-      });
+      }
+      if ( !r.item ) {
+        return {
+          ...shared, img: "icons/svg/hazard.svg",
+          name: r.entry.identifier || r.entry.uuid || _loc("SIMPLE_SHOP_CRAFT_5E.Unknown"),
+          subtitle: r.entry.identifier || null, price: null, valueCP: 0,
+          warning: true, warningTooltip: _loc("SIMPLE_SHOP_CRAFT_5E.RecipeEditor.UnresolvedWarning")
+        };
+      }
+      return {
+        ...shared, img: r.item.img, name: r.item.name, subtitle: r.entry.identifier || null,
+        price, valueCP, warning: isDefaultIdentifier(r.item),
+        warningTooltip: isDefaultIdentifier(r.item) ? _loc("SIMPLE_SHOP_CRAFT_5E.RecipeEditor.NoIdentifierWarning") : null
+      };
+    });
     const requiredSumCP = materialRows.filter(r => r.required)
       .reduce((sum, r) => sum + ((r.valueCP ?? 0) * r.quantity), 0);
     context.requiredValueParts = breakdownCopper(requiredSumCP);
@@ -257,14 +257,7 @@ export default class RecipeSheet extends Application5e {
     if ( this.hasFrame ) this.window.title.innerText = this.title;
     if ( !this.isEditable ) this._disableFields();
 
-    const dropArea = this.element.querySelector("[data-drop-area]");
-    dropArea?.addEventListener("dragover", event => event.preventDefault());
-    dropArea?.addEventListener("dragenter", () => dropArea.classList.add("is-dragover"));
-    dropArea?.addEventListener("dragleave", event => {
-      if ( event.currentTarget.contains(event.relatedTarget) ) return;
-      dropArea.classList.remove("is-dragover");
-    });
-    dropArea?.addEventListener("drop", event => this.#onDropItem(event));
+    applyDropArea(this.element.querySelector("[data-drop-area]"), event => this.#onDropItem(event));
 
     this.element.querySelectorAll(".item-tooltip[data-uuid]").forEach(applyLoadingTooltip);
   }
