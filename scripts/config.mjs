@@ -126,7 +126,7 @@ export const STARTER_PACKS = {
       "shortbow", "shortsword", "sickle", "sling", "spear", "trident", "war-pick", "warhammer", "whip",
       "breastplate", "chain-mail", "chain-shirt", "half-plate-armor", "hide-armor", "leather-armor", "padded-armor",
       "plate-armor", "ring-mail", "scale-mail", "shield", "splint-armor", "studded-leather-armor",
-      "arrows", "bolts", "bullets-sling", "needles", "quiver", "case-crossbow-bolt", "smiths-tools"
+      "arrows", "bolts", "bullets-sling", "quiver", "case-crossbow-bolt", "smiths-tools"
     ]
   },
   alchemist: {
@@ -149,7 +149,7 @@ export const STARTER_PACKS = {
     label: "SIMPLE_SHOP_CRAFT_5E.StarterPack.Blackmarket",
     items: [
       "blowgun", "bullets-sling", "caltrops", "crowbar", "dagger", "disguise-kit", "forgery-kit", "lantern-hooded",
-      "lock", "manacles", "needles", "poison-basic", "poisoners-kit", "sling", "thieves-tools"
+      "lock", "manacles", "poison-basic", "poisoners-kit", "sling", "thieves-tools"
     ]
   },
   generalStore: {

@@ -47,6 +47,8 @@ out a campaign's shops, and where players go to open one for themselves.
   entirely — useful for putting a shop in front of the party the moment it matters, without asking them to
   go find it themselves.
 - GMs can duplicate or delete a shop directly from the list.
+- The shop list and the Craft tab's recipe list both support search, filtering, and sorting for quick
+  navigation.
 
 <table>
   <tr>
@@ -66,6 +68,9 @@ out a campaign's shops, and where players go to open one for themselves.
   content over a matching SRD (2014) entry, but falls back to whatever's found (including the world's own
   Items) when nothing rules-matching exists. Dragging an item in instead stores it by UUID, for one-off
   pieces with no matching compendium entry.
+- Fill from Table draws items straight from a RollTable into the shop's stock, resolving each result the
+  same way as adding it by hand.
+- Search, filter by type, and sort by name or price to navigate a large Buy or Sell table quickly.
 - Buying an item the character already owns (matched by identifier) increases its quantity instead of
   creating a duplicate — containers are the exception, since each one holds its own separate contents.
 - Items sold as a bundle — ammunition and other stackable gear — are bought as a set, but a player selling
@@ -96,17 +101,23 @@ out a campaign's shops, and where players go to open one for themselves.
 
 <table>
   <tr>
-    <td colspan="2">
+    <td width="70%">
       <strong>Shop sheet</strong><br>
       <img src="docs/example_shop_sheet.png" alt="Shop sheet showing the Buy tab of the Blacksmith shop">
     </td>
+    <td width="30%">
+      <strong>Vendor Settings</strong><br>
+      <img src="docs/example_vendor_setting.png" alt="Vendor Settings">
+    </td>
   </tr>
+</table>
+  <table>
   <tr>
-    <td width="60%">
+    <td width="50%">
       <strong>Shopping cart</strong><br>
       <img src="docs/example_shopping_cart.png" alt="Shopping cart summarizing items to buy and sell before confirming">
     </td>
-    <td width="40%">
+    <td width="50%">
       <strong>Purchase confirmation</strong><br>
       <img src="docs/example_chat_card.png" alt="Chat card requesting GM confirmation for a purchase">
     </td>
@@ -188,13 +199,12 @@ out a campaign's shops, and where players go to open one for themselves.
 
 ---
 
-
 ## Crafting
 
 ### Creating Recipes
 
 - The Craft tab lists every recipe grouped by its target item's type, so players can see at a glance what's
-  available to make.
+  available to make, its material value and crafting duration, and which tool/skill proficiencies it needs.
 - A recipe can be open to every player, or locked down to a specific list of actors.
 - Building one starts with a target item — required — picked from the Compendium Browser or dropped in
   directly by UUID, plus how many of it the recipe produces per craft.
@@ -250,7 +260,7 @@ out a campaign's shops, and where players go to open one for themselves.
     </td>
     <td width="50%">
       <strong>Craft confirmation</strong><br>
-      <img src="docs/example_craft_chat.png" alt="Chat card requesting GM confirmation to start a craft"">
+      <img src="docs/example_craft_chat.png" alt="Chat card requesting GM confirmation to start a craft">
     </td>
   </tr>
   <tr>
@@ -266,4 +276,3 @@ out a campaign's shops, and where players go to open one for themselves.
 ## What's Next
 
 - Non-item services: spellcasting, hirelings, food & lodging
-- Search and filtering for the recipe browser

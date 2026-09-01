@@ -2,8 +2,8 @@ import { MODULE_ID } from "../../config.mjs";
 import { newEntryStock, Shop, ShopItemEntry } from "../../data/shop-data.mjs";
 import { calendariaWeekdayOptions, isCalendariaActive } from "../../integrations/calendaria.mjs";
 import {
-  applyLoadingTooltip, breakdownCopper, buildItemTableSections, finalizeGroups, isDnd5eAutoRecoveryEnabled,
-  needsDefaultPrice, openItemSheet, resolveItemPrice, selectableActors, toCopper
+  applyItemFilters, applyItemSort, applyLoadingTooltip, breakdownCopper, buildItemTableSections, finalizeGroups,
+  isDnd5eAutoRecoveryEnabled, needsDefaultPrice, openItemSheet, resolveItemPrice, selectableActors, toCopper
 } from "../../utils.mjs";
 
 import FillFromTableDialog from "./fill-from-table-dialog.mjs";
@@ -30,7 +30,7 @@ const { Application5e } = game.dnd5e.applications.api;
  * @type {{ id: string, label?: string }[]}
  */
 const BUY_COLUMNS = [
-  { id: "cart", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.CartQuantity" },
+  { id: "cart" },
   { id: "discount", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.PriceModifier" },
   { id: "price", label: "DND5E.Price" },
   { id: "weight", label: "DND5E.Weight" },
@@ -43,7 +43,7 @@ const BUY_COLUMNS = [
  * @type {{ id: string, label?: string }[]}
  */
 const SELL_COLUMNS = [
-  { id: "cart", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SellQuantity" },
+  { id: "cart" },
   { id: "discount", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.PriceModifier" },
   { id: "price", label: "DND5E.Price" },
   { id: "weight", label: "DND5E.Weight" },
@@ -52,16 +52,13 @@ const SELL_COLUMNS = [
 ];
 
 /**
- * Festival options for the active calendar, if it supports festivals. Empty otherwise.
- * @returns {{ value: string, label: string }[]}
+ * Cycle-able Buy/Sell sort modes, in cycle order.
+ * @type {Record<string, { icon: string, label: string }>}
  */
-function festivalOptions() {
-  const calendar = game.time.calendar;
-  const festivals = calendar.festivalsArray ?? calendar.festivals ?? [];
-  return festivals.map(f => ({ value: f.name, label: _loc(f.name) }));
-}
-
-/* -------------------------------------------- */
+const SORT_MODES = {
+  name: { icon: "fa-solid fa-arrow-down-a-z", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SortByName" },
+  price: { icon: "fa-solid fa-arrow-down-1-9", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SortByPrice" }
+};
 
 /**
  * Application for viewing and, in Edit mode, configuring a single shop.
@@ -266,6 +263,54 @@ export default class ShopSheet extends Application5e {
    * @type {{ type: string, label: string, items: object[] }[]}
    */
   #lastSellGroups = [];
+
+  /* -------------------------------------------- */
+
+  /**
+   * Current Buy-tab search query, kept live across re-renders.
+   * @type {string}
+   */
+  #buySearch = "";
+
+  /* -------------------------------------------- */
+
+  /**
+   * Current Sell-tab search query, kept live across re-renders.
+   * @type {string}
+   */
+  #sellSearch = "";
+
+  /* -------------------------------------------- */
+
+  /**
+   * Current Buy-tab type filter, kept live across re-renders. Empty string means no filter.
+   * @type {string}
+   */
+  #buyTypeFilter = "";
+
+  /* -------------------------------------------- */
+
+  /**
+   * Current Sell-tab type filter, kept live across re-renders. Empty string means no filter.
+   * @type {string}
+   */
+  #sellTypeFilter = "";
+
+  /* -------------------------------------------- */
+
+  /**
+   * Current Buy-tab sort, kept live across re-renders. "type" is the default server-rendered order.
+   * @type {"type"|"name"}
+   */
+  #buySort = "name";
+
+  /* -------------------------------------------- */
+
+  /**
+   * Current Sell-tab sort, kept live across re-renders. "type" is the default server-rendered order.
+   * @type {"type"|"name"}
+   */
+  #sellSort = "name";
 
   /* -------------------------------------------- */
 
@@ -636,6 +681,54 @@ export default class ShopSheet extends Application5e {
           await this.#mergeItemEntries([
             { uuid: data.uuid, ...newEntryStock(item, this.shop.stockDefaults) }
           ]);
+        });
+      }
+    }
+
+    if ( (partId === "buy") || (partId === "sell") ) {
+      const content = htmlElement.querySelector(".items-list");
+      if ( content ) {
+        const typeSelect = htmlElement.querySelector(".item-type-filter");
+        const sortButton = htmlElement.querySelector(".sort-control");
+        const clearButton = htmlElement.querySelector(".clear-control");
+        if ( typeSelect ) typeSelect.value = (partId === "buy") ? this.#buyTypeFilter : this.#sellTypeFilter;
+        const sortKey = (partId === "buy") ? this.#buySort : this.#sellSort;
+        if ( sortButton ) {
+          sortButton.querySelector("i").className = SORT_MODES[sortKey].icon;
+          sortButton.setAttribute("aria-label", _loc(SORT_MODES[sortKey].label));
+        }
+        applyItemSort(sortKey, content);
+        typeSelect?.closest(".filter-control")?.classList.toggle("active", !!typeSelect?.value);
+        const searchFilter = new foundry.applications.ux.SearchFilter({
+          inputSelector: ".item-search", contentSelector: ".items-list",
+          initial: (partId === "buy") ? this.#buySearch : this.#sellSearch,
+          callback: (event, query, rgx) => {
+            if ( partId === "buy" ) this.#buySearch = query;
+            else this.#sellSearch = query;
+            applyItemFilters(rgx, typeSelect?.value, content);
+          }
+        });
+        searchFilter.bind(htmlElement);
+        typeSelect?.addEventListener("change", () => {
+          if ( partId === "buy" ) this.#buyTypeFilter = typeSelect.value;
+          else this.#sellTypeFilter = typeSelect.value;
+          typeSelect.closest(".filter-control").classList.toggle("active", !!typeSelect.value);
+          applyItemFilters(searchFilter.rgx, typeSelect.value, content);
+        });
+        sortButton?.addEventListener("click", () => {
+          const modes = Object.keys(SORT_MODES);
+          const current = (partId === "buy") ? this.#buySort : this.#sellSort;
+          const next = modes[(modes.indexOf(current) + 1) % modes.length];
+          if ( partId === "buy" ) this.#buySort = next;
+          else this.#sellSort = next;
+          this.render();
+        });
+        clearButton?.addEventListener("click", () => {
+          searchFilter.filter(null, "");
+          if ( typeSelect ) {
+            typeSelect.value = "";
+            typeSelect.dispatchEvent(new Event("change"));
+          }
         });
       }
     }
@@ -1087,7 +1180,7 @@ export default class ShopSheet extends Application5e {
     if ( game.user.isGM ) await Shop.update(this.shopId, updateData);
     else {
       const gm = game.users.activeGM;
-      if ( !gm ) return ui.notifications.warn(_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoActiveGM"));
+      if ( !gm ) return ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoActiveGM", { localize: true });
       await gm.query(`${MODULE_ID}.updateShop`, { shopId: this.shopId, updateData });
     }
     this.render();
@@ -1106,6 +1199,18 @@ export default class ShopSheet extends Application5e {
  */
 function additiveSource(label, value) {
   return { label, value: `${Math.abs(value)}%`, type: (value < 0) ? "subtract" : "add" };
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Festival options for the active calendar, if it supports festivals. Empty otherwise.
+ * @returns {{ value: string, label: string }[]}
+ */
+function festivalOptions() {
+  const calendar = game.time.calendar;
+  const festivals = calendar.festivalsArray ?? calendar.festivals ?? [];
+  return festivals.map(f => ({ value: f.name, label: _loc(f.name) }));
 }
 
 /* -------------------------------------------- */

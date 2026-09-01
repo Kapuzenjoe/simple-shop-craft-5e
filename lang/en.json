@@ -104,6 +104,8 @@
         "Create": "New Shop",
         "Delete": "Delete Shop",
         "Duplicate": "Duplicate Shop",
+        "SearchShops": "Search Shops",
+        "SortBySettlementCap": "Sort by Settlement Cap",
         "DeleteConfirm": "Delete this shop? This cannot be undone."
       },
       "Recipes": {
@@ -113,6 +115,9 @@
         "DeleteConfirm": "Delete this recipe? This cannot be undone.",
         "Unlocked": "Unlocked",
         "UnlockedAll": "All",
+        "SearchRecipes": "Search Recipes",
+        "MaterialValue": "Material Value",
+        "SortByMaterialValue": "Sort by Material Value",
         "Locked": "You haven't unlocked this recipe yet."
       }
     },
@@ -146,6 +151,10 @@
     "ShopEditor": {
       "Title": "Edit Shop",
       "AddItems": "Add Items",
+      "SearchItems": "Search Items",
+      "AllTypes": "All Types",
+      "SortByName": "Sort by Name",
+      "SortByPrice": "Sort by Price",
       "GenerateItem": "Generate Item",
       "GenerateItemType": "Item Type",
       "GenerateItemMundane": "Mundane",
@@ -253,8 +262,6 @@
       "StockMax": "Max Stock",
       "StockMaxHint": "Empty uses the shop's default for this item type.",
       "StockCurrent": "Current Stock",
-      "CartQuantity": "Buy",
-      "SellQuantity": "Sell",
       "IncreaseQuantity": "Increase Quantity",
       "DecreaseQuantity": "Decrease Quantity",
       "NoSellableItems": "Nothing to sell.",

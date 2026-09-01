@@ -126,10 +126,9 @@ export default class ShopCreateDialog extends Dialog5e {
  * @returns {{ identifier: string, bundleSize: number|null }[]}
  */
 function getStarterItems(pack) {
-  return (STARTER_PACKS[pack]?.items ?? []).map(item => {
-    return typeof item === "string" ? { identifier: item, bundleSize: null } : { identifier: item.identifier, bundleSize: item.bundleSize ?? null };
-  }
-  );
+  return (STARTER_PACKS[pack]?.items ?? []).map(item => typeof item === "string"
+    ? { identifier: item, bundleSize: null }
+    : { identifier: item.identifier, bundleSize: item.bundleSize ?? null });
 }
 
 /* -------------------------------------------- */

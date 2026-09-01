@@ -1,6 +1,6 @@
 <section class="items-list">
     {{#each sections}}
-    <div class="items-section card">
+    <div class="items-section card" data-type="{{ this.type }}">
         <div class="items-header header">
             <h3 class="item-name">{{ localize this.label }}</h3>
             {{#each this.columns}}

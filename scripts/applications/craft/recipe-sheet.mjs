@@ -1,8 +1,8 @@
 import { MODULE_ID } from "../../config.mjs";
 import { Recipe, RecipeMaterial } from "../../data/recipe-data.mjs";
 import {
-  applyLoadingTooltip, breakdownCopper, buildItemTableSections, currencyRows, effectiveCraftCost, getCurrencyOptions,
-  goldPoolCurrencies, isDefaultIdentifier, itemRefKey, resolveEntries, resolveIdentifierIndex,
+  applyDropArea, applyLoadingTooltip, breakdownCopper, buildItemTableSections, currencyRows, effectiveCraftCost,
+  getCurrencyOptions, goldPoolCurrencies, isDefaultIdentifier, itemRefKey, resolveEntries, resolveIdentifierIndex,
   resolveItemPrice, subtypeOptions, toCopper
 } from "../../utils.mjs";
 import BaseShopConfig from "../shops/shop-config/base-shop-config.mjs";
@@ -257,14 +257,7 @@ export default class RecipeSheet extends Application5e {
     if ( this.hasFrame ) this.window.title.innerText = this.title;
     if ( !this.isEditable ) this._disableFields();
 
-    const dropArea = this.element.querySelector("[data-drop-area]");
-    dropArea?.addEventListener("dragover", event => event.preventDefault());
-    dropArea?.addEventListener("dragenter", () => dropArea.classList.add("is-dragover"));
-    dropArea?.addEventListener("dragleave", event => {
-      if ( event.currentTarget.contains(event.relatedTarget) ) return;
-      dropArea.classList.remove("is-dragover");
-    });
-    dropArea?.addEventListener("drop", event => this.#onDropItem(event));
+    applyDropArea(this.element.querySelector("[data-drop-area]"), event => this.#onDropItem(event));
 
     this.element.querySelectorAll(".item-tooltip[data-uuid]").forEach(applyLoadingTooltip);
   }

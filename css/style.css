@@ -7,12 +7,34 @@
     width: 120px;
   }
 
+  .item-settlementCap,
+  .item-materialValue {
+    min-width: 120px;
+    gap: 0.25rem;
+  }
+
+  .item-settlementCap i {
+    font-size: var(--font-size-9);
+    color: var(--color-text-tertiary);
+  }
+
   .item-active {
     width: 90px;
   }
 
   .item-unlocked {
     width: 90px;
+  }
+
+  .proficiency-icon {
+    margin-left: 4px;
+    color: var(--color-text-tertiary);
+    cursor: help;
+  }
+
+  .item-materialValue i {
+    font-size: var(--font-size-9);
+    color: var(--color-text-tertiary);
   }
 
   .item-controls {
@@ -23,6 +45,11 @@
 #tooltip.property-attribution.simple-shop-craft-5e table td.attribution-value {
   inline-size: auto;
   white-space: nowrap;
+}
+
+#tooltip.stacked-tooltip.simple-shop-craft-5e,
+.locked-tooltip.stacked-tooltip.simple-shop-craft-5e {
+  white-space: pre-line;
 }
 
 .simple-shop-craft-5e {
@@ -69,6 +96,90 @@
 
   .card-tray {
     margin-inline: 0;
+  }
+
+  .drop-area {
+    border: var(--dnd5e-border-dashed, 1px dashed #999);
+    border-radius: 4px;
+    color: var(--color-text-secondary);
+    display: grid;
+    font-size: var(--font-size-11);
+    font-style: italic;
+    padding: 6px;
+    place-content: center;
+    text-align: center;
+
+    &.is-dragover {
+      border-color: var(--dnd5e-color-gold);
+      box-shadow: 0 0 6px var(--dnd5e-color-gold);
+    }
+  }
+
+  search {
+    display: flex;
+    align-items: center;
+    border-radius: 4px;
+    background: var(--dnd5e-background-card);
+    box-shadow: 0 0 6px var(--dnd5e-shadow-45);
+    border: var(--dnd5e-border-gold);
+    padding-right: 4px;
+    margin-bottom: 8px;
+    position: relative;
+
+    &::before {
+      content: "\f002";
+      font-family: var(--font-awesome);
+      font-weight: bold;
+      color: var(--color-text-tertiary);
+      position: absolute;
+      left: 12px;
+    }
+
+    .item-search {
+      flex: 1;
+      background: none;
+      border: none;
+      padding: 8px 8px 8px 36px;
+      font-size: var(--font-size-13);
+      outline: none;
+    }
+
+    .filter-control {
+      position: relative;
+      display: grid;
+      place-content: center;
+      width: 32px;
+      align-self: stretch;
+      cursor: pointer;
+      color: var(--color-text-tertiary);
+
+      &::before {
+        content: "\f0b0";
+        font-family: var(--font-awesome);
+        font-weight: bold;
+      }
+
+      select {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        cursor: pointer;
+      }
+
+      &.active {
+        color: var(--dnd5e-color-red);
+      }
+
+      &.clear-control, &.sort-control {
+        border: none;
+        background: none;
+        padding: 0;
+
+        &::before {
+          content: none;
+        }
+      }
+    }
   }
 }
 
@@ -182,8 +293,6 @@
     width: 70px;
     justify-content: space-evenly;
     gap: 4px;
-    border-right: 1px solid var(--dnd5e-color-gold);
-    padding-right: 4px;
   }
 
   .title .bundle-size {
@@ -205,12 +314,5 @@
     color: var(--dnd5e-color-failure);
     margin-left: 4px;
     cursor: help;
-  }
-}
-
-.simple-shop-craft-5e.recipe-sheet {
-  .drop-area.is-dragover {
-    border-color: var(--dnd5e-color-gold);
-    box-shadow: 0 0 6px var(--dnd5e-color-gold);
   }
 }

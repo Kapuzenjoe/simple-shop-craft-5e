@@ -1,10 +1,31 @@
-<li class="item" data-id="{{ recipe._id }}" data-recipe-id="{{ recipe._id }}">
+<li class="item" data-id="{{ recipe._id }}" data-recipe-id="{{ recipe._id }}" data-name="{{ displayName }}"
+    data-material-value="{{ materialValueCP }}">
     <div class="item-row">
-        <div class="item-name rollable" data-action="startCraft" role="button" data-recipe-id="{{ recipe._id }}">
+        <div class="item-name item-tooltip rollable" data-action="startCraft" role="button"
+             data-recipe-id="{{ recipe._id }}" {{#if itemUuid}}data-uuid="{{ itemUuid }}"{{/if}}>
             {{> "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs"
                 img=recipe.img name=displayName bundleSize=bundleSize }}
+            {{#if toolProfTooltip}}
+            <i class="fa-solid fa-hammer proficiency-icon" data-tooltip="{{ toolProfTooltip }}"
+               data-tooltip-class="simple-shop-craft-5e stacked-tooltip"></i>
+            {{/if}}
+            {{#if skillProfTooltip}}
+            <i class="fa-solid fa-briefcase proficiency-icon" data-tooltip="{{ skillProfTooltip }}"
+               data-tooltip-class="simple-shop-craft-5e stacked-tooltip"></i>
+            {{/if}}
         </div>
-        <div class="item-detail item-unlocked">{{ unlockedLabel }}</div>
+        <div class="item-detail item-materialValue{{#unless materialValueDisplay}} empty{{/unless}}">
+            {{#if materialValueDisplay}}
+            {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=materialValueDisplay}}
+            {{/if}}
+        </div>
+        <div class="item-detail item-duration">{{ durationDisplay }}</div>
+        {{#if @root.isGM}}
+        <div class="item-detail item-unlocked"{{#if unlockedTooltip}}
+             data-tooltip="{{ unlockedTooltip }}" data-tooltip-class="simple-shop-craft-5e stacked-tooltip"{{/if}}>
+            {{ unlockedLabel }}
+        </div>
+        {{/if}}
         <div class="item-detail item-controls always-visible">
             {{#if @root.isGM}}
             <button type="button" class="unbutton config-button item-control item-action" data-action="editRecipe"

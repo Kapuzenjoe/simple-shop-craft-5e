@@ -1,4 +1,4 @@
-<li class="item{{#if suppressed}} suppressed{{/if}}"
+<li class="item{{#if suppressed}} suppressed{{/if}}" data-name="{{ itemName }}" data-price="{{ priceCP }}"
     {{#if suppressed}}{{#unless @root.editable}}hidden{{/unless}}{{/if}}>
     <div class="item-row">
         <div class="item-detail item-cart">

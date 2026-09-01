@@ -1,4 +1,4 @@
-<li class="item{{#if suppressed}} suppressed{{/if}}">
+<li class="item{{#if suppressed}} suppressed{{/if}}" data-name="{{ item.name }}" data-price="{{ priceCP }}">
     <div class="item-row">
         <div class="item-detail item-cart">
             <a class="adjustment-button" data-action="adjustSellQuantity" data-item-id="{{ item.id }}" data-delta="-1"

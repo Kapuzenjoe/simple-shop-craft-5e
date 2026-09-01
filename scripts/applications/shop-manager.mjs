@@ -1,7 +1,9 @@
-import { SETTLEMENT_CAPS } from "../config.mjs";
 import { Recipe } from "../data/recipe-data.mjs";
 import { Shop } from "../data/shop-data.mjs";
-import { buildItemTableSections, finalizeGroups, resolveEntries } from "../utils.mjs";
+import {
+  applyItemFilters, applyItemSort, applyLoadingTooltip, breakdownCopper, buildItemTableSections, effectiveCraftCost,
+  finalizeGroups, formatDuration, resolveEntries, resolveTotalHours, toCopper
+} from "../utils.mjs";
 
 import CraftStartDialog from "./craft/craft-start-dialog.mjs";
 import RecipeSheet from "./craft/recipe-sheet.mjs";
@@ -9,6 +11,24 @@ import ShopCreateDialog from "./shops/shop-create-dialog.mjs";
 import ShopSheet from "./shops/shop-sheet.mjs";
 
 const { Application5e } = game.dnd5e.applications.api;
+
+/**
+ * Cycle-able Shops-list sort modes, in cycle order.
+ * @type {Record<string, { icon: string, label: string }>}
+ */
+const SHOP_SORT_MODES = {
+  name: { icon: "fa-solid fa-arrow-down-a-z", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SortByName" },
+  settlementCap: { icon: "fa-solid fa-arrow-down-1-9", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.SortBySettlementCap" }
+};
+
+/**
+ * Cycle-able Recipes-list sort modes, in cycle order.
+ * @type {Record<string, { icon: string, label: string }>}
+ */
+const RECIPE_SORT_MODES = {
+  name: { icon: "fa-solid fa-arrow-down-a-z", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SortByName" },
+  materialValue: { icon: "fa-solid fa-arrow-down-1-9", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.SortByMaterialValue" }
+};
 
 /**
  * GM-facing application for managing shops.
@@ -66,6 +86,48 @@ export default class ShopManager extends Application5e {
   };
 
   /* -------------------------------------------- */
+  /*  Properties                                  */
+  /* -------------------------------------------- */
+
+  /**
+   * Current name search query for the shops list.
+   * @type {string}
+   */
+  #shopSearch = "";
+
+  /* -------------------------------------------- */
+
+  /**
+   * Current sort mode for the shops list, a key of {@link SORT_MODES}.
+   * @type {"name"|"settlementCap"}
+   */
+  #shopSort = "name";
+
+  /* -------------------------------------------- */
+
+  /**
+   * Current name search query for the recipes list.
+   * @type {string}
+   */
+  #recipeSearch = "";
+
+  /* -------------------------------------------- */
+
+  /**
+   * Current item-type filter for the recipes list. Empty string means no filter.
+   * @type {string}
+   */
+  #recipeTypeFilter = "";
+
+  /* -------------------------------------------- */
+
+  /**
+   * Current sort mode for the recipes list, a key of {@link RECIPE_SORT_MODES}.
+   * @type {"name"|"materialValue"}
+   */
+  #recipeSort = "name";
+
+  /* -------------------------------------------- */
   /*  Rendering                                   */
   /* -------------------------------------------- */
 
@@ -74,16 +136,25 @@ export default class ShopManager extends Application5e {
     const context = await super._prepareContext(options);
     context.isGM = game.user.isGM;
     const shops = Shop.getAll().filter(s => context.isGM || s.active);
-    const rows = shops.toSorted((a, b) => a.name.localeCompare(b.name)).map(shop => ({
+    const byName = (a, b) => a.name.localeCompare(b.name);
+    const capCP = shop => shop.settlementCap.value == null
+      ? Number.MAX_SAFE_INTEGER
+      : toCopper(shop.settlementCap.value, shop.settlementCap.denomination);
+    const sorted = (this.#shopSort === "settlementCap")
+      ? shops.toSorted((a, b) => (capCP(a) - capCP(b)) || byName(a, b))
+      : shops.toSorted(byName);
+    const rows = sorted.map(shop => ({
       shop,
       npc: shop.npc ? fromUuidSync(shop.npc) : null,
       openingHours: shop.openingHoursDisplay(),
-      subtitle: [shop.location || null, ShopManager.#settlementCapLabel(shop) || null].filter(Boolean).join(" · "),
+      subtitle: shop.location,
+      settlementCapDisplay: (shop.settlementCap.value != null) ? breakdownCopper(capCP(shop)) : null,
       template: "modules/simple-shop-craft-5e/templates/shop-manager/shop-row.hbs"
     }));
     const columns = [
       { id: "npc", label: "SIMPLE_SHOP_CRAFT_5E.Owner" },
       { id: "openingHours", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.OpeningHours" },
+      { id: "settlementCap", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SettlementCap" },
       { id: "active", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Status" },
       { id: "controls" }
     ];
@@ -104,17 +175,36 @@ export default class ShopManager extends Application5e {
       ? recipes
       : recipes.filter(r => r.openToAll || (actor && r.unlockedFor.has(actor.uuid)));
     const targetResolved = await resolveEntries(visibleRecipes.map(r => r.targetItem));
+    const craftCosts = await Promise.all(targetResolved.map(async ({ item }) => {
+      if ( !item?.uuid ) return null;
+      const fullItem = await fromUuid(item.uuid);
+      return fullItem?.system?.getCraftCost ? effectiveCraftCost(fullItem) : null;
+    }));
+    const toolLabel = key => game.dnd5e.documents.Trait.keyLabel(key, { trait: "tool" });
+    const skillLabel = key => _loc(CONFIG.DND5E.skills[key]?.label ?? key);
     const recipeRows = visibleRecipes
-      .map((recipe, index) => ({
-        recipe,
-        displayName: recipe.name || targetResolved[index]?.item?.name
-          || _loc("SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder"),
-        unlockedLabel: recipe.openToAll
-          ? _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.UnlockedAll")
-          : (recipe.unlockedFor.size ? String(recipe.unlockedFor.size) : ""),
-        type: targetResolved[index]?.item?.type ?? "unknown",
-        bundleSize: (recipe.targetQuantity > 1) ? recipe.targetQuantity : null
-      }))
+      .map((recipe, index) => {
+        const item = targetResolved[index]?.item;
+        const materialValueCP = recipe.craftThreshold(craftCosts[index], item);
+        return {
+          recipe,
+          displayName: recipe.name || item?.name || _loc("SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder"),
+          itemUuid: item?.uuid ?? null,
+          unlockedLabel: recipe.openToAll
+            ? _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.UnlockedAll")
+            : (recipe.unlockedFor.size ? String(recipe.unlockedFor.size) : ""),
+          unlockedTooltip: (!recipe.openToAll && recipe.unlockedFor.size)
+            ? Array.from(recipe.unlockedFor).map(uuid => fromUuidSync(uuid)?.name).filter(Boolean).join("\n")
+            : "",
+          toolProfTooltip: Array.from(recipe.toolProficiencies).map(toolLabel).filter(Boolean).join("\n"),
+          skillProfTooltip: Array.from(recipe.skillProficiencies).map(skillLabel).filter(Boolean).join("\n"),
+          type: item?.type ?? "unknown",
+          bundleSize: (recipe.targetQuantity > 1) ? recipe.targetQuantity : null,
+          materialValueCP,
+          materialValueDisplay: recipe.ignoreCraftValue ? null : breakdownCopper(materialValueCP),
+          durationDisplay: formatDuration(resolveTotalHours(recipe, craftCosts[index]))
+        };
+      })
       .toSorted((a, b) => a.displayName.localeCompare(b.displayName));
     const recipeGroups = new Map();
     for ( const row of recipeRows ) {
@@ -124,7 +214,12 @@ export default class ShopManager extends Application5e {
     context.recipeTable = buildItemTableSections({
       groups: finalizeGroups(recipeGroups),
       emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.None",
-      columns: [{ id: "unlocked", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Unlocked" }, { id: "controls" }],
+      columns: [
+        { id: "materialValue", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.MaterialValue" },
+        { id: "duration", label: "DND5E.Duration" },
+        ...(context.isGM ? [{ id: "unlocked", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Unlocked" }] : []),
+        { id: "controls" }
+      ],
       rowTemplate: "modules/simple-shop-craft-5e/templates/shop-manager/recipe-row.hbs"
     });
     return context;
@@ -160,6 +255,70 @@ export default class ShopManager extends Application5e {
       },
       jQuery: false
     });
+  }
+
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  _attachPartListeners(partId, htmlElement, options) {
+    super._attachPartListeners(partId, htmlElement, options);
+
+    if ( partId === "shops" ) {
+      const content = htmlElement.querySelector(".items-list");
+      const sortButton = htmlElement.querySelector(".sort-control");
+      sortButton.querySelector("i").className = SHOP_SORT_MODES[this.#shopSort].icon;
+      sortButton.setAttribute("aria-label", _loc(SHOP_SORT_MODES[this.#shopSort].label));
+      sortButton.addEventListener("click", () => {
+        const modes = Object.keys(SHOP_SORT_MODES);
+        this.#shopSort = modes[(modes.indexOf(this.#shopSort) + 1) % modes.length];
+        this.render();
+      });
+      new foundry.applications.ux.SearchFilter({
+        inputSelector: ".item-search", contentSelector: ".items-list",
+        initial: this.#shopSearch,
+        callback: (event, query, rgx) => {
+          this.#shopSearch = query;
+          applyItemFilters(rgx, "", content);
+        }
+      }).bind(htmlElement);
+    }
+
+    if ( partId === "recipes" ) {
+      const content = htmlElement.querySelector(".items-list");
+      htmlElement.querySelectorAll(".item-tooltip[data-uuid]").forEach(el => applyLoadingTooltip(el));
+      const typeSelect = htmlElement.querySelector(".item-type-filter");
+      const sortButton = htmlElement.querySelector(".sort-control");
+      const clearButton = htmlElement.querySelector(".clear-control");
+      typeSelect.value = this.#recipeTypeFilter;
+      typeSelect.closest(".filter-control").classList.toggle("active", !!typeSelect.value);
+      sortButton.querySelector("i").className = RECIPE_SORT_MODES[this.#recipeSort].icon;
+      sortButton.setAttribute("aria-label", _loc(RECIPE_SORT_MODES[this.#recipeSort].label));
+      applyItemSort(this.#recipeSort, content);
+      const searchFilter = new foundry.applications.ux.SearchFilter({
+        inputSelector: ".item-search", contentSelector: ".items-list",
+        initial: this.#recipeSearch,
+        callback: (event, query, rgx) => {
+          this.#recipeSearch = query;
+          applyItemFilters(rgx, typeSelect.value, content);
+        }
+      });
+      searchFilter.bind(htmlElement);
+      typeSelect.addEventListener("change", () => {
+        this.#recipeTypeFilter = typeSelect.value;
+        typeSelect.closest(".filter-control").classList.toggle("active", !!typeSelect.value);
+        applyItemFilters(searchFilter.rgx, typeSelect.value, content);
+      });
+      sortButton.addEventListener("click", () => {
+        const modes = Object.keys(RECIPE_SORT_MODES);
+        this.#recipeSort = modes[(modes.indexOf(this.#recipeSort) + 1) % modes.length];
+        this.render();
+      });
+      clearButton.addEventListener("click", () => {
+        searchFilter.filter(null, "");
+        typeSelect.value = "";
+        typeSelect.dispatchEvent(new Event("change"));
+      });
+    }
   }
 
   /* -------------------------------------------- */
@@ -253,20 +412,6 @@ export default class ShopManager extends Application5e {
 
   /* -------------------------------------------- */
   /*  Helpers                                     */
-  /* -------------------------------------------- */
-
-  /**
-   * Determine the display label for a shop's settlement cap: the matching preset name, "Custom" for a
-   * non-preset value, or an empty string when uncapped.
-   * @param {Shop} shop
-   * @returns {string}
-   */
-  static #settlementCapLabel(shop) {
-    const preset = Object.entries(SETTLEMENT_CAPS).find(([, v]) => v.value === shop.settlementCap.value)?.[0];
-    if ( preset ) return _loc(SETTLEMENT_CAPS[preset].label);
-    return shop.settlementCap.value != null ? _loc("SIMPLE_SHOP_CRAFT_5E.Custom") : "";
-  }
-
   /* -------------------------------------------- */
 
   /**

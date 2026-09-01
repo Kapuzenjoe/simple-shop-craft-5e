@@ -1,4 +1,82 @@
-import { EXCLUDED_PACKS, MODULE_ID, PACKAGE_TYPE_ORDER, RARITY_DEFAULT_PRICES } from "./config.mjs";
+import { EXCLUDED_PACKS, HOURS_PER_USE, MODULE_ID, PACKAGE_TYPE_ORDER, RARITY_DEFAULT_PRICES } from "./config.mjs";
+
+/**
+ * Hours per duration unit, for converting a recipe's duration override to total progress hours.
+ * @type {Record<string, number>}
+ */
+const HOURS_PER_UNIT = { minute: 1 / 60, hour: 1, day: HOURS_PER_USE };
+
+/**
+ * Show or hide item rows within an `.items-list` by name match and/or selected type, hiding a type section
+ * entirely once every row within it is filtered out. Leaves already-suppressed (`[hidden]`) rows untouched.
+ * @param {RegExp} rgx
+ * @param {string} typeFilter  Selected type, or "" for no filter.
+ * @param {HTMLElement} content
+ */
+export function applyItemFilters(rgx, typeFilter, content) {
+  for ( const section of content.querySelectorAll(".items-section") ) {
+    const typeMatches = !typeFilter || (section.dataset.type === typeFilter);
+    let matched = false;
+    for ( const row of section.querySelectorAll(".item:not([hidden])") ) {
+      const match = typeMatches && foundry.applications.ux.SearchFilter.testQuery(rgx, row.dataset.name);
+      if ( match ) matched = true;
+      row.style.display = match ? "" : "none";
+    }
+    section.style.display = matched ? "" : "none";
+  }
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Reorder each `.item-list` within an `.items-list` by name or by the given sort mode. Runs on every
+ * render, so newly added rows are always inserted in sorted order without requiring user interaction.
+ * @param {string} sortType
+ * @param {HTMLElement} content
+ */
+export function applyItemSort(sortType, content) {
+  for ( const list of content.querySelectorAll(".item-list") ) {
+    const rows = Array.from(list.children);
+    if ( sortType === "name" ) rows.sort((a, b) => a.dataset.name.localeCompare(b.dataset.name));
+    else rows.sort((a, b) => Number(a.dataset[sortType]) - Number(b.dataset[sortType]));
+    rows.forEach(row => list.append(row));
+  }
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Resolve a recipe's total crafting duration in hours: its explicit override if set, otherwise the
+ * rules-based crafting time for the target item.
+ * @param {Recipe} recipe
+ * @param {{ days: number, gold: number }|null} craftCost
+ * @returns {number}
+ */
+export function resolveTotalHours(recipe, craftCost) {
+  return recipe.durationOverride.value != null
+    ? recipe.durationOverride.value * HOURS_PER_UNIT[recipe.durationOverride.units]
+    : (craftCost?.days ?? 0) * HOURS_PER_USE;
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Format a duration in hours as a short breakdown, largest unit first (e.g. "1d 8h 20min").
+ * @param {number} totalHours
+ * @returns {string}
+ */
+export function formatDuration(totalHours) {
+  const days = Math.floor(totalHours / HOURS_PER_USE);
+  const hours = Math.floor(totalHours % HOURS_PER_USE);
+  const minutes = Math.round((totalHours % 1) * 60);
+  const parts = [];
+  if ( days ) parts.push(`${days}d`);
+  if ( hours ) parts.push(`${hours}h`);
+  if ( minutes ) parts.push(`${minutes}min`);
+  return parts.length ? parts.join(" ") : "0min";
+}
+
+/* -------------------------------------------- */
 
 /**
  * Break a copper amount down into whole-unit denominations, largest to smallest.
@@ -41,7 +119,7 @@ export function breakdownCopper(valueCP, { negative=false, capAt=CONFIG.DND5E.de
  */
 export function buildItemTableSections({ groups, emptyLabel, columns, rowTemplate }) {
   const sections = groups.map(group => ({
-    label: group.label,
+    type: group.type, label: group.label,
     columns,
     rows: group.items.map(row => ({ ...row, template: rowTemplate }))
   }));
@@ -467,6 +545,24 @@ export function subtypeOptions(types) {
 export function toCopper(value, denomination="gp") {
   const cpPerUnit = CONFIG.DND5E.currencies.cp.conversion / (CONFIG.DND5E.currencies[denomination]?.conversion ?? 1);
   return Math.floor(game.dnd5e.utils.roundCurrency?.(value * cpPerUnit, "cp") ?? (value * cpPerUnit));
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Wire a `[data-drop-area]` element's dragover/dragenter/dragleave/drop events, toggling its
+ * `is-dragover` hover-highlight class while a drag is over it. No-op if `element` is null.
+ * @param {HTMLElement|null} element
+ * @param {(event: DragEvent) => void} onDrop
+ */
+export function applyDropArea(element, onDrop) {
+  element?.addEventListener("dragover", event => event.preventDefault());
+  element?.addEventListener("dragenter", () => element.classList.add("is-dragover"));
+  element?.addEventListener("dragleave", event => {
+    if ( event.currentTarget.contains(event.relatedTarget) ) return;
+    element.classList.remove("is-dragover");
+  });
+  element?.addEventListener("drop", onDrop);
 }
 
 /* -------------------------------------------- */
