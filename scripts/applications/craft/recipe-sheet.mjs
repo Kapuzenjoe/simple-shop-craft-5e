@@ -1,4 +1,4 @@
-import { MODULE_ID } from "../../config.mjs";
+import { MODULE_ID, UNLOCK_MODES } from "../../config.mjs";
 import { Recipe, RecipeMaterial } from "../../data/recipe-data.mjs";
 import {
   applyDropArea, applyLoadingTooltip, breakdownCopper, buildItemTableSections, currencyRows, effectiveCraftCost,
@@ -210,7 +210,10 @@ export default class RecipeSheet extends Application5e {
     context.materialPriceRows = currencyRows(recipe.materialPrice, "materialPrice.", craftCostBreakdown);
     context.unlockFields = [
       { field: fields.unlockedFor, name: "unlockedFor", value: Array.from(recipe.unlockedFor) },
-      { field: fields.openToAll, name: "openToAll", value: recipe.openToAll }
+      {
+        field: fields.unlockMode, name: "unlockMode", value: recipe.unlockMode,
+        options: Object.entries(UNLOCK_MODES).map(([value, { label }]) => ({ value, label: _loc(label) }))
+      }
     ];
     context.toolFields = [
       {

@@ -1,6 +1,7 @@
-import { SETTING_KEYS } from "../config.mjs";
+import { SETTING_KEYS, UNLOCK_MODES } from "../config.mjs";
 import { toCopper } from "../utils.mjs";
 
+import { migrateUnlockMode } from "./migration.mjs";
 import { SettingCollectionMixin } from "./setting-collection.mjs";
 
 const {
@@ -71,7 +72,7 @@ export class Recipe extends SettingCollectionMixin(foundry.abstract.DataModel, S
       allowFreeformMaterials: new BooleanField({ initial: false }),
       ignoreCraftValue: new BooleanField({ initial: false }),
       unlockedFor: new SetField(new DocumentUUIDField({ type: "Actor" })),
-      openToAll: new BooleanField({ initial: false }),
+      unlockMode: new StringField({ initial: "toolProficiency", choices: Object.keys(UNLOCK_MODES), required: true }),
       materialPrice: new ObjectField({ initial: {} }),
       toolProficiencies: new SetField(new StringField()),
       skillProficiencies: new SetField(new StringField()),
@@ -81,6 +82,32 @@ export class Recipe extends SettingCollectionMixin(foundry.abstract.DataModel, S
         units: new StringField({ initial: "day", choices: ["minute", "hour", "day"] })
       })
     };
+  }
+
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  static _migrateData(source) {
+    super._migrateData(source);
+    migrateUnlockMode(source);
+    return source;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Determine whether the given actor may start this craft.
+   * @param {Actor5e|null} actor  Actor attempting to craft.
+   * @returns {boolean}
+   */
+  canCraft(actor) {
+    if ( this.unlockMode === "all" ) return true;
+    if ( !actor ) return false;
+    if ( this.unlockedFor.has(actor.uuid) ) return true;
+    if ( this.unlockMode === "toolProficiency" ) {
+      return Array.from(this.toolProficiencies).some(key => (actor.system.tools?.[key]?.value ?? 0) > 0);
+    }
+    return false;
   }
 
   /* -------------------------------------------- */

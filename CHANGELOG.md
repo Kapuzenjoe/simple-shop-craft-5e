@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.0
+
+- Changed a recipe's "Open to All" checkbox to a three-way Unlock Mode: Individual, Open to All, or Tool-Proficient (any actor proficient in the recipe's required tool).
+- Changed the Recipes list's Unlocked hover to also show current Tool-Proficient party characters.
+
 ## 0.3.0
 
 - Added a "Fill from Table" action to a shop's Buy tab, drawing items from a RollTable into its stock.

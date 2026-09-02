@@ -3,7 +3,7 @@ import jsdoc from "eslint-plugin-jsdoc";
 import globals from "globals";
 
 export default [
-  { ignores: ["node_modules/", "packs/", "temp/"] },
+  { ignores: ["node_modules/", "packs/", "temp/", "foundry/"] },
   {
     languageOptions: {
       ecmaVersion: "latest",

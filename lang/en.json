@@ -51,11 +51,11 @@
         },
         "unlockedFor": {
           "label": "Unlocked For",
-          "hint": "Actors who may start this craft. Ignored if \"Open to All\" is checked."
+          "hint": "Actors who may always start this craft, regardless of Unlock Mode below."
         },
-        "openToAll": {
-          "label": "Open to All",
-          "hint": "Any player may start this craft, regardless of the list above."
+        "unlockMode": {
+          "label": "Unlock Mode",
+          "hint": "Who else may start this craft, in addition to the actors listed above."
         },
         "materialPrice": {
           "label": "Material Price",
@@ -146,7 +146,10 @@
       "RequiredMaterialsValue": "Required Materials Value",
       "CraftValueIgnored": "Crafting value is ignored for this recipe.",
       "MaterialCriteriaTypeRequired": "Choose an item type.",
-      "Unlock": "Unlock"
+      "Unlock": "Unlock",
+      "UnlockModeIndividual": "Individual",
+      "UnlockModeAll": "Open to All",
+      "UnlockModeToolProficient": "Tool-Proficient"
     },
     "ShopEditor": {
       "Title": "Edit Shop",

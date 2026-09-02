@@ -86,6 +86,16 @@ export const RESTOCK_MODES = {
 };
 
 /**
+ * Unlock behaviors for a recipe.
+ * @type {Record<string, { label: string }>}
+ */
+export const UNLOCK_MODES = {
+  individual: { label: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.UnlockModeIndividual" },
+  all: { label: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.UnlockModeAll" },
+  toolProficiency: { label: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.UnlockModeToolProficient" }
+};
+
+/**
  * Hours of progress granted per use of the "Progress Craft" activity (one downtime workday), per DMG
  * 2024 crafting rules.
  * @type {number}

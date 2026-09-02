@@ -173,7 +173,7 @@ export default class ShopManager extends Application5e {
     const actor = game.user.character;
     const visibleRecipes = context.isGM
       ? recipes
-      : recipes.filter(r => r.openToAll || (actor && r.unlockedFor.has(actor.uuid)));
+      : recipes.filter(r => r.canCraft(actor));
     const targetResolved = await resolveEntries(visibleRecipes.map(r => r.targetItem));
     const craftCosts = await Promise.all(targetResolved.map(async ({ item }) => {
       if ( !item?.uuid ) return null;
@@ -182,6 +182,15 @@ export default class ShopManager extends Application5e {
     }));
     const toolLabel = key => game.dnd5e.documents.Trait.keyLabel(key, { trait: "tool" });
     const skillLabel = key => _loc(CONFIG.DND5E.skills[key]?.label ?? key);
+    const unlockedDisplay = recipe => {
+      if ( recipe.unlockMode === "all" ) {
+        return { unlockedLabel: _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.UnlockedAll"), unlockedTooltip: "" };
+      }
+      const party = game.actors.party;
+      const candidates = party ? party.system.playerCharacters : game.actors.filter(a => a.system.isCharacter);
+      const names = candidates.filter(a => recipe.canCraft(a)).map(a => a.name);
+      return { unlockedLabel: names.length ? String(names.length) : "", unlockedTooltip: names.join("\n") };
+    };
     const recipeRows = visibleRecipes
       .map((recipe, index) => {
         const item = targetResolved[index]?.item;
@@ -190,12 +199,7 @@ export default class ShopManager extends Application5e {
           recipe,
           displayName: recipe.name || item?.name || _loc("SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder"),
           itemUuid: item?.uuid ?? null,
-          unlockedLabel: recipe.openToAll
-            ? _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.UnlockedAll")
-            : (recipe.unlockedFor.size ? String(recipe.unlockedFor.size) : ""),
-          unlockedTooltip: (!recipe.openToAll && recipe.unlockedFor.size)
-            ? Array.from(recipe.unlockedFor).map(uuid => fromUuidSync(uuid)?.name).filter(Boolean).join("\n")
-            : "",
+          ...unlockedDisplay(recipe),
           toolProfTooltip: Array.from(recipe.toolProficiencies).map(toolLabel).filter(Boolean).join("\n"),
           skillProfTooltip: Array.from(recipe.skillProficiencies).map(skillLabel).filter(Boolean).join("\n"),
           type: item?.type ?? "unknown",
@@ -387,7 +391,7 @@ export default class ShopManager extends Application5e {
     if ( !recipe ) return;
     if ( !game.user.isGM ) {
       const actor = game.user.character;
-      const allowed = recipe.openToAll || (actor && recipe.unlockedFor.has(actor.uuid));
+      const allowed = recipe.canCraft(actor);
       if ( !allowed ) {
         ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Locked", { localize: true });
         return;

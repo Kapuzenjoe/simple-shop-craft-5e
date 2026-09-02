@@ -127,7 +127,9 @@
  * @property {boolean} ignoreCraftValue           Whether this recipe requires only material presence, ignoring
  *                                                the crafting-value threshold entirely.
  * @property {Set<string>} unlockedFor           Actor UUIDs allowed to start this craft.
- * @property {boolean} openToAll                 Whether any actor may start this craft, ignoring `unlockedFor`.
+ * @property {string} unlockMode                 Who else may start this craft, in addition to `unlockedFor`:
+ *                                                `"individual"` (only `unlockedFor`), `"all"` (any actor), or
+ *                                                `"toolProficiency"` (any actor proficient in `toolProficiencies`).
  * @property {Record<string, number>} materialPrice  Required value of the selected materials, per denomination.
  * @property {Set<string>} toolProficiencies     Required tool proficiency keys (`CONFIG.DND5E.tools`).
  * @property {Set<string>} skillProficiencies    Alternative skill proficiency keys (`CONFIG.DND5E.skills`) — any one
