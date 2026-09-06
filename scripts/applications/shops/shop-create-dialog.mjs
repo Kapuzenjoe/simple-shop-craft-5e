@@ -1,11 +1,11 @@
-import { GOLD_POOL_DEFAULT, STARTER_PACKS } from "../../config.mjs";
+import { DEFAULT_STOCK_BY_TYPE, defaultStockKey, MODULE_ID, SETTING_KEYS, STARTER_PACKS } from "../../config.mjs";
 import { newEntryStock, Shop } from "../../data/shop-data.mjs";
 import { resolveIdentifierIndex } from "../../utils.mjs";
 
 import ShopSheet from "./shop-sheet.mjs";
 
 /**
- * @import { default as ShopManager } from "../shop-manager.mjs";
+ * @import ShopManager from "../shop-manager.mjs";
  */
 
 const { Dialog5e } = game.dnd5e.applications.api;
@@ -30,8 +30,7 @@ export default class ShopCreateDialog extends Dialog5e {
     buttons: [
       { action: "create", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Create", icon: "fas fa-plus", default: true }
     ],
-    form: { handler: ShopCreateDialog.#onSubmit },
-    shopManager: null
+    form: { handler: ShopCreateDialog.#onSubmit }
   };
 
   /* -------------------------------------------- */
@@ -41,6 +40,8 @@ export default class ShopCreateDialog extends Dialog5e {
     ...super.PARTS,
     content: { template: "modules/simple-shop-craft-5e/templates/partials/config-dialog-content.hbs" }
   };
+
+  /* -------------------------------------------- */
 
   /**
    * The shop manager this dialog was opened from.
@@ -102,11 +103,19 @@ export default class ShopCreateDialog extends Dialog5e {
       const uuid = byIdentifier.get(identifier)?.uuid;
       return uuid ? fromUuid(uuid) : null;
     }));
-    const stockDefaults = Shop.schema.fields.stockDefaults.getInitialValue({});
+    const stockDefaults = {
+      byType: Object.fromEntries(
+        Object.keys(DEFAULT_STOCK_BY_TYPE).map(type => [type, game.settings.get(MODULE_ID, defaultStockKey(type))])
+      ),
+      magicRule: game.settings.get(MODULE_ID, SETTING_KEYS.DEFAULT_STOCK_MAGIC_RULE)
+    };
+    const goldPool = game.settings.get(MODULE_ID, SETTING_KEYS.DEFAULT_GOLD_POOL);
     const newShop = {
       name: data.name || packs.find(p => p.value === data.starterPack)?.label
         || _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Create"),
-      goldPool: { max: { gp: GOLD_POOL_DEFAULT }, current: { gp: GOLD_POOL_DEFAULT }, unlimited: false },
+      buyModifier: game.settings.get(MODULE_ID, SETTING_KEYS.DEFAULT_BUY_MODIFIER),
+      sellModifier: game.settings.get(MODULE_ID, SETTING_KEYS.DEFAULT_SELL_MODIFIER),
+      goldPool: { max: { gp: goldPool }, current: { gp: goldPool }, unlimited: false },
       items: starterItems.map(({ identifier, bundleSize }, index) => {
         return { identifier, bundleSize, ...newEntryStock(resolvedItems[index], stockDefaults) };
       })

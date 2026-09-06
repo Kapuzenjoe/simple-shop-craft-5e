@@ -72,7 +72,7 @@ export class Recipe extends SettingCollectionMixin(foundry.abstract.DataModel, S
       allowFreeformMaterials: new BooleanField({ initial: false }),
       ignoreCraftValue: new BooleanField({ initial: false }),
       unlockedFor: new SetField(new DocumentUUIDField({ type: "Actor" })),
-      unlockMode: new StringField({ initial: "toolProficiency", choices: Object.keys(UNLOCK_MODES), required: true }),
+      unlockMode: new StringField({ initial: "individual", choices: Object.keys(UNLOCK_MODES), required: true }),
       materialPrice: new ObjectField({ initial: {} }),
       toolProficiencies: new SetField(new StringField()),
       skillProficiencies: new SetField(new StringField()),

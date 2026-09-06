@@ -25,15 +25,18 @@ export default class MaterialCriteriaDialog extends Dialog5e {
     buttons: [
       { action: "add", label: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.AddMaterialCriteria", icon: "fas fa-plus", default: true }
     ],
-    form: { handler: MaterialCriteriaDialog.#onSubmit },
-    onSubmit: null
+    form: { handler: MaterialCriteriaDialog.#onSubmit }
   };
+
+  /* -------------------------------------------- */
 
   /** @override */
   static PARTS = {
     ...super.PARTS,
     content: { template: "modules/simple-shop-craft-5e/templates/partials/config-dialog-content.hbs" }
   };
+
+  /* -------------------------------------------- */
 
   /**
    * Callback receiving the finished criteria.

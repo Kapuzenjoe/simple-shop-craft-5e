@@ -13,7 +13,12 @@ export const MODULE_ID = "simple-shop-craft-5e";
  */
 export const SETTING_KEYS = {
   SHOPS: "shops",
-  RECIPES: "recipes"
+  RECIPES: "recipes",
+  DEFAULT_BUY_MODIFIER: "defaultBuyModifier",
+  DEFAULT_SELL_MODIFIER: "defaultSellModifier",
+  DEFAULT_GOLD_POOL: "defaultGoldPool",
+  DEFAULT_STOCK_MAGIC_RULE: "defaultStockMagicRule",
+  MAX_HOURS_PER_WORKDAY: "maxHoursPerWorkday"
 };
 
 /**
@@ -60,6 +65,15 @@ export const DEFAULT_STOCK_BY_TYPE = {
 };
 
 /**
+ * Setting key for a given item type's default stock quantity.
+ * @param {string} type
+ * @returns {string}
+ */
+export function defaultStockKey(type) {
+  return `defaultStock${type.charAt(0).toUpperCase()}${type.slice(1)}`;
+}
+
+/**
  * Item types eligible for the magic-item stock exemption.
  * @type {Set<string>}
  */
@@ -103,7 +117,7 @@ export const UNLOCK_MODES = {
 export const HOURS_PER_USE = 8;
 
 /**
- * Default gp price per rarity, per DMG 2024 "Magic Item Values by Rarity".
+ * Default gp price per rarity, per DMG 2024 "Magic Item Rarities and Values".
  * @type {Record<string, { durable: number, consumable: number }>}
  */
 export const RARITY_DEFAULT_PRICES = {

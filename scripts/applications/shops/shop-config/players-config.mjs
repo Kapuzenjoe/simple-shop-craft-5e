@@ -1,7 +1,7 @@
 import BaseShopConfig from "./base-shop-config.mjs";
 
 /**
- * @import { default as ShopSheet } from "../shop-sheet.mjs";
+ * @import ShopSheet from "../shop-sheet.mjs";
  */
 
 /**
@@ -30,10 +30,7 @@ export default class PlayersConfig extends BaseShopConfig {
     actions: {
       removePlayerDiscount: PlayersConfig.#removePlayerDiscount,
       resetHaggling: PlayersConfig.#resetHaggling
-    },
-    shopSheet: null,
-    onUpdate: null,
-    onUpdatePlayerDiscount: null
+    }
   };
 
   /* -------------------------------------------- */
@@ -43,6 +40,8 @@ export default class PlayersConfig extends BaseShopConfig {
     ...super.PARTS,
     content: { template: "modules/simple-shop-craft-5e/templates/players-config/content.hbs" }
   };
+
+  /* -------------------------------------------- */
 
   /**
    * The shop editor this config belongs to.

@@ -4,7 +4,8 @@ import {
 import { calendariaDayOfWeek, calendariaWeekdaysPassed, isCalendariaActive } from "../integrations/calendaria.mjs";
 import {
   breakdownCopper, currencyRows, deductActorCurrencyChecked, excludeFilter, isDnd5eAutoRecoveryEnabled,
-  isShopPackSource, itemRefKey, needsDefaultPrice, resolveEntries, resolveItemPrice, secondsPerDay, toCopper
+  isShopPackSource, itemRarity, itemRefKey, needsDefaultPrice, resolveEntries, resolveItemPrice, resolveRarityPrice,
+  secondsPerDay, toCopper
 } from "../utils.mjs";
 
 import { EnchantedItemBlueprint } from "./enchanted-item-blueprint.mjs";
@@ -53,7 +54,7 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
   }
 
   /* -------------------------------------------- */
-  /*  Data Migration                               */
+  /*  Data Migration                              */
   /* -------------------------------------------- */
 
   /** @inheritDoc */
@@ -154,15 +155,19 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
 
     for ( const type of typeConfigs.keys() ) {
       const filters = [
-        { k: "system.source.rules", o: "in", v: [rules, null, undefined] },
+        { o: "NOT", v: { o: "OR", v: [
+          { k: "system.rarity", o: "in", v: ["artifact"] },
+          { k: "system.rarities", o: "hasany", v: ["artifact"] }
+        ] } },
         excludeFilter("system.type.value", ["natural"]),
-        excludeFilter("system.rarity", ["artifact"]),
         excludeFilter("system.identifier", ["spell-scroll", "enspelled-staff", "enspelled-weapon", "enspelled-armor"])
       ];
       const results = await game.dnd5e.applications.CompendiumBrowser.fetch(Item, {
-        types: new Set([type]), filters
+        types: new Set([type]), filters, indexFields: new Set(["system.source"])
       });
-      const fromShopPack = results.filter(index => isShopPackSource(index.uuid));
+      const fromShopPack = results
+        .filter(index => [rules, null, undefined].includes(index.system?.source?.rules))
+        .filter(index => isShopPackSource(index.uuid));
       pool.push(...fromShopPack.map(index => ({ kind: "item", index })));
     }
 
@@ -173,7 +178,6 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
       if ( spellFilter.levels ) allowedLevels = allowedLevels.filter(l => spellFilter.levels.has(l));
       if ( allowedLevels.length ) {
         const filters = [
-          { k: "system.source.rules", o: "in", v: [rules, null, undefined] },
           { k: "system.level", o: "in", v: allowedLevels }
         ];
         if ( spellFilter.schools ) filters.push({ k: "system.school", o: "in", v: Array.from(spellFilter.schools) });
@@ -187,9 +191,10 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
           filters.push({ k: "system.identifier", o: "in", v: Array.from(identifiers) });
         }
         const results = await game.dnd5e.applications.CompendiumBrowser.fetch(Item, {
-          types: new Set(["spell"]), filters
+          types: new Set(["spell"]), filters, indexFields: new Set(["system.source"])
         });
-        pool.push(...results.map(index => ({ kind: "spell", index })));
+        const bySourceRules = results.filter(index => [rules, null, undefined].includes(index.system?.source?.rules));
+        pool.push(...bySourceRules.map(index => ({ kind: "spell", index })));
       }
     }
 
@@ -219,6 +224,12 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
       const [candidate] = pool.splice(Math.floor(Math.random() * pool.length), 1);
 
       if ( candidate.kind === "spell" ) {
+        if ( capCP != null ) {
+          const rarity = Object.entries(SPELL_SCROLL_LEVELS)
+            .find(([, levels]) => levels.includes(candidate.index.system.level))?.[0];
+          const price = resolveRarityPrice(rarity, { isConsumable: true });
+          if ( price && (toCopper(price.value, price.denomination) > capCP) ) continue;
+        }
         const entry = {
           spellScroll: { spellUuid: candidate.index.uuid }, stock: { max: null, current: 1 }, restockMode: "exclude"
         };
@@ -231,10 +242,10 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
       if ( (magic === "magic") && !isMagic ) continue;
       if ( (magic === "mundane") && isMagic ) continue;
       const hasEnchant = candidateItem.system.activities?.some(a => a.type === "enchant");
-      if ( !hasEnchant && !candidateItem.system.price?.value && !(isMagic && candidateItem.system.rarity) ) continue;
+      if ( !hasEnchant && !candidateItem.system.price?.value && !(isMagic && itemRarity(candidateItem)) ) continue;
 
       if ( !hasEnchant || candidateItem.system.type?.baseItem ) {
-        if ( rarities && !rarities.has(candidateItem.system.rarity || "") ) continue;
+        if ( rarities && !rarities.has(itemRarity(candidateItem)) ) continue;
         const wantedSubtypes = typeConfigs.get(candidateItem.type);
         if ( wantedSubtypes && !wantedSubtypes.has(candidateItem.system.type?.value) ) continue;
         if ( capCP != null ) {

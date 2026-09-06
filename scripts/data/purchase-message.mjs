@@ -9,8 +9,8 @@ const {
 } = foundry.data.fields;
 
 /**
- * @import { default as ShopSheet } from "../applications/shops/shop-sheet.mjs";
- * @import { CurrencyPart, PurchaseBuyLine, PurchaseSellLine } from "../_types.mjs";
+ * @import ShopSheet from "../applications/shops/shop-sheet.mjs";
+ * @import { CurrencyPart, PurchaseBuyLine, PurchaseSellLine, PurchaseMessageCardData } from "../_types.mjs";
  */
 
 /**
@@ -31,16 +31,8 @@ const STATUS_LABELS = {
 
 /**
  * A data model that represents a purchase chat card's own flag data.
- * @property {string} status                Status of the pending transaction: "pending", "accepted", or "rejected".
- * @property {string} shopId                Id of the shop this purchase was made through.
- * @property {string} shopName              Display name of the shop.
- * @property {string} shopImg               Image path of the shop.
- * @property {string} actorUuid             UUID of the purchasing actor.
- * @property {string} actorName             Display name of the purchasing actor.
- * @property {PurchaseBuyLine[]} buyLines   Items being bought from the shop.
- * @property {PurchaseSellLine[]} sellLines Items being sold to the shop.
- * @property {CurrencyPart[]} total         Net transaction total, broken down by denomination.
- * @property {number} netCP                 Net transaction total, in copper (positive = actor pays).
+ * @extends {foundry.abstract.DataModel<PurchaseMessageCardData>}
+ * @mixes PurchaseMessageCardData
  */
 export class PurchaseMessageData extends foundry.abstract.DataModel {
 
@@ -166,6 +158,8 @@ export class PurchaseMessageData extends foundry.abstract.DataModel {
     });
   }
 }
+
+/* -------------------------------------------- */
 
 /**
  * A currency breakdown, largest denomination to smallest.

@@ -2,7 +2,7 @@ import { MODULE_ID } from "../../config.mjs";
 import { newEntryStock, Shop, ShopItemEntry } from "../../data/shop-data.mjs";
 import { calendariaWeekdayOptions, isCalendariaActive } from "../../integrations/calendaria.mjs";
 import {
-  applyItemFilters, applyItemSort, applyLoadingTooltip, breakdownCopper, buildItemTableSections, finalizeGroups,
+  applyItemSort, applyListControls, applyLoadingTooltip, breakdownCopper, buildItemTableSections, finalizeGroups,
   isDnd5eAutoRecoveryEnabled, needsDefaultPrice, openItemSheet, resolveItemPrice, selectableActors, toCopper
 } from "../../utils.mjs";
 
@@ -10,13 +10,14 @@ import FillFromTableDialog from "./fill-from-table-dialog.mjs";
 import GenerateItemDialog from "./generate-item-dialog.mjs";
 import HaggleDialog from "./haggle-dialog.mjs";
 import ShopCart from "./shop-cart.mjs";
+import DiscountConfig from "./shop-config/discount-config.mjs";
 import MaxStockConfig from "./shop-config/max-stock-config.mjs";
+import ModifiersConfig from "./shop-config/modifiers-config.mjs";
+import OwnerConfig from "./shop-config/owner-config.mjs";
 import PlayersConfig from "./shop-config/players-config.mjs";
+import PriceConfig from "./shop-config/price-config.mjs";
+import RenameConfig from "./shop-config/rename-config.mjs";
 import SettlementCapConfig from "./shop-config/settlement-cap-config.mjs";
-import {
-  openDiscountConfig, openModifiersConfig,
-  openOwnerConfig, openPriceConfig, openRenameConfig
-} from "./shop-config/simple-configs.mjs";
 import VendorConfig from "./shop-config/vendor-config.mjs";
 
 /**
@@ -381,39 +382,6 @@ export default class ShopSheet extends Application5e {
 
   /* -------------------------------------------- */
 
-  /**
-   * Whether shop-editing header controls (rename, spotlight) should be visible.
-   * @this {ShopSheet}
-   * @returns {boolean}
-   */
-  static #isEditable() {
-    return this.isEditable;
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Whether the "Deactivate" header control should be visible.
-   * @this {ShopSheet}
-   * @returns {boolean}
-   */
-  static #canDeactivate() {
-    return this.isEditable && this.shop.active;
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Whether the "Activate" header control should be visible.
-   * @this {ShopSheet}
-   * @returns {boolean}
-   */
-  static #canActivate() {
-    return this.isEditable && !this.shop.active;
-  }
-
-  /* -------------------------------------------- */
-
   /** @inheritDoc */
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
@@ -436,12 +404,15 @@ export default class ShopSheet extends Application5e {
     context.hagglingLocked = context.shop.isHagglingLocked(this.selectedActorUuid);
     const playerOverride = context.shop.resolvePlayerOverride(this.selectedActorUuid);
     const renderDiscountTooltip = (sources, total) => ShopSheet.#renderAttribution(sources, total);
+    const hasCrafterFeat = (game.dnd5e.settings.rulesVersion === "modern")
+      && !!context.actor?.items.some(i => (i.type === "feat") && (i.system.identifier === "crafter"));
 
     const resolved = await ShopItemEntry.resolveMany(context.shop.items);
     context.groups = await groupByType({
       rows: resolved, settlementCap: context.shop.settlementCap, buyModifier: context.shop.buyModifier,
       cart: this.cart, fixedValueLootTypes: context.shop.fixedValueLootTypes, playerBuyModifier: playerOverride.buy,
-      actorName: context.actor?.name, renderDiscountTooltip, stockDefaults: context.shop.stockDefaults
+      actorName: context.actor?.name, renderDiscountTooltip, stockDefaults: context.shop.stockDefaults,
+      hasCrafterFeat
     });
     this.#lastGroups = context.groups;
 
@@ -686,52 +657,52 @@ export default class ShopSheet extends Application5e {
     }
 
     if ( (partId === "buy") || (partId === "sell") ) {
-      const content = htmlElement.querySelector(".items-list");
-      if ( content ) {
-        const typeSelect = htmlElement.querySelector(".item-type-filter");
-        const sortButton = htmlElement.querySelector(".sort-control");
-        const clearButton = htmlElement.querySelector(".clear-control");
-        if ( typeSelect ) typeSelect.value = (partId === "buy") ? this.#buyTypeFilter : this.#sellTypeFilter;
-        const sortKey = (partId === "buy") ? this.#buySort : this.#sellSort;
-        if ( sortButton ) {
-          sortButton.querySelector("i").className = SORT_MODES[sortKey].icon;
-          sortButton.setAttribute("aria-label", _loc(SORT_MODES[sortKey].label));
-        }
-        applyItemSort(sortKey, content);
-        typeSelect?.closest(".filter-control")?.classList.toggle("active", !!typeSelect?.value);
-        const searchFilter = new foundry.applications.ux.SearchFilter({
-          inputSelector: ".item-search", contentSelector: ".items-list",
-          initial: (partId === "buy") ? this.#buySearch : this.#sellSearch,
-          callback: (event, query, rgx) => {
-            if ( partId === "buy" ) this.#buySearch = query;
-            else this.#sellSearch = query;
-            applyItemFilters(rgx, typeSelect?.value, content);
-          }
-        });
-        searchFilter.bind(htmlElement);
-        typeSelect?.addEventListener("change", () => {
-          if ( partId === "buy" ) this.#buyTypeFilter = typeSelect.value;
-          else this.#sellTypeFilter = typeSelect.value;
-          typeSelect.closest(".filter-control").classList.toggle("active", !!typeSelect.value);
-          applyItemFilters(searchFilter.rgx, typeSelect.value, content);
-        });
-        sortButton?.addEventListener("click", () => {
-          const modes = Object.keys(SORT_MODES);
-          const current = (partId === "buy") ? this.#buySort : this.#sellSort;
-          const next = modes[(modes.indexOf(current) + 1) % modes.length];
-          if ( partId === "buy" ) this.#buySort = next;
-          else this.#sellSort = next;
-          this.render();
-        });
-        clearButton?.addEventListener("click", () => {
-          searchFilter.filter(null, "");
-          if ( typeSelect ) {
-            typeSelect.value = "";
-            typeSelect.dispatchEvent(new Event("change"));
-          }
-        });
-      }
+      const isBuy = partId === "buy";
+      const content = applyListControls(htmlElement, {
+        sortModes: SORT_MODES,
+        sort: isBuy ? this.#buySort : this.#sellSort,
+        setSort: v => { if ( isBuy ) this.#buySort = v; else this.#sellSort = v; },
+        typeFilter: isBuy ? this.#buyTypeFilter : this.#sellTypeFilter,
+        setTypeFilter: v => { if ( isBuy ) this.#buyTypeFilter = v; else this.#sellTypeFilter = v; },
+        search: isBuy ? this.#buySearch : this.#sellSearch,
+        setSearch: v => { if ( isBuy ) this.#buySearch = v; else this.#sellSearch = v; },
+        onSort: () => this.render()
+      });
+      if ( content ) applyItemSort(isBuy ? this.#buySort : this.#sellSort, content);
     }
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Whether shop-editing header controls (rename, spotlight) should be visible.
+   * @this {ShopSheet}
+   * @returns {boolean}
+   */
+  static #isEditable() {
+    return this.isEditable;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Whether the "Deactivate" header control should be visible.
+   * @this {ShopSheet}
+   * @returns {boolean}
+   */
+  static #canDeactivate() {
+    return this.isEditable && this.shop.active;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Whether the "Activate" header control should be visible.
+   * @this {ShopSheet}
+   * @returns {boolean}
+   */
+  static #canActivate() {
+    return this.isEditable && !this.shop.active;
   }
 
   /* -------------------------------------------- */
@@ -819,14 +790,17 @@ export default class ShopSheet extends Application5e {
    */
   static async #editDiscount(event, target) {
     const playerOverride = this.shop.resolvePlayerOverride(this.selectedActorUuid);
-    await openDiscountConfig(this, target, playerOverride, updateData => this.#updateShop(updateData));
+    await new DiscountConfig({
+      shopSheet: this, entryKey: target.dataset.key, playerOverride,
+      onUpdate: updateData => this.#updateShop(updateData)
+    }).render({ force: true });
   }
 
   /* -------------------------------------------- */
 
   /**
-   * Handle opening the file picker to change this shop's image, mirroring core's own
-   * `DocumentSheetV2#_onEditImage` (`document-sheet.mjs:320`).
+   * Handle opening the file picker to change this shop's image.
+   * @see dnd5e — BaseApplication5e#_onEditImage()
    * @this {ShopSheet}
    * @param {Event} event         Triggering click event.
    * @param {HTMLElement} target  The `<img data-edit="img">` element that was clicked.
@@ -868,7 +842,8 @@ export default class ShopSheet extends Application5e {
    * @this {ShopSheet}
    */
   static async #editModifiers() {
-    await openModifiersConfig(this, updateData => this.#updateShop(updateData));
+    await new ModifiersConfig({ shopSheet: this, onUpdate: updateData => this.#updateShop(updateData) })
+      .render({ force: true });
   }
 
   /* -------------------------------------------- */
@@ -878,7 +853,8 @@ export default class ShopSheet extends Application5e {
    * @this {ShopSheet}
    */
   static async #editOwner() {
-    await openOwnerConfig(this, updateData => this.#updateShop(updateData));
+    await new OwnerConfig({ shopSheet: this, onUpdate: updateData => this.#updateShop(updateData) })
+      .render({ force: true });
   }
 
   /* -------------------------------------------- */
@@ -904,7 +880,9 @@ export default class ShopSheet extends Application5e {
    * @param {HTMLElement} target  Element that was clicked.
    */
   static async #editPrice(event, target) {
-    await openPriceConfig(this, target, updateData => this.#updateShop(updateData));
+    await new PriceConfig({
+      shopSheet: this, entryKey: target.dataset.key, onUpdate: updateData => this.#updateShop(updateData)
+    }).render({ force: true });
   }
 
   /* -------------------------------------------- */
@@ -1059,7 +1037,8 @@ export default class ShopSheet extends Application5e {
    * @this {ShopSheet}
    */
   static async #renameShop() {
-    await openRenameConfig(this, updateData => this.#updateShop(updateData));
+    await new RenameConfig({ shopSheet: this, onUpdate: updateData => this.#updateShop(updateData) })
+      .render({ force: true });
   }
 
   /* -------------------------------------------- */
@@ -1180,7 +1159,10 @@ export default class ShopSheet extends Application5e {
     if ( game.user.isGM ) await Shop.update(this.shopId, updateData);
     else {
       const gm = game.users.activeGM;
-      if ( !gm ) return ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoActiveGM", { localize: true });
+      if ( !gm ) {
+        ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoActiveGM", { localize: true });
+        return;
+      }
       await gm.query(`${MODULE_ID}.updateShop`, { shopId: this.shopId, updateData });
     }
     this.render();
@@ -1230,11 +1212,12 @@ function festivalOptions() {
  * @param {(sources: object[], total: string) => Promise<string>} options.renderDiscountTooltip
  * @param {{ byType: Record<string, number|null>, magicRule: string }} options.stockDefaults  The shop's
  *   default stock configuration, used to resolve a row's default max stock for display.
+ * @param {boolean} options.hasCrafterFeat  Whether the acting actor owns the PHB 2024 "Crafter" feat.
  * @returns {Promise<{ type: string, label: string, items: object[] }[]>}
  */
 async function groupByType({
   rows, settlementCap, buyModifier, cart, fixedValueLootTypes, playerBuyModifier, actorName, renderDiscountTooltip,
-  stockDefaults
+  stockDefaults, hasCrafterFeat
 }) {
   const targetUnit = game.settings.get("dnd5e", "metricWeightUnits") ? "kg" : "lb";
   const capCP = settlementCap?.value != null ? toCopper(settlementCap.value, settlementCap.denomination) : null;
@@ -1247,9 +1230,10 @@ async function groupByType({
       ? row.entry.price.denomination
       : (itemPrice?.denomination ?? CONFIG.DND5E.defaultCurrency);
     const rowIsFixedValue = isFixedValue(row.item, fixedValueLootTypes);
+    const isMagic = Array.from(row.item?.system?.properties ?? []).includes("mgc");
     const { percent: discountPercent, sources } = resolveDiscountSources({
       itemOverride: row.entry.discount, isFixedValue: rowIsFixedValue, shopModifier: buyModifier,
-      playerModifier: playerBuyModifier, actorName
+      playerModifier: playerBuyModifier, actorName, crafterDiscount: hasCrafterFeat && !isMagic
     });
     const finalValue = basePrice * (1 + (discountPercent / 100));
     const baseCP = toCopper(basePrice, denomination);
@@ -1366,10 +1350,11 @@ function isFixedValue(item, fixedValueLootTypes) {
  * @param {number} options.shopModifier         Shop's default percent for this side (buy or sell).
  * @param {number|null} options.playerModifier  Acting actor's additive modifier for this side, if configured.
  * @param {string} [options.actorName]          Acting actor's name, used to label the player row.
+ * @param {boolean} [options.crafterDiscount]   Whether the PHB 2024 "Crafter" feat's 20% buy discount applies.
  * @returns {{ percent: number, sources: object[] }}
  */
 function resolveDiscountSources({
-  itemOverride, isFixedValue: rowIsFixedValue, shopModifier, playerModifier, actorName
+  itemOverride, isFixedValue: rowIsFixedValue, shopModifier, playerModifier, actorName, crafterDiscount
 }) {
   if ( itemOverride != null ) {
     const sources = [{ label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.ItemOverride"), value: `${itemOverride}%`, type: "override" }];
@@ -1384,6 +1369,10 @@ function resolveDiscountSources({
   if ( playerModifier ) {
     sources.push(additiveSource(actorName, playerModifier));
     percent += playerModifier;
+  }
+  if ( crafterDiscount ) {
+    sources.push(additiveSource(_loc("SIMPLE_SHOP_CRAFT_5E.CrafterFeat"), -20));
+    percent -= 20;
   }
   return { percent, sources };
 }

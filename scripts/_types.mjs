@@ -148,6 +148,7 @@
  * @property {object} targetItem
  * @property {string} [targetItem.identifier]  Stable `system.identifier` of the item this craft produces.
  * @property {string} [targetItem.uuid]        Direct UUID reference, used when no `system.identifier` match exists.
+ * @property {number} targetQuantity           Units to produce when this craft completes.
  * @property {string} activityId               Id of the "Progress Craft" activity on the tracked item.
  * @property {number} totalHours               Total progress hours needed to finish the craft.
  * @property {number|null} hoursPerUse         Progress hours added per activation. `null` uses the module default.
@@ -178,6 +179,33 @@
  * @property {string} name      Display name of the contributed item.
  * @property {string} img       Image path of the contributed item.
  * @property {number} quantity  Quantity contributed from this item.
+ */
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef CraftMessageCardData
+ * @property {string} status                     Status of the pending craft: "pending", "accepted", or "rejected".
+ * @property {string} recipeId                   Id of the recipe this craft was started from.
+ * @property {object} targetItem
+ * @property {string} [targetItem.identifier]     Stable `system.identifier` of the produced item.
+ * @property {string} [targetItem.uuid]           Direct UUID reference, used when no `system.identifier` match exists.
+ * @property {number} targetQuantity              Units to produce when this craft completes.
+ * @property {string} targetName                  Display name of the produced item.
+ * @property {string} targetImg                   Image path of the produced item.
+ * @property {string} actorUuid                   UUID of the crafting actor.
+ * @property {string} actorName                   Display name of the crafting actor.
+ * @property {string|null} toolKey                Tool proficiency key used, or `null` if none required.
+ * @property {CraftMaterialLine[]} materialLines   Materials contributed toward this craft.
+ * @property {number} goldCP                      Copper amount filled in from the actor's own currency.
+ * @property {number} totalHours                  Total progress hours needed to finish the craft.
+ * @property {number|null} hoursPerUse            Progress hours added per activation. `null` uses the module default.
+ * @property {object} weight
+ * @property {number} weight.value                Weight of the produced item.
+ * @property {string} weight.units                Weight unit of the produced item.
+ * @property {object} halfPrice
+ * @property {number} halfPrice.value             Half the produced item's market price, for refund display.
+ * @property {string} halfPrice.denomination      Currency denomination of `halfPrice.value`.
  */
 
 /* -------------------------------------------- */
@@ -216,6 +244,22 @@
  * @property {number} quantity         Quantity sold.
  * @property {number} priceCP          Price per unit, in copper.
  * @property {CurrencyPart[]} subtotal Line subtotal, broken down by denomination.
+ */
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef PurchaseMessageCardData
+ * @property {string} status                Status of the pending transaction: "pending", "accepted", or "rejected".
+ * @property {string} shopId                Id of the shop this purchase was made through.
+ * @property {string} shopName              Display name of the shop.
+ * @property {string} shopImg               Image path of the shop.
+ * @property {string} actorUuid             UUID of the purchasing actor.
+ * @property {string} actorName             Display name of the purchasing actor.
+ * @property {PurchaseBuyLine[]} buyLines   Items being bought from the shop.
+ * @property {PurchaseSellLine[]} sellLines Items being sold to the shop.
+ * @property {CurrencyPart[]} total         Net transaction total, broken down by denomination.
+ * @property {number} netCP                 Net transaction total, in copper (positive = actor pays).
  */
 
 /* -------------------------------------------- */

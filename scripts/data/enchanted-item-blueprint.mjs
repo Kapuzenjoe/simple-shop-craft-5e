@@ -1,4 +1,4 @@
-import { excludeFilter, isShopPackSource } from "../utils.mjs";
+import { excludeFilter, isShopPackSource, itemRarity } from "../utils.mjs";
 
 const { DocumentUUIDField, StringField } = foundry.data.fields;
 
@@ -74,8 +74,10 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
    * @returns {string}
    */
   static resolveProfileRarity(item, effect) {
-    const rarityChange = effect.system.changes?.find(change => change.key === "system.rarity");
-    return rarityChange?.value ?? item.system.rarity ?? "";
+    const rarityChange = effect.system.changes?.find(
+      change => (change.key === "system.rarity") || (change.key === "system.rarities")
+    );
+    return rarityChange?.value || itemRarity(item);
   }
 
   /* -------------------------------------------- */
@@ -108,15 +110,16 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
     const rules = game.dnd5e.settings.rulesVersion === "modern" ? "2024" : "2014";
     const categoryFilters = EnchantedItemBlueprint.#parseRestrictionCategory(activity.item);
     const results = await game.dnd5e.applications.CompendiumBrowser.fetch(Item, {
-      types, filters: [
-        { k: "system.source.rules", o: "in", v: [rules, null, undefined] },
+      types, indexFields: new Set(["system.source"]), filters: [
         excludeFilter("system.type.value", ["natural"]),
         ...categoryFilters,
         ...(wantedSubtypes ? [{ k: "system.type.value", o: "in", v: wantedSubtypes }] : [])
       ]
     });
 
-    const fromShopPack = results.filter(index => isShopPackSource(index.uuid));
+    const fromShopPack = results
+      .filter(index => [rules, null, undefined].includes(index.system?.source?.rules))
+      .filter(index => isShopPackSource(index.uuid));
     const registry = BASE_ITEM_REGISTRIES[itemType];
     const baseItemUuids = (registry && ((itemType !== "equipment") || categoryFilters.length))
       ? new Set(Object.values(registry())) : null;
@@ -170,8 +173,10 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
         ? { ...enchantItem.system.price }
         : { ...itemData.system.price, value: 0 };
     }
-    if ( !changeKeys.has("system.rarity") && enchantItem.system.rarity ) {
-      itemData.system.rarity = enchantItem.system.rarity;
+    const enchantRarity = itemRarity(enchantItem);
+    if ( !changeKeys.has("system.rarity") && !changeKeys.has("system.rarities") && enchantRarity ) {
+      if ( baseItem.system.schema.has("rarities") ) itemData.system.rarities = [enchantRarity];
+      else itemData.system.rarity = enchantRarity;
     }
 
     const bonusChange = effect.system.changes?.find(change => change.key === "system.magicalBonus");

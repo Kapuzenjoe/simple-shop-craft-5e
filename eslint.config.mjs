@@ -170,7 +170,7 @@ export default [
       }],
       "prefer-template": "warn",
       "@stylistic/quote-props": ["warn", "as-needed", { keywords: false }],
-      "@stylistic/quotes": ["warn", "double", { avoidEscape: true, allowTemplateLiterals: false }],
+      "@stylistic/quotes": ["warn", "double", { avoidEscape: true, allowTemplateLiterals: "never" }],
       "@stylistic/semi": "warn",
       "@stylistic/space-before-blocks": ["warn", "always"],
       "@stylistic/space-before-function-paren": ["warn", {

@@ -9,7 +9,7 @@ const {
 
 /**
  * @import { Recipe } from "./recipe-data.mjs";
- * @import { CraftMaterialLine } from "../_types.mjs";
+ * @import { CraftMaterialLine, CraftMessageCardData } from "../_types.mjs";
  */
 
 /**
@@ -30,26 +30,8 @@ const STATUS_LABELS = {
 
 /**
  * A data model that represents a craft-start chat card's own flag data.
- * @property {string} status                     Status of the pending craft: "pending", "accepted", or "rejected".
- * @property {string} recipeId                   Id of the recipe this craft was started from.
- * @property {object} targetItem
- * @property {string} [targetItem.identifier]     Stable `system.identifier` of the produced item.
- * @property {string} [targetItem.uuid]           Direct UUID reference, used when no `system.identifier` match exists.
- * @property {string} targetName                  Display name of the produced item.
- * @property {string} targetImg                   Image path of the produced item.
- * @property {string} actorUuid                   UUID of the crafting actor.
- * @property {string} actorName                   Display name of the crafting actor.
- * @property {string|null} toolKey                Tool proficiency key used, or `null` if none required.
- * @property {CraftMaterialLine[]} materialLines   Materials contributed toward this craft.
- * @property {number} goldCP                      Copper amount filled in from the actor's own currency.
- * @property {number} totalHours                  Total progress hours needed to finish the craft.
- * @property {number|null} hoursPerUse            Progress hours added per activation. `null` uses the module default.
- * @property {object} weight
- * @property {number} weight.value                Weight of the produced item.
- * @property {string} weight.units                Weight unit of the produced item.
- * @property {object} halfPrice
- * @property {number} halfPrice.value             Half the produced item's market price, for refund display.
- * @property {string} halfPrice.denomination      Currency denomination of `halfPrice.value`.
+ * @extends {foundry.abstract.DataModel<CraftMessageCardData>}
+ * @mixes CraftMessageCardData
  */
 export class CraftMessageData extends foundry.abstract.DataModel {
 
@@ -62,6 +44,7 @@ export class CraftMessageData extends foundry.abstract.DataModel {
         identifier: new StringField({ blank: true }),
         uuid: new DocumentUUIDField({ type: "Item", blank: true })
       }),
+      targetQuantity: new NumberField({ initial: 1, integer: true, min: 1 }),
       targetName: new StringField(),
       targetImg: new FilePathField({ categories: ["IMAGE"] }),
       actorUuid: new DocumentUUIDField({ type: "Actor" }),
@@ -116,6 +99,7 @@ export class CraftMessageData extends foundry.abstract.DataModel {
     const craft = new CraftMessageData({
       recipeId: recipe._id,
       targetItem: { identifier: recipe.targetItem.identifier, uuid: recipe.targetItem.uuid },
+      targetQuantity: recipe.targetQuantity,
       targetName: targetItem.name, targetImg: targetItem.img,
       actorUuid: actor.uuid, actorName: actor.name, toolKey: toolKey || null,
       materialLines: materialLines.map(line => ({

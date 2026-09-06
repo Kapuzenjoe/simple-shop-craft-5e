@@ -132,6 +132,8 @@ export default class RecipeSheet extends Application5e {
       for ( const part of breakdownCopper(toCopper(context.craftCost.gold, "gp")) ) craftCostBreakdown[part.denomination] = part.value;
     }
     const thresholdCP = recipe.craftThreshold(context.craftCost, targetResolved.item);
+    const targetBundleSize = (targetResolved.item?.system?.quantity > 1) ? targetResolved.item.system.quantity : 1;
+    const durationScale = recipe.targetQuantity / targetBundleSize;
 
     const materialsResolved = await resolveEntries(recipe.materials);
     const materialRows = materialsResolved.map((r, index) => ({ ...r, index })).map(r => {
@@ -230,7 +232,7 @@ export default class RecipeSheet extends Application5e {
       {
         field: fields.durationOverride.fields.value, name: "durationOverride.value", value: recipe.durationOverride.value,
         input: (field, config) => foundry.applications.fields.createNumberInput(config),
-        placeholder: context.craftCost ? String(context.craftCost.days) : undefined
+        placeholder: context.craftCost ? String(context.craftCost.days * durationScale) : undefined
       },
       {
         field: fields.durationOverride.fields.units, name: "durationOverride.units", value: recipe.durationOverride.units,
@@ -354,10 +356,7 @@ export default class RecipeSheet extends Application5e {
    * @returns {Promise<void>}
    */
   static async #editTargetItem() {
-    const selection = await game.dnd5e.applications.CompendiumBrowser.select({
-      tab: "physical", selection: { min: 1, max: 1 }
-    });
-    const uuid = selection?.size ? Array.from(selection)[0] : null;
+    const uuid = await game.dnd5e.applications.CompendiumBrowser.selectOne({ tab: "physical" });
     const item = uuid ? await fromUuid(uuid) : null;
     if ( !item ) return;
 
@@ -428,7 +427,7 @@ export default class RecipeSheet extends Application5e {
       {
         label: "SIMPLE_SHOP_CRAFT_5E.RemoveMaterial",
         icon: '<i class="fas fa-trash" inert></i>',
-        onClick: (event, target) => RecipeSheet.#removeMaterial.call(this, event, target)
+        onClick: (event, target) => this.#removeMaterial(target)
       }
     ];
   }
@@ -521,12 +520,10 @@ export default class RecipeSheet extends Application5e {
 
   /**
    * Handle removing a material.
-   * @this {RecipeSheet}
-   * @param {Event} event         Triggering click event.
-   * @param {HTMLElement} target  Button that was clicked.
+   * @param {HTMLElement} target  Row element the context menu was triggered for.
    * @returns {Promise<void>}
    */
-  static async #removeMaterial(event, target) {
+  async #removeMaterial(target) {
     const index = Number(target.dataset.index);
     const materials = this.recipe.materials.filter((m, i) => i !== index).map(m => m.toObject());
     await Recipe.update(this.recipeId, { materials });
@@ -545,8 +542,6 @@ export default class RecipeSheet extends Application5e {
     this.render();
   }
 
-  /* -------------------------------------------- */
-  /*  Helpers                                     */
   /* -------------------------------------------- */
 
   /**

@@ -2,8 +2,21 @@
 
 ## 0.4.0
 
+- Added an automatic 20% buy discount on nonmagical items for an actor with the PHB 2024 "Crafter" feat (#6).
+- Added a "Configure Defaults" settings menu for a new shop's starting Buy Modifier, Sell Modifier, Gold Pool, Magic-Item Stock Rule, and per-type default stock (#15).
+- Added a "Configure Homebrew" settings menu for optional house-rule overrides, currently Max Hours per Workday for crafting.
 - Changed a recipe's "Open to All" checkbox to a three-way Unlock Mode: Individual, Open to All, or Tool-Proficient (any actor proficient in the recipe's required tool).
 - Changed the Recipes list's Unlocked hover to also show current Tool-Proficient party characters.
+- Reworked the "Progress Craft" activity's time tracking:
+  - Changed each use to a dialog for entering hours and minutes to spend, instead of a fixed per-use amount.
+  - Changed the daily crafting budget to a per-actor tracker that resets on a long rest.
+  - Added a warning when today's workday hours are already spent.
+  - Added a chat message with the hours worked and updated progress on every use.
+  - Changed the activity's activation cost to a plain action.
+  - Fixed the "Refund Resource" button appearing on the activity's chat card (#13).
+- Fixed a completed craft always producing the target item's default catalog quantity instead of the recipe's target quantity.
+- Fixed a recipe's crafting duration not scaling with its target quantity, showing a shorter duration than the craft order actually requires.
+- Fixed the shop item generator's spell scroll draw ignoring the settlement's price cap.
 
 ## 0.3.0
 

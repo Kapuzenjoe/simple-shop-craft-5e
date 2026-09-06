@@ -1,7 +1,7 @@
 import { ShopItemEntry } from "../../data/shop-data.mjs";
 
 /**
- * @import { default as ShopSheet } from "./shop-sheet.mjs";
+ * @import ShopSheet from "./shop-sheet.mjs";
  */
 
 const { Dialog5e } = game.dnd5e.applications.api;
@@ -31,9 +31,7 @@ export default class FillFromTableDialog extends Dialog5e {
     buttons: [
       { action: "fill", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.FillFromTable", icon: "fas fa-table-list", default: true }
     ],
-    form: { handler: FillFromTableDialog.#onSubmit },
-    shopSheet: null,
-    onFilled: null
+    form: { handler: FillFromTableDialog.#onSubmit }
   };
 
   /* -------------------------------------------- */
@@ -44,11 +42,15 @@ export default class FillFromTableDialog extends Dialog5e {
     content: { template: "modules/simple-shop-craft-5e/templates/partials/config-dialog-content.hbs" }
   };
 
+  /* -------------------------------------------- */
+
   /**
    * The shop editor this dialog was opened from.
    * @type {ShopSheet}
    */
   shopSheet;
+
+  /* -------------------------------------------- */
 
   /**
    * Callback receiving the resolved item entries.

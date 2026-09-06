@@ -1,10 +1,9 @@
-import { HOURS_PER_USE } from "../../config.mjs";
 import { CraftMessageData } from "../../data/craft-message.mjs";
 import { Recipe } from "../../data/recipe-data.mjs";
 import {
-  applyDropArea, applyLoadingTooltip, breakdownCopper, buildItemTableSections, effectiveCraftCost, needsDefaultPrice,
-  openItemSheet, resolveBundleSizes, resolveEntries, resolveItemPrice, resolveTotalHours, selectableActors,
-  subtypeOptions, toCopper
+  applyDropArea, applyLoadingTooltip, breakdownCopper, buildItemTableSections, effectiveCraftCost, maxHoursPerWorkday,
+  needsDefaultPrice, openItemSheet, resolveBundleSizes, resolveEntries, resolveItemPrice, resolveTotalHours,
+  selectableActors, subtypeOptions, toCopper
 } from "../../utils.mjs";
 
 const { Dialog5e } = game.dnd5e.applications.api;
@@ -30,11 +29,10 @@ export default class CraftStartDialog extends Dialog5e {
     position: { width: 420, height: "auto" },
     actions: {
       openItemSheet: CraftStartDialog.#openItemSheet,
-      removeMaterial: CraftStartDialog.#removeFreeformMaterial,
-      stepMaterialQuantity: CraftStartDialog.#stepMaterialCandidate,
-      startCraft: CraftStartDialog.#startCraft
-    },
-    recipeId: null
+      removeMaterial: CraftStartDialog.#removeMaterial,
+      startCraft: CraftStartDialog.#startCraft,
+      stepMaterialQuantity: CraftStartDialog.#stepMaterialQuantity
+    }
   };
 
   /* -------------------------------------------- */
@@ -387,8 +385,8 @@ export default class CraftStartDialog extends Dialog5e {
     const canStart = !!actor && !!targetItem && toolEligible && skillEligible && requiredMet
       && (materialsMet || (this.#fillWithGold && !goldInsufficient));
 
-    const totalHours = resolveTotalHours(recipe, craftCost);
-    const hoursPerUse = Math.min(HOURS_PER_USE, totalHours);
+    const totalHours = resolveTotalHours(recipe, craftCost, targetItem);
+    const hoursPerUse = Math.min(maxHoursPerWorkday(), totalHours);
 
     return {
       recipe, actor, targetItem, craftCost, fixedLines, freeformItems,
@@ -428,7 +426,7 @@ export default class CraftStartDialog extends Dialog5e {
    * @param {Event} event         Triggering click event.
    * @param {HTMLElement} target  Button that was clicked.
    */
-  static #removeFreeformMaterial(event, target) {
+  static #removeMaterial(event, target) {
     this.#freeformIds.delete(target.dataset.itemId);
     this.render({ parts: ["content", "footer"] });
   }
@@ -441,7 +439,7 @@ export default class CraftStartDialog extends Dialog5e {
    * @param {Event} event         Triggering click event.
    * @param {HTMLElement} target  Button that was clicked.
    */
-  static #stepMaterialCandidate(event, target) {
+  static #stepMaterialQuantity(event, target) {
     const key = `${target.dataset.index}:${target.dataset.itemId}`;
     const step = Number(target.dataset.step);
     const max = Number(target.dataset.max ?? Infinity);

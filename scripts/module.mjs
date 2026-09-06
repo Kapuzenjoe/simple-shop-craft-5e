@@ -12,6 +12,8 @@ Hooks.once("init", () => {
   Hooks.on("dnd5e.renderChatMessage", PurchaseMessageData.onRender);
   Hooks.on("dnd5e.renderChatMessage", CraftMessageData.onRender);
   Hooks.on("dnd5e.postUseActivity", InProgressCraft.onPostUseActivity);
+  Hooks.on("dnd5e.preUseActivity", InProgressCraft.onPreUseActivity);
+  Hooks.on("dnd5e.restCompleted", InProgressCraft.onRestCompleted);
   Hooks.on("renderCharacterActorSheet", InProgressCraft.onRenderCharacterActorSheet);
   if ( isCalendariaActive() ) Hooks.on("calendaria.dayChange", Shop.onCalendariaDayChange);
   else Hooks.on("updateWorldTime", Shop.onUpdateWorldTime);

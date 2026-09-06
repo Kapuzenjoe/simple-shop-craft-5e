@@ -1,5 +1,5 @@
 /**
- * @import { default as ShopSheet } from "./shop-sheet.mjs";
+ * @import ShopSheet from "./shop-sheet.mjs";
  */
 
 const { Dialog5e } = game.dnd5e.applications.api;
@@ -26,9 +26,7 @@ export default class HaggleDialog extends Dialog5e {
     buttons: [
       { action: "roll", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.HagglingRoll", icon: "fa-solid fa-dice-d20", default: true }
     ],
-    form: { handler: HaggleDialog.#onSubmit },
-    shopSheet: null,
-    onUpdatePlayerDiscount: null
+    form: { handler: HaggleDialog.#onSubmit }
   };
 
   /* -------------------------------------------- */
@@ -39,17 +37,23 @@ export default class HaggleDialog extends Dialog5e {
     content: { template: "modules/simple-shop-craft-5e/templates/partials/config-dialog-content.hbs" }
   };
 
+  /* -------------------------------------------- */
+
   /**
    * The shop editor this dialog belongs to.
    * @type {ShopSheet}
    */
   shopSheet;
 
+  /* -------------------------------------------- */
+
   /**
    * Callback receiving a haggling-lock update for the acting actor.
    * @type {(actorUuid: string, updateData: object) => Promise<void>}
    */
   onUpdatePlayerDiscount;
+
+  /* -------------------------------------------- */
 
   /**
    * DC computed for the current NPC, cached during content preparation for reuse on submit.

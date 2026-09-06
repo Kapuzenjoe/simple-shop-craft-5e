@@ -151,6 +151,44 @@
       "UnlockModeAll": "Open to All",
       "UnlockModeToolProficient": "Tool-Proficient"
     },
+    "Settings": {
+      "Defaults": {
+        "Name": "Defaults",
+        "Label": "Configure Defaults",
+        "Hint": "Configure default values applied when creating a new shop.",
+        "Groups": {
+          "ShopDefaults": "Shop Defaults"
+        },
+        "BuyModifier": {
+          "Name": "Default Buy Modifier",
+          "Hint": "Set the Buy Modifier a newly created shop starts with. Negative values lower item prices, positive values raise them."
+        },
+        "SellModifier": {
+          "Name": "Default Sell Modifier",
+          "Hint": "Set the Sell Modifier a newly created shop starts with. Negative values lower item prices, positive values raise them."
+        },
+        "GoldPool": {
+          "Name": "Default Gold Pool",
+          "Hint": "Set the starting Gold Pool amount (in gp) a newly created shop begins with."
+        },
+        "StockMagicRule": {
+          "Name": "Default Magic-Item Stock Rule",
+          "Hint": "Set the magic-item stock exemption rule a newly created shop begins with."
+        }
+      },
+      "Homebrew": {
+        "Name": "Homebrew",
+        "Label": "Configure Homebrew",
+        "Hint": "Configure optional house-rule overrides for this module's mechanics.",
+        "Groups": {
+          "Crafting": "Crafting"
+        },
+        "MaxHoursPerWorkday": {
+          "Name": "Max Hours per Workday",
+          "Hint": "Limit the crafting hours a single Progress Craft use may add toward a recipe. A workday is 8 hours per the crafting rules; raise this only as a deliberate house rule."
+        }
+      }
+    },
     "ShopEditor": {
       "Title": "Edit Shop",
       "AddItems": "Add Items",
@@ -323,10 +361,22 @@
     "Craft": {
       "InProgressName": "Crafting: {name}",
       "ProgressActivityName": "Progress Craft",
-      "ProgressActivityFlavor": "The crafting progresses ({completed}/{total} workdays).",
-      "CompleteMessage": "{name} is finished and has been added to {actor}'s inventory."
+      "ProgressActivityFlavor": "The crafting progresses ({progress}/{total}).",
+      "CompleteMessage": "{name} is finished and has been added to {actor}'s inventory.",
+      "NoWorkdayRemaining": "You have no workday hours remaining today for crafting.",
+      "ProgressCard": {
+        "HoursWorked": "Worked {hours}."
+      },
+      "ProgressHoursDialog": {
+        "Title": "Progress Craft",
+        "Confirm": "Confirm",
+        "Progress": "Progress",
+        "NoAmountSelected": "Enter at least some progress time.",
+        "HoursHint": "Progress this use contributes toward the craft ({worked} of {daily} worked today)."
+      }
     },
     "Shop": "Shop",
+    "CrafterFeat": "Crafter Feat",
     "Owner": "Owner",
     "Recipe": "Recipe",
     "Unknown": "Unknown",

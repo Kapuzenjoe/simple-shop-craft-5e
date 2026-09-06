@@ -5,7 +5,7 @@ import { getCurrencyOptions } from "../../../utils.mjs";
 import BaseShopConfig from "./base-shop-config.mjs";
 
 /**
- * @import { default as ShopSheet } from "../shop-sheet.mjs";
+ * @import ShopSheet from "../shop-sheet.mjs";
  */
 
 /**
@@ -32,9 +32,7 @@ export default class SettlementCapConfig extends BaseShopConfig {
   static DEFAULT_OPTIONS = {
     id: "settlement-cap-config-{id}",
     window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SettlementCap" },
-    form: { handler: SettlementCapConfig.#onSubmit },
-    shopSheet: null,
-    onUpdate: null
+    form: { handler: SettlementCapConfig.#onSubmit }
   };
 
   /* -------------------------------------------- */
@@ -44,6 +42,8 @@ export default class SettlementCapConfig extends BaseShopConfig {
     ...super.PARTS,
     content: { template: "modules/simple-shop-craft-5e/templates/settlement-cap-config/content.hbs" }
   };
+
+  /* -------------------------------------------- */
 
   /**
    * The shop editor this config belongs to.

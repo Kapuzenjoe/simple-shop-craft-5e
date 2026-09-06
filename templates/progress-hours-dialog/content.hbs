@@ -1,0 +1,18 @@
+<section class="tab active progress-hours-dialog-content">
+    <fieldset>
+        <legend>{{ localize legend }}</legend>
+        <div class="form-group split-group">
+            <label>
+                {{ label }}
+                {{#if warn}}<i class="fa-solid fa-triangle-exclamation warning"></i>{{/if}}
+            </label>
+            <div class="form-fields">
+                {{ formField hoursField name="hours" value=hours label="DND5E.ACTIVATION.Type.Hour.Header"
+                             localize=true hint=false classes="label-top" disabled=disabled }}
+                {{ formField minutesField name="minutes" value=minutes label="DND5E.ACTIVATION.Type.Minute.Header"
+                             localize=true hint=false classes="label-top" disabled=disabled }}
+            </div>
+            {{#if hint}}<p class="hint">{{{ hint }}}</p>{{/if}}
+        </div>
+    </fieldset>
+</section>
