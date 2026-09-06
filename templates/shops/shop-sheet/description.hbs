@@ -12,6 +12,9 @@
         <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.OpeningHours" }}</legend>
         {{#if (and isGM isEditMode)}}
         <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.OpeningHoursHint" }}</p>
+        {{#unless calendarModeActive}}
+        <p class="note warn">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.OpeningHoursNoCalendarHint" }}</p>
+        {{/unless}}
         <div class="form-group slim">
             <label>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.StatusOverride" }}</label>
             <div class="form-fields">
@@ -86,8 +89,8 @@
         <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.RestockDays" }}</legend>
         {{#if (and isGM isEditMode)}}
         <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.RestockDaysHint" }}</p>
-        {{#unless restockCalendarActive}}
-        <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.AutoRestockNoCalendarHint" }}</p>
+        {{#unless calendarModeActive}}
+        <p class="note warn">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.AutoRestockNoCalendarHint" }}</p>
         {{/unless}}
         {{ formInput shopFields.restockWeekdays value=restockWeekdays options=restockWeekdayOptions classes="full-width" }}
         {{else}}

@@ -1,0 +1,20 @@
+<div class="simple-shop-craft-5e chat-card craft-card">
+    <section class="card-header description">
+        <header class="summary">
+            <img class="gold-icon" src="{{ itemImg }}" alt="{{ itemName }}">
+            <div class="name-stacked">
+                <span class="title">{{ itemName }}</span>
+                <span class="subtitle">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftCard.Crafter" }}: {{ actorName }}</span>
+            </div>
+        </header>
+    </section>
+    <p class="supplement">{{ startedLabel }}</p>
+
+    {{#unless resolved}}
+    <div class="card-buttons">
+        <button type="button" data-action="endProgress">
+            <i class="fas fa-hourglass-end" inert></i> <span>{{ localize "SIMPLE_SHOP_CRAFT_5E.Craft.ProgressSession.EndProgress" }}</span>
+        </button>
+    </div>
+    {{/unless}}
+</div>

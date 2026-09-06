@@ -1,4 +1,6 @@
 import { EXCLUDED_PACKS, MODULE_ID, PACKAGE_TYPE_ORDER, RARITY_DEFAULT_PRICES, SETTING_KEYS } from "./config.mjs";
+import { isCalendariaActive } from "./integrations/calendaria.mjs";
+import { isEmberActive } from "./integrations/ember.mjs";
 
 /**
  * @import Recipe from "./data/recipe-data.mjs";
@@ -217,14 +219,38 @@ export function toCopper(value, denomination="gp") {
 /* -------------------------------------------- */
 
 /**
- * Whether dnd5e's own Calendar Configuration is set to automatic recovery.
+ * Return whether dnd5e's daily recovery is currently being handled manually rather than by the calendar.
  * @returns {boolean}
  */
-export function isDnd5eAutoRecoveryEnabled() {
-  if ( !game.settings.settings.has("dnd5e.calendarConfig") ) return false;
+export function isManualRecoveryActive() {
+  if ( !game.settings.settings.has("dnd5e.calendarConfig") ) return true;
   const cfg = game.settings.get("dnd5e", "calendarConfig");
-  if ( !("dailyRecovery" in cfg) ) return !!cfg.enabled;
-  return !!cfg.enabled && !cfg.manualRecovery;
+  if ( !("dailyRecovery" in cfg) ) return true;
+  return !cfg.enabled || cfg.manualRecovery;
+}
+
+
+/* -------------------------------------------- */
+
+/**
+ * Whether calendar day-change tracking is currently active.
+ * @returns {boolean}
+ */
+export function isCalendarModeActive() {
+  const override = game.settings.get(MODULE_ID, SETTING_KEYS.CALENDAR_MODE);
+  if ( override !== "default" ) return override === "on";
+  return isCalendariaActive() || isEmberActive() || !isManualRecoveryActive();
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Whether a forward `updateWorldTime` change should be handled by this client.
+ * @param {number} dt
+ * @returns {boolean}
+ */
+export function shouldHandleWorldTimeAdvance(dt) {
+  return (dt > 0) && game.user.isActiveGM;
 }
 
 /* -------------------------------------------- */
@@ -324,9 +350,9 @@ export async function preloadHandlebarsTemplates() {
     "modules/simple-shop-craft-5e/templates/partials/material-row.hbs",
     "modules/simple-shop-craft-5e/templates/shop-manager/recipe-row.hbs",
     "modules/simple-shop-craft-5e/templates/shop-manager/shop-row.hbs",
-    "modules/simple-shop-craft-5e/templates/shop-sheet/buy-row.hbs",
-    "modules/simple-shop-craft-5e/templates/shop-sheet/sell-row.hbs",
-    "modules/simple-shop-craft-5e/templates/shop-sheet/players-dialog-row.hbs"
+    "modules/simple-shop-craft-5e/templates/shops/shop-sheet/buy-row.hbs",
+    "modules/simple-shop-craft-5e/templates/shops/shop-sheet/sell-row.hbs",
+    "modules/simple-shop-craft-5e/templates/shops/shop-sheet/players-dialog-row.hbs"
   ]);
 }
 

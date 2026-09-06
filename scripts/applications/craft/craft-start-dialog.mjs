@@ -41,7 +41,7 @@ export default class CraftStartDialog extends Dialog5e {
   static PARTS = {
     ...super.PARTS,
     content: {
-      template: "modules/simple-shop-craft-5e/templates/craft-start-dialog/content.hbs",
+      template: "modules/simple-shop-craft-5e/templates/craft/craft-start-dialog/content.hbs",
       templates: [
         "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs",
         "modules/simple-shop-craft-5e/templates/partials/item-table.hbs"
@@ -296,6 +296,7 @@ export default class CraftStartDialog extends Dialog5e {
       });
     });
     const bundleSizes = await resolveBundleSizes([...rawCandidates.flat(), ...freeformItems]);
+    const allocated = new Map(freeformItems.map(item => [item.id, item.system.quantity]));
 
     const fixedLines = materialsResolved.map(({ entry, item }, index) => {
       if ( entry.criteria?.type ) {
@@ -304,10 +305,12 @@ export default class CraftStartDialog extends Dialog5e {
           .filter(i => materialValueCP(i, bundleSizes.get(i.id)) >= (minValueCP ?? 0))
           .map(i => {
             const valueCP = materialValueCP(i, bundleSizes.get(i.id));
+            const available = Math.max(0, i.system.quantity - (allocated.get(i.id) ?? 0));
+            const selected = Math.min(this.#materialQuantities.get(`${index}:${i.id}`) ?? 0, available);
+            allocated.set(i.id, (allocated.get(i.id) ?? 0) + selected);
             return {
-              id: i.id, name: i.name, img: i.img, uuid: i.uuid, owned: i.system.quantity,
-              selected: Math.min(this.#materialQuantities.get(`${index}:${i.id}`) ?? 0, i.system.quantity),
-              valueCP, price: breakdownCopper(valueCP)
+              id: i.id, name: i.name, img: i.img, uuid: i.uuid, available, selected, valueCP,
+              price: breakdownCopper(valueCP)
             };
           });
         const suppliedUnits = candidates.reduce((sum, c) => sum + c.selected, 0);
@@ -355,7 +358,7 @@ export default class CraftStartDialog extends Dialog5e {
     const requiredMet = fixedLines.every(l => !l.required || l.slotMet);
     const requiredAvailable = fixedLines.every(l => {
       if ( !l.required ) return true;
-      if ( l.criteria ) return l.candidates.reduce((sum, c) => sum + c.owned, 0) >= l.quantity;
+      if ( l.criteria ) return l.candidates.reduce((sum, c) => sum + c.available, 0) >= l.quantity;
       return l.ownedQuantity >= l.quantity;
     });
 

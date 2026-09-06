@@ -18,7 +18,8 @@ export const SETTING_KEYS = {
   DEFAULT_SELL_MODIFIER: "defaultSellModifier",
   DEFAULT_GOLD_POOL: "defaultGoldPool",
   DEFAULT_STOCK_MAGIC_RULE: "defaultStockMagicRule",
-  MAX_HOURS_PER_WORKDAY: "maxHoursPerWorkday"
+  MAX_HOURS_PER_WORKDAY: "maxHoursPerWorkday",
+  CALENDAR_MODE: "calendarMode"
 };
 
 /**
@@ -97,6 +98,16 @@ export const RESTOCK_MODES = {
   normal: { label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.RestockModeNormal" },
   unlimited: { label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.RestockModeUnlimited" },
   exclude: { label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.RestockModeExclude" }
+};
+
+/**
+ * Calendar-coupled crafting override modes.
+ * @type {Record<string, { label: string }>}
+ */
+export const CALENDAR_MODES = {
+  default: { label: "SIMPLE_SHOP_CRAFT_5E.Settings.Homebrew.CalendarMode.Default" },
+  on: { label: "SIMPLE_SHOP_CRAFT_5E.Settings.Homebrew.CalendarMode.On" },
+  off: { label: "SIMPLE_SHOP_CRAFT_5E.Settings.Homebrew.CalendarMode.Off" }
 };
 
 /**

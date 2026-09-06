@@ -1,5 +1,8 @@
 import { MODULE_ID } from "../config.mjs";
-import { deductActorCurrencyChecked, formatDuration, maxHoursPerWorkday, resolveEntries } from "../utils.mjs";
+import {
+  deductActorCurrencyChecked, formatDuration, isCalendarModeActive, maxHoursPerWorkday, resolveEntries,
+  shouldHandleWorldTimeAdvance
+} from "../utils.mjs";
 
 import ProgressHoursDialog from "../applications/craft/progress-hours-dialog.mjs";
 
@@ -46,7 +49,10 @@ export class InProgressCraft extends foundry.abstract.DataModel {
       activityId: new StringField({ blank: true }),
       totalHours: new NumberField({ required: true, initial: 0 }),
       hoursPerUse: new NumberField({ initial: null, nullable: true }),
-      progress: new NumberField({ required: true, initial: 0 })
+      progress: new NumberField({ required: true, initial: 0 }),
+      pendingStart: new NumberField({ initial: null, nullable: true }),
+      pendingHours: new NumberField({ initial: null, nullable: true }),
+      pendingMessageId: new StringField({ blank: true })
     };
   }
 
@@ -136,7 +142,8 @@ export class InProgressCraft extends foundry.abstract.DataModel {
   /* -------------------------------------------- */
 
   /**
-   * Handle a use of the "Progress Craft" activity: advance progress, complete the craft once full.
+   * Handle a use of the "Progress Craft" activity: in calendar mode, start a pending session instead of
+   * crediting progress immediately; otherwise advance progress right away, completing the craft once full.
    * @param {Activity} activity
    * @param {ActivityUseConfiguration} usageConfig
    * @returns {Promise<void>}
@@ -148,35 +155,102 @@ export class InProgressCraft extends foundry.abstract.DataModel {
 
     const craft = new InProgressCraft(flag);
     const hoursThisUse = usageConfig.simpleShopCraft5e?.hoursThisUse ?? craft.hoursPerUse ?? maxHoursPerWorkday();
-    craft.updateSource({ progress: craft.progress + hoursThisUse });
+
+    if ( isCalendarModeActive() ) {
+      const { ProgressSessionMessageData } = await import("./progress-session-message.mjs");
+      const message = await ProgressSessionMessageData.create(item, item.actor, hoursThisUse);
+      craft.updateSource({
+        pendingStart: game.time.worldTime, pendingHours: hoursThisUse, pendingMessageId: message.id
+      });
+      await item.update({ [`flags.${MODULE_ID}.craft`]: craft.toObject() });
+      return;
+    }
+
+    await craft.creditProgress(item, hoursThisUse);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Credit progress hours toward this craft, post a progress-update chat message (or complete the craft
+   * once its total is reached), and persist the result.
+   * @param {Item5e} item   The in-progress craft item.
+   * @param {number} hours  Hours of progress to credit.
+   * @returns {Promise<void>}
+   */
+  async creditProgress(item, hours) {
+    this.updateSource({ progress: this.progress + hours });
 
     const actor = item.actor;
     if ( actor ) {
       const workedToday = actor.getFlag(MODULE_ID, "hoursWorkedToday") ?? 0;
-      await actor.setFlag(MODULE_ID, "hoursWorkedToday", workedToday + hoursThisUse);
+      await actor.setFlag(MODULE_ID, "hoursWorkedToday", workedToday + hours);
     }
 
     await ChatMessage.create({
       content: await foundry.applications.handlebars.renderTemplate(PROGRESS_TEMPLATE, {
         itemImg: item.img, itemName: item.name, actorName: actor?.name ?? "",
         hoursWorkedLabel: _loc("SIMPLE_SHOP_CRAFT_5E.Craft.ProgressCard.HoursWorked", {
-          hours: formatDuration(hoursThisUse, { days: false })
+          hours: formatDuration(hours, { days: false })
         }),
-        progressLabel: craft.#progressLabel()
+        progressLabel: this.#progressLabel()
       }),
       speaker: ChatMessage.getSpeaker({ actor })
     });
 
-    if ( craft.progress >= craft.totalHours ) {
-      await craft.complete(item);
+    if ( this.progress >= this.totalHours ) {
+      await this.complete(item);
       return;
     }
 
-    await activity.update({ "description.chatFlavor": craft.#progressLabel() });
+    await item.system.activities.get(this.activityId)?.update({ "description.chatFlavor": this.#progressLabel() });
     await item.update({
-      [`flags.${MODULE_ID}.craft`]: craft.toObject(),
-      "system.description.value": craft.applyProgressDescription(item.system.description.value ?? "")
+      [`flags.${MODULE_ID}.craft`]: this.toObject(),
+      "system.description.value": this.applyProgressDescription(item.system.description.value ?? "")
     });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Resolve this craft's currently pending calendar-mode session: credit the full planned hours once
+   * naturally elapsed, or only the hours actually elapsed so far if ended early.
+   * @param {Item5e} item
+   * @param {object} [options={}]
+   * @param {boolean} [options.early=false]  End the session now instead of waiting out its planned duration.
+   * @returns {Promise<void>}
+   */
+  async resolvePendingSession(item, { early=false }={}) {
+    if ( this.pendingStart == null ) return;
+    const elapsedHours = (game.time.worldTime - this.pendingStart) / 3600;
+    const hours = early ? Math.min(this.pendingHours, elapsedHours) : this.pendingHours;
+    const messageId = this.pendingMessageId;
+    this.updateSource({ pendingStart: null, pendingHours: null, pendingMessageId: "" });
+    await this.creditProgress(item, hours);
+    const { ProgressSessionMessageData } = await import("./progress-session-message.mjs");
+    await ProgressSessionMessageData.resolve(messageId);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle Foundry's `updateWorldTime` hook.
+   * @param {number} worldTime
+   * @param {number} dt
+   * @returns {Promise<void>}
+   */
+  static async onUpdateWorldTime(worldTime, dt) {
+    if ( !shouldHandleWorldTimeAdvance(dt) ) return;
+
+    for ( const actor of game.actors ) {
+      for ( const item of actor.items ) {
+        const flag = item.getFlag(MODULE_ID, "craft");
+        if ( flag?.pendingStart == null ) continue;
+        const craft = new InProgressCraft(flag);
+        if ( (worldTime - craft.pendingStart) / 3600 < craft.pendingHours ) continue;
+        await craft.resolvePendingSession(item);
+      }
+    }
   }
 
   /* -------------------------------------------- */

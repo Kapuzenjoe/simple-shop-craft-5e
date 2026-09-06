@@ -5,10 +5,8 @@
  *                                             the shop's buyModifier. `null` = no override.
  * @property {number|null} sellModifier        Percent discount (negative) or markup (positive) override, replacing
  *                                             the shop's sellModifier. `null` = no override.
- * @property {boolean} hagglingLocked          Whether this actor is locked out from Haggling for this shop after a
- *                                             failed Influence check.
- * @property {number|null} hagglingTimestamp   World time (`game.time.worldTime`) when the lockout was set, or
- *                                             `null` if never locked.
+ * @property {Record<string, number>} hagglingLocks  Map of Charisma skill id to the world time
+ *                                                    (`game.time.worldTime`) its Influence check last failed.
  */
 
 /* -------------------------------------------- */
@@ -153,6 +151,11 @@
  * @property {number} totalHours               Total progress hours needed to finish the craft.
  * @property {number|null} hoursPerUse         Progress hours added per activation. `null` uses the module default.
  * @property {number} progress                 Progress hours accumulated so far.
+ * @property {number|null} pendingStart        World time a calendar-mode progress session started, or `null` if
+ *                                             none is running.
+ * @property {number|null} pendingHours        Hours planned for the current calendar-mode progress session.
+ * @property {string} pendingMessageId         Id of the chat message announcing the pending session, so it
+ *                                             can be marked resolved once the session ends.
  */
 
 /* -------------------------------------------- */
@@ -206,6 +209,19 @@
  * @property {object} halfPrice
  * @property {number} halfPrice.value             Half the produced item's market price, for refund display.
  * @property {string} halfPrice.denomination      Currency denomination of `halfPrice.value`.
+ */
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef ProgressSessionMessageCardData
+ * @property {boolean} resolved     Whether this session has ended, hiding its "End Progress" action.
+ * @property {string} itemUuid      UUID of the in-progress craft item this session belongs to.
+ * @property {string} actorUuid     UUID of the crafting actor.
+ * @property {string} actorName     Display name of the crafting actor.
+ * @property {string} itemName      Display name of the in-progress craft item.
+ * @property {string} itemImg       Image path of the in-progress craft item.
+ * @property {number} pendingHours  Hours planned for this session.
  */
 
 /* -------------------------------------------- */

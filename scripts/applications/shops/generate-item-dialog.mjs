@@ -51,7 +51,7 @@ export default class GenerateItemDialog extends Dialog5e {
   /** @override */
   static PARTS = {
     ...super.PARTS,
-    content: { template: "modules/simple-shop-craft-5e/templates/generate-item-dialog/content.hbs" }
+    content: { template: "modules/simple-shop-craft-5e/templates/shops/generate-item-dialog/content.hbs" }
   };
 
   /* -------------------------------------------- */

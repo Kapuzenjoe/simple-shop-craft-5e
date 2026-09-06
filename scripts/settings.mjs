@@ -1,7 +1,8 @@
 import DefaultsConfig from "./applications/settings/defaults-config.mjs";
 import HomebrewConfig from "./applications/settings/homebrew-config.mjs";
 import {
-  DEFAULT_STOCK_BY_TYPE, defaultStockKey, GOLD_POOL_DEFAULT, HOURS_PER_USE, MODULE_ID, SETTING_KEYS, STOCK_MAGIC_RULES
+  CALENDAR_MODES, DEFAULT_STOCK_BY_TYPE, defaultStockKey, GOLD_POOL_DEFAULT, HOURS_PER_USE, MODULE_ID, SETTING_KEYS,
+  STOCK_MAGIC_RULES
 } from "./config.mjs";
 import { Recipe } from "./data/recipe-data.mjs";
 import { Shop } from "./data/shop-data.mjs";
@@ -58,6 +59,17 @@ const SETTINGS = [
     key: SETTING_KEYS.MAX_HOURS_PER_WORKDAY,
     scope: "world",
     type: new NumberField({ required: true, initial: HOURS_PER_USE, integer: true, min: 1 })
+  },
+  {
+    config: false,
+    name: "SIMPLE_SHOP_CRAFT_5E.Settings.Homebrew.CalendarMode.Name",
+    hint: "SIMPLE_SHOP_CRAFT_5E.Settings.Homebrew.CalendarMode.Hint",
+    key: SETTING_KEYS.CALENDAR_MODE,
+    scope: "world",
+    type: new StringField({
+      initial: "default", required: true,
+      choices: Object.fromEntries(Object.entries(CALENDAR_MODES).map(([k, v]) => [k, v.label]))
+    })
   },
   {
     config: false,

@@ -186,6 +186,13 @@
         "MaxHoursPerWorkday": {
           "Name": "Max Hours per Workday",
           "Hint": "Limit the crafting hours a single Progress Craft use may add toward a recipe. A workday is 8 hours per the crafting rules; raise this only as a deliberate house rule."
+        },
+        "CalendarMode": {
+          "Name": "Calendar Mode",
+          "Hint": "Whether shop restock, haggling resets, and crafting progress follow calendar time passage or need manual handling. Default: automatic, active when Calendaria, Ember, or dnd5e's own \"Daily Recovery Mode\" is set to Calendar Recovery.",
+          "Default": "Default (Auto-Detect)",
+          "On": "Always On",
+          "Off": "Always Off"
         }
       }
     },
@@ -232,7 +239,8 @@
       "HagglingAttitude": "Attitude",
       "HagglingCurrent": "Current Discount",
       "HagglingRoll": "Roll",
-      "HagglingLocked": "Haggling Locked",
+      "HagglingLocked": "Locked",
+      "HagglingSomeLocked": "Skills used in a recent failed attempt are on cooldown for 24 hours.",
       "HagglingUnlock": "Reset Haggling Lock",
       "EditPlayers": "Edit Player Discounts",
       "Players": {
@@ -253,6 +261,7 @@
       "OpeningHoursMinute": "Min",
       "OpeningHoursAlways": "Always Open",
       "OpeningHoursHint": "Players can't open this shop outside these hours.",
+      "OpeningHoursNoCalendarHint": "Requires Calendar Mode to be active to track time of day.",
       "ClosedWeekdays": "Closed Weekdays",
       "ClosedFestivals": "Closed Festivals",
       "StatusOverride": "Status Override",
@@ -286,7 +295,7 @@
       "StockMagicRuleHint": "Which Magical items skip the default stock below and are excluded from restock instead.",
       "RestockDays": "Restock Days",
       "RestockDaysHint": "On the selected weekdays, this shop's stock and gold pool reset to their maximum at the next in-game day change.",
-      "AutoRestockNoCalendarHint": "Requires an active calendar (dnd5e's own or Calendaria) to track elapsed days.",
+      "AutoRestockNoCalendarHint": "Requires Calendar Mode to be active to track elapsed days.",
       "AutoRestockNever": "Never",
       "PriceTooltip": "Edit Price",
       "PriceOverrideHint": "Override this item's default price for this shop.",
@@ -366,6 +375,10 @@
       "NoWorkdayRemaining": "You have no workday hours remaining today for crafting.",
       "ProgressCard": {
         "HoursWorked": "Worked {hours}."
+      },
+      "ProgressSession": {
+        "Started": "Started crafting — planned {hours}.",
+        "EndProgress": "End Progress"
       },
       "ProgressHoursDialog": {
         "Title": "Progress Craft",

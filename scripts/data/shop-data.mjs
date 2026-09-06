@@ -1,11 +1,11 @@
 import {
   DEFAULT_STOCK_BY_TYPE, MAGIC_EXEMPT_TYPES, RESTOCK_MODES, SETTING_KEYS, SPELL_SCROLL_LEVELS, STOCK_MAGIC_RULES
 } from "../config.mjs";
-import { calendariaDayOfWeek, calendariaWeekdaysPassed, isCalendariaActive } from "../integrations/calendaria.mjs";
+import { calendariaDayOfWeek, isCalendariaActive } from "../integrations/calendaria.mjs";
 import {
-  breakdownCopper, currencyRows, deductActorCurrencyChecked, excludeFilter, isDnd5eAutoRecoveryEnabled,
+  breakdownCopper, currencyRows, deductActorCurrencyChecked, excludeFilter, isCalendarModeActive, secondsPerDay,
   isShopPackSource, itemRarity, itemRefKey, needsDefaultPrice, resolveEntries, resolveItemPrice, resolveRarityPrice,
-  secondsPerDay, toCopper
+  shouldHandleWorldTimeAdvance, toCopper
 } from "../utils.mjs";
 
 import { EnchantedItemBlueprint } from "./enchanted-item-blueprint.mjs";
@@ -305,8 +305,7 @@ export class ShopPlayerDiscount extends foundry.abstract.DataModel {
       actor: new DocumentUUIDField({ type: "Actor" }),
       buyModifier: new NumberField({ initial: null, nullable: true, integer: true, min: -100, max: 1000 }),
       sellModifier: new NumberField({ initial: null, nullable: true, integer: true, min: -100, max: 1000 }),
-      hagglingLocked: new BooleanField({ initial: false }),
-      hagglingTimestamp: new NumberField({ initial: null, nullable: true, integer: true })
+      hagglingLocks: new TypedObjectField(new NumberField({ integer: true }), { initial: () => ({}) })
     };
   }
 }
@@ -410,12 +409,26 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
   /* -------------------------------------------- */
 
   /**
-   * Whether an actor is currently locked out from Haggling for this shop after a failed Influence check.
+   * Whether an actor is currently locked out from Haggling with a specific Charisma skill for this shop,
+   * after failing an Influence check "in the same way" within the last 24 hours.
+   * @param {string} [actorUuid]
+   * @param {string} skill
+   * @returns {boolean}
+   */
+  isHagglingLocked(actorUuid, skill) {
+    return !!(actorUuid && this.playerDiscounts.find(pd => pd.actor === actorUuid)?.hagglingLocks?.[skill]);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Whether an actor has any currently active Haggling lock for this shop, regardless of skill.
    * @param {string} [actorUuid]
    * @returns {boolean}
    */
-  isHagglingLocked(actorUuid) {
-    return !!(actorUuid && this.playerDiscounts.find(pd => pd.actor === actorUuid)?.hagglingLocked);
+  hasHagglingLocks(actorUuid) {
+    const locks = actorUuid && this.playerDiscounts.find(pd => pd.actor === actorUuid)?.hagglingLocks;
+    return !!locks && (Object.keys(locks).length > 0);
   }
 
   /* -------------------------------------------- */
@@ -655,9 +668,13 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
 
       let hagglingChanged = false;
       const playerDiscounts = shop.playerDiscounts.map(pd => {
-        if ( !pd.hagglingLocked || (Math.floor((worldTime - pd.hagglingTimestamp) / perDay) < 1) ) return pd.toObject();
+        const locks = pd.hagglingLocks ?? {};
+        const remaining = Object.fromEntries(
+          Object.entries(locks).filter(([, timestamp]) => Math.floor((worldTime - timestamp) / perDay) < 1)
+        );
+        if ( Object.keys(remaining).length === Object.keys(locks).length ) return pd.toObject();
         hagglingChanged = true;
-        return { ...pd.toObject(), hagglingLocked: false, hagglingTimestamp: null };
+        return { ...pd.toObject(), hagglingLocks: remaining };
       });
       if ( hagglingChanged ) updateData.playerDiscounts = playerDiscounts;
 
@@ -668,32 +685,20 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
   /* -------------------------------------------- */
 
   /**
-   * Handle Calendaria's day-change hook — fires once per `updateWorldTime` call, even for multi-day jumps.
-   * @param {{ previous: object, current: object }} data
-   * @returns {Promise<void>}
-   */
-  static async onCalendariaDayChange(data) {
-    const weekdaysPassed = calendariaWeekdaysPassed(data);
-    if ( weekdaysPassed === undefined ) return;
-    await Shop.handleDayChange(game.time.worldTime, weekdaysPassed);
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Handle dnd5e's `updateWorldTime` hook, filtered to actual day changes.
+   * Handle Foundry's `updateWorldTime` hook, restocking due shops and clearing expired haggling locks.
    * @param {number} worldTime
    * @param {number} dt
-   * @param {object} options
    * @returns {Promise<void>}
    */
-  static async onUpdateWorldTime(worldTime, dt, options) {
-    if ( dt <= 0 ) return;
-    const midnights = options.dnd5e?.deltas?.midnights;
-    if ( !(midnights > 0) ) return;
-    if ( !isDnd5eAutoRecoveryEnabled() ) return;
+  static async onUpdateWorldTime(worldTime, dt) {
+    if ( !shouldHandleWorldTimeAdvance(dt) ) return;
+    if ( !isCalendarModeActive() ) return;
+    const perDay = secondsPerDay();
+    const midnights = Math.floor(worldTime / perDay) - Math.floor((worldTime - dt) / perDay);
+    if ( midnights <= 0 ) return;
     const weekLength = game.time.calendar.days.values.length;
-    const dayOfWeek = game.time.calendar.timeToComponents(worldTime).dayOfWeek;
+    const dayOfWeek = isCalendariaActive()
+      ? calendariaDayOfWeek(worldTime) : game.time.calendar.timeToComponents(worldTime).dayOfWeek;
     const weekdaysPassed = (midnights >= weekLength)
       ? null
       : Array.from({ length: midnights }, (_, i) => (dayOfWeek - i + weekLength) % weekLength);

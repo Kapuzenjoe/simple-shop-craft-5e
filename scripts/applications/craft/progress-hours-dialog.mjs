@@ -38,6 +38,9 @@ export default class ProgressHoursDialog extends Dialog5e {
     classes: ["simple-shop-craft-5e", "progress-hours-dialog", "standard-form"],
     window: { title: "SIMPLE_SHOP_CRAFT_5E.Craft.ProgressHoursDialog.Title" },
     position: { width: 400 },
+    actions: {
+      stepAmount: ProgressHoursDialog.#stepAmount
+    },
     buttons: [
       { action: "confirm", label: "SIMPLE_SHOP_CRAFT_5E.Craft.ProgressHoursDialog.Confirm", icon: "fa-solid fa-check", default: true }
     ],
@@ -49,7 +52,7 @@ export default class ProgressHoursDialog extends Dialog5e {
   /** @override */
   static PARTS = {
     ...super.PARTS,
-    content: { template: "modules/simple-shop-craft-5e/templates/progress-hours-dialog/content.hbs" }
+    content: { template: "modules/simple-shop-craft-5e/templates/craft/progress-hours-dialog/content.hbs" }
   };
 
   /**
@@ -121,10 +124,6 @@ export default class ProgressHoursDialog extends Dialog5e {
     context = await super._prepareContentContext(context, options);
     context.legend = this.options.window?.title;
     const exhausted = this.max <= 0;
-    const maxMinutes = Math.round(this.max * 60);
-    const maxHours = Math.floor(maxMinutes / 60);
-    const minutesCap = (this.hours >= maxHours) ? (maxMinutes % 60) : 59;
-    context.disabled = exhausted;
     context.warn = exhausted;
     context.label = _loc("SIMPLE_SHOP_CRAFT_5E.Craft.ProgressHoursDialog.Progress");
     context.hint = exhausted
@@ -135,12 +134,6 @@ export default class ProgressHoursDialog extends Dialog5e {
       });
     context.hours = this.hours;
     context.minutes = this.minutes;
-    context.hoursField = new foundry.data.fields.NumberField({
-      min: 0, max: exhausted ? 0 : maxHours, integer: true, required: true
-    });
-    context.minutesField = new foundry.data.fields.NumberField({
-      min: 0, max: exhausted ? 0 : minutesCap, integer: true, required: true
-    });
     return context;
   }
 
@@ -149,19 +142,22 @@ export default class ProgressHoursDialog extends Dialog5e {
   /* -------------------------------------------- */
 
   /**
-   * Handle keeping the minutes field's valid range in sync with the currently entered hours.
-   * @param {ApplicationFormConfiguration} formConfig
-   * @param {Event} event
+   * Handle stepping the hours or minutes value, clamped to the remaining workday budget.
+   * @this {ProgressHoursDialog}
+   * @param {Event} event         Triggering click event.
+   * @param {HTMLElement} target  Button that was clicked.
    * @returns {void}
    */
-  _onChangeForm(formConfig, event) {
-    super._onChangeForm(formConfig, event);
-    const data = new foundry.applications.ux.FormDataExtended(this.form).object;
+  static #stepAmount(event, target) {
     const maxMinutes = Math.round(this.max * 60);
     const maxHours = Math.floor(maxMinutes / 60);
-    this.hours = Math.min(Number(data.hours) || 0, maxHours);
-    const minutesCap = (this.hours >= maxHours) ? (maxMinutes % 60) : 59;
-    this.minutes = Math.min(Number(data.minutes) || 0, minutesCap);
+    const step = Number(target.dataset.step);
+    if ( target.dataset.field === "hours" ) {
+      this.hours = Math.min(maxHours, Math.max(0, this.hours + step));
+    } else {
+      const minutesCap = (this.hours >= maxHours) ? (maxMinutes % 60) : 59;
+      this.minutes = Math.min(minutesCap, Math.max(0, this.minutes + step));
+    }
     this.render();
   }
 
@@ -180,8 +176,7 @@ export default class ProgressHoursDialog extends Dialog5e {
       ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.Craft.NoWorkdayRemaining", { localize: true });
       return;
     }
-    const data = foundry.utils.expandObject(formData.object);
-    const hoursThisUse = Number(data.hours) + (Number(data.minutes) / 60);
+    const hoursThisUse = this.hours + (this.minutes / 60);
     if ( hoursThisUse <= 0 ) {
       ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.Craft.ProgressHoursDialog.NoAmountSelected", { localize: true });
       return;

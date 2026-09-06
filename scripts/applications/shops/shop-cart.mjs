@@ -32,7 +32,7 @@ export default class ShopCart extends Dialog5e {
   /** @override */
   static PARTS = {
     ...super.PARTS,
-    content: { template: "modules/simple-shop-craft-5e/templates/shop-cart/content.hbs" }
+    content: { template: "modules/simple-shop-craft-5e/templates/shops/shop-cart/content.hbs" }
   };
 
   /* -------------------------------------------- */

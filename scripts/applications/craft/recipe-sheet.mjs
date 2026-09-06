@@ -50,7 +50,7 @@ export default class RecipeSheet extends Application5e {
   /** @override */
   static PARTS = {
     content: {
-      template: "modules/simple-shop-craft-5e/templates/recipe-sheet/content.hbs",
+      template: "modules/simple-shop-craft-5e/templates/craft/recipe-sheet/content.hbs",
       templates: [
         "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs",
         "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs",

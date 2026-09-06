@@ -1,9 +1,8 @@
 import { MODULE_ID } from "../../config.mjs";
 import { newEntryStock, Shop, ShopItemEntry } from "../../data/shop-data.mjs";
-import { calendariaWeekdayOptions, isCalendariaActive } from "../../integrations/calendaria.mjs";
 import {
   applyItemSort, applyListControls, applyLoadingTooltip, breakdownCopper, buildItemTableSections, finalizeGroups,
-  isDnd5eAutoRecoveryEnabled, needsDefaultPrice, openItemSheet, resolveItemPrice, selectableActors, toCopper
+  isCalendarModeActive, needsDefaultPrice, openItemSheet, resolveItemPrice, selectableActors, toCopper
 } from "../../utils.mjs";
 
 import FillFromTableDialog from "./fill-from-table-dialog.mjs";
@@ -146,7 +145,7 @@ export default class ShopSheet extends Application5e {
   /** @override */
   static PARTS = {
     header: {
-      template: "modules/simple-shop-craft-5e/templates/shop-sheet/header.hbs",
+      template: "modules/simple-shop-craft-5e/templates/shops/shop-sheet/header.hbs",
       templates: ["modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs"]
     },
     tabs: {
@@ -160,7 +159,7 @@ export default class ShopSheet extends Application5e {
         "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs",
         "modules/simple-shop-craft-5e/templates/partials/item-weight-cell.hbs",
         "modules/simple-shop-craft-5e/templates/partials/item-table.hbs",
-        "modules/simple-shop-craft-5e/templates/shop-sheet/buy-row.hbs"
+        "modules/simple-shop-craft-5e/templates/shops/shop-sheet/buy-row.hbs"
       ],
       scrollable: [""]
     },
@@ -171,12 +170,12 @@ export default class ShopSheet extends Application5e {
         "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs",
         "modules/simple-shop-craft-5e/templates/partials/item-weight-cell.hbs",
         "modules/simple-shop-craft-5e/templates/partials/item-table.hbs",
-        "modules/simple-shop-craft-5e/templates/shop-sheet/sell-row.hbs"
+        "modules/simple-shop-craft-5e/templates/shops/shop-sheet/sell-row.hbs"
       ],
       scrollable: [""]
     },
     description: {
-      template: "modules/simple-shop-craft-5e/templates/shop-sheet/description.hbs",
+      template: "modules/simple-shop-craft-5e/templates/shops/shop-sheet/description.hbs",
       scrollable: [""]
     },
     footer: {
@@ -401,7 +400,6 @@ export default class ShopSheet extends Application5e {
       ...characters.map(a => ({ value: a.uuid, label: a.name }))
     ].map(o => ({ ...o, selected: o.value === this.selectedActorUuid }));
     context.actor = this.selectedActorUuid ? fromUuidSync(this.selectedActorUuid) : null;
-    context.hagglingLocked = context.shop.isHagglingLocked(this.selectedActorUuid);
     const playerOverride = context.shop.resolvePlayerOverride(this.selectedActorUuid);
     const renderDiscountTooltip = (sources, total) => ShopSheet.#renderAttribution(sources, total);
     const hasCrafterFeat = (game.dnd5e.settings.rulesVersion === "modern")
@@ -479,10 +477,10 @@ export default class ShopSheet extends Application5e {
       { value: "open", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StatusOverrideOpen") },
       { value: "closed", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StatusOverrideClosed") }
     ];
-    context.restockCalendarActive = isCalendariaActive() || isDnd5eAutoRecoveryEnabled();
-    context.restockWeekdayOptions = isCalendariaActive()
-      ? calendariaWeekdayOptions()
-      : game.time.calendar.days.values.map((day, value) => ({ value, label: _loc(day.name) }));
+    context.calendarModeActive = isCalendarModeActive();
+    context.restockWeekdayOptions = game.time.calendar.days.values.map(
+      (day, value) => ({ value, label: _loc(day.name) })
+    );
     context.restockWeekdays = Array.from(context.shop.restockWeekdays);
     const selectedNames = context.restockWeekdayOptions
       .filter(o => context.shop.restockWeekdays.has(o.value)).map(o => o.label);
@@ -515,7 +513,7 @@ export default class ShopSheet extends Application5e {
     context.tabId = "buy";
     context.table = buildItemTableSections({
       groups: context.groups, emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.None", columns: BUY_COLUMNS,
-      rowTemplate: "modules/simple-shop-craft-5e/templates/shop-sheet/buy-row.hbs"
+      rowTemplate: "modules/simple-shop-craft-5e/templates/shops/shop-sheet/buy-row.hbs"
     });
     return context;
   }
@@ -538,7 +536,7 @@ export default class ShopSheet extends Application5e {
       emptyLabel: context.shop.goldPool.sellDisabled
         ? "SIMPLE_SHOP_CRAFT_5E.ShopEditor.PurchaseOnlyShopHint"
         : "SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoSellableItems",
-      columns: SELL_COLUMNS, rowTemplate: "modules/simple-shop-craft-5e/templates/shop-sheet/sell-row.hbs"
+      columns: SELL_COLUMNS, rowTemplate: "modules/simple-shop-craft-5e/templates/shops/shop-sheet/sell-row.hbs"
     });
     return context;
   }

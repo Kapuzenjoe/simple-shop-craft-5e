@@ -40,7 +40,7 @@ export default class SettlementCapConfig extends BaseShopConfig {
   /** @override */
   static PARTS = {
     ...super.PARTS,
-    content: { template: "modules/simple-shop-craft-5e/templates/settlement-cap-config/content.hbs" }
+    content: { template: "modules/simple-shop-craft-5e/templates/shops/shop-config/settlement-cap-config/content.hbs" }
   };
 
   /* -------------------------------------------- */

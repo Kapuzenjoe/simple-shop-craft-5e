@@ -40,7 +40,7 @@ export default class VendorConfig extends BaseShopConfig {
   /** @override */
   static PARTS = {
     ...super.PARTS,
-    content: { template: "modules/simple-shop-craft-5e/templates/vendor-config/content.hbs" }
+    content: { template: "modules/simple-shop-craft-5e/templates/shops/shop-config/vendor-config/content.hbs" }
   };
 
   /* -------------------------------------------- */
