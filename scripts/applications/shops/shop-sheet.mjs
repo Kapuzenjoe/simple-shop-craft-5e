@@ -1138,12 +1138,17 @@ export default class ShopSheet extends Application5e {
    * @returns {Promise<void>}
    */
   async #updatePlayerDiscount(actorUuid, updateData) {
-    const existing = this.shop.playerDiscounts.map(pd => pd.toObject());
-    const index = existing.findIndex(pd => pd.actor === actorUuid);
-    const playerDiscounts = index >= 0
-      ? existing.map((pd, i) => i === index ? { ...pd, ...updateData } : pd)
-      : [...existing, { actor: actorUuid, buyModifier: null, sellModifier: null, ...updateData }];
-    await this.#updateShop({ playerDiscounts });
+    if ( game.user.isGM ) await Shop.update(this.shopId, Shop.mergePlayerDiscount(actorUuid, updateData));
+    else {
+      const gm = game.users.activeGM;
+      if ( !gm ) {
+        ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoActiveGM", { localize: true });
+        return;
+      }
+      await gm.query(`${MODULE_ID}.updatePlayerDiscount`, { shopId: this.shopId, actorUuid, updateData });
+    }
+    this.render();
+    if ( this.#cartApp?.rendered ) this.#cartApp.render();
   }
 
   /* -------------------------------------------- */
@@ -1154,15 +1159,8 @@ export default class ShopSheet extends Application5e {
    * @returns {Promise<void>}
    */
   async #updateShop(updateData) {
-    if ( game.user.isGM ) await Shop.update(this.shopId, updateData);
-    else {
-      const gm = game.users.activeGM;
-      if ( !gm ) {
-        ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoActiveGM", { localize: true });
-        return;
-      }
-      await gm.query(`${MODULE_ID}.updateShop`, { shopId: this.shopId, updateData });
-    }
+    if ( !game.user.isGM ) return;
+    await Shop.update(this.shopId, updateData);
     this.render();
     if ( this.#cartApp?.rendered ) this.#cartApp.render();
   }

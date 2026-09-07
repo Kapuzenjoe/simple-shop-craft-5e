@@ -378,6 +378,26 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
   /* -------------------------------------------- */
 
   /**
+   * Merge an update into one actor's playerDiscounts entry, creating one with no discount overrides yet
+   * if it doesn't already exist.
+   * @param {string} actorUuid
+   * @param {object} updateData
+   * @returns {function(Shop): object}  Update function for {@link Shop.update}.
+   */
+  static mergePlayerDiscount(actorUuid, updateData) {
+    return shop => {
+      const existing = shop.playerDiscounts.map(pd => pd.toObject());
+      const index = existing.findIndex(pd => pd.actor === actorUuid);
+      const playerDiscounts = index >= 0
+        ? existing.map((pd, i) => i === index ? { ...pd, ...updateData } : pd)
+        : [...existing, { actor: actorUuid, buyModifier: null, sellModifier: null, ...updateData }];
+      return { playerDiscounts };
+    };
+  }
+
+  /* -------------------------------------------- */
+
+  /**
    * Resolve this shop's effective gold pool for buy-back transactions, summed to copper.
    * @returns {number|null}  Copper amount available, or `null` if unlimited (no cap enforced).
    */
@@ -402,7 +422,7 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
     const isMagic = props?.has?.("mgc") ?? props?.includes?.("mgc") ?? false;
     const { magicRule, byType } = stockDefaults;
     const exempt = isMagic
-      && ((magicRule === "none") || ((magicRule === "gear") && MAGIC_EXEMPT_TYPES.has(item.type)));
+      && ((magicRule === "all") || ((magicRule === "gear") && MAGIC_EXEMPT_TYPES.has(item.type)));
     return exempt ? null : (byType[item.type] ?? null);
   }
 
@@ -721,7 +741,7 @@ export function newEntryStock(item, stockDefaults) {
   const isMagic = item.system.properties?.has("mgc") ?? false;
   if ( isMagic ) {
     const { magicRule } = stockDefaults;
-    const exempt = (magicRule === "none") || ((magicRule === "gear") && MAGIC_EXEMPT_TYPES.has(item.type));
+    const exempt = (magicRule === "all") || ((magicRule === "gear") && MAGIC_EXEMPT_TYPES.has(item.type));
     if ( exempt ) return { stock: { max: null, current: 1 }, restockMode: "exclude" };
   }
   const max = Shop.defaultStockMax(item, stockDefaults);

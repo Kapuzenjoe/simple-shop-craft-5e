@@ -296,7 +296,7 @@ export default class CraftStartDialog extends Dialog5e {
       });
     });
     const bundleSizes = await resolveBundleSizes([...rawCandidates.flat(), ...freeformItems]);
-    const allocated = new Map(freeformItems.map(item => [item.id, item.system.quantity]));
+    const allocated = new Map(freeformItems.map(item => [item.id, 1]));
 
     const fixedLines = materialsResolved.map(({ entry, item }, index) => {
       if ( entry.criteria?.type ) {
@@ -310,6 +310,7 @@ export default class CraftStartDialog extends Dialog5e {
             allocated.set(i.id, (allocated.get(i.id) ?? 0) + selected);
             return {
               id: i.id, name: i.name, img: i.img, uuid: i.uuid, available, selected, valueCP,
+              quantity: i.system.quantity,
               price: breakdownCopper(valueCP)
             };
           });
@@ -332,10 +333,13 @@ export default class CraftStartDialog extends Dialog5e {
         ? actor.items.filter(i => i.system.identifier === materialIdentifier)
         : [];
       const owned = ownedStacks[0] ?? null;
-      const ownedQuantity = ownedStacks.reduce((sum, i) => sum + i.system.quantity, 0);
+      const ownedQuantity = ownedStacks.reduce(
+        (sum, i) => sum + Math.max(0, i.system.quantity - (allocated.get(i.id) ?? 0)), 0
+      );
       const maxUnits = Math.min(ownedQuantity, entry.quantity);
       const overrideKey = owned ? `${index}:${owned.id}` : null;
       const suppliedUnits = owned ? Math.min(this.#materialQuantities.get(overrideKey) ?? 0, maxUnits) : 0;
+      if ( owned ) allocated.set(owned.id, (allocated.get(owned.id) ?? 0) + suppliedUnits);
       const itemBundleSize = (item?.system?.quantity > 1) ? item.system.quantity : 1;
       const itemValueCP = (entry.value?.value != null)
         ? toCopper(entry.value.value, entry.value.denomination)
@@ -446,7 +450,9 @@ export default class CraftStartDialog extends Dialog5e {
     const key = `${target.dataset.index}:${target.dataset.itemId}`;
     const step = Number(target.dataset.step);
     const max = Number(target.dataset.max ?? Infinity);
-    this.#materialQuantities.set(key, Math.min(max, Math.max(0, (this.#materialQuantities.get(key) ?? 0) + step)));
+    const physicalMax = Number(target.dataset.physicalMax ?? max);
+    const current = Math.min(this.#materialQuantities.get(key) ?? 0, max);
+    this.#materialQuantities.set(key, Math.min(physicalMax, Math.max(0, current + step)));
     this.render({ parts: ["content", "footer"] });
   }
 

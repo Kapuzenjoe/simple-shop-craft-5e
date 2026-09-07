@@ -286,8 +286,12 @@ export function selectableActors({ includeParty=false }={}) {
 export function formatDuration(totalHours, { days=true }={}) {
   const hoursPerWorkday = maxHoursPerWorkday();
   const dayCount = days ? Math.floor(totalHours / hoursPerWorkday) : 0;
-  const hours = Math.floor(days ? totalHours % hoursPerWorkday : totalHours);
-  const minutes = Math.round((totalHours % 1) * 60);
+  let hours = Math.floor(days ? totalHours % hoursPerWorkday : totalHours);
+  let minutes = Math.round((totalHours % 1) * 60);
+  if ( minutes === 60 ) {
+    minutes = 0;
+    hours += 1;
+  }
   const parts = [];
   if ( dayCount ) parts.push(`${dayCount}d`);
   if ( hours ) parts.push(`${hours}h`);

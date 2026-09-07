@@ -373,6 +373,7 @@
       "ProgressActivityFlavor": "The crafting progresses ({progress}/{total}).",
       "CompleteMessage": "{name} is finished and has been added to {actor}'s inventory.",
       "NoWorkdayRemaining": "You have no workday hours remaining today for crafting.",
+      "SessionPending": "A crafting session is already in progress for this item.",
       "ProgressCard": {
         "HoursWorked": "Worked {hours}."
       },

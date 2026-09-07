@@ -120,12 +120,17 @@ export class InProgressCraft extends foundry.abstract.DataModel {
    * @param {ActivityUseConfiguration} usageConfig
    * @param {ActivityDialogConfiguration} dialogConfig
    * @param {ActivityMessageConfiguration} messageConfig
-   * @returns {void}
+   * @returns {boolean|void}  Explicitly returns `false` to prevent activity use while a session is pending.
    */
   static onPreUseActivity(activity, usageConfig, dialogConfig, messageConfig) {
     const item = activity.item;
     const flag = item?.getFlag(MODULE_ID, "craft");
     if ( !flag || (flag.activityId !== activity.id) ) return;
+
+    if ( flag.pendingStart != null ) {
+      ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.Craft.SessionPending", { localize: true });
+      return false;
+    }
 
     const actor = item.actor;
     const dailyMax = maxHoursPerWorkday();
@@ -179,12 +184,13 @@ export class InProgressCraft extends foundry.abstract.DataModel {
    * @returns {Promise<void>}
    */
   async creditProgress(item, hours) {
-    this.updateSource({ progress: this.progress + hours });
+    const roundToMinute = value => Math.round(value * 60) / 60;
+    this.updateSource({ progress: roundToMinute(this.progress + hours) });
 
     const actor = item.actor;
     if ( actor ) {
       const workedToday = actor.getFlag(MODULE_ID, "hoursWorkedToday") ?? 0;
-      await actor.setFlag(MODULE_ID, "hoursWorkedToday", workedToday + hours);
+      await actor.setFlag(MODULE_ID, "hoursWorkedToday", roundToMinute(workedToday + hours));
     }
 
     await ChatMessage.create({
@@ -222,7 +228,7 @@ export class InProgressCraft extends foundry.abstract.DataModel {
    */
   async resolvePendingSession(item, { early=false }={}) {
     if ( this.pendingStart == null ) return;
-    const elapsedHours = (game.time.worldTime - this.pendingStart) / 3600;
+    const elapsedHours = Math.max(0, (game.time.worldTime - this.pendingStart) / 3600);
     const hours = early ? Math.min(this.pendingHours, elapsedHours) : this.pendingHours;
     const messageId = this.pendingMessageId;
     this.updateSource({ pendingStart: null, pendingHours: null, pendingMessageId: "" });

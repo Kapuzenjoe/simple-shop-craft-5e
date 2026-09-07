@@ -11,6 +11,9 @@
 - Changed the Recipes list's Unlocked hover to also show current Tool-Proficient party characters.
 - Fixed a completed craft always producing the target item's default catalog quantity instead of the recipe's target quantity.
 - Fixed a shop's Haggling lockout applying to every Charisma skill after one failed attempt instead of just the skill that failed (#14).
+- Fixed a shop losing a Haggling lock or Player Discount change when two updates landed at the same time.
+- Fixed the "Magical Items" stock rule's "None" and "All Types" options being swapped.
+- Fixed "Fill from Table" ignoring the shop's Settlement Cap.
 - Fixed the craft order letting the same owned item be assigned to two material slots at once, showing more covered value than actually available (#12).
 - Fixed a recipe's crafting duration not scaling with its target quantity, showing a shorter duration than the craft order actually requires.
 - Fixed the shop item generator's spell scroll draw ignoring the settlement's price cap.

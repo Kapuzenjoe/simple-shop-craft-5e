@@ -8,6 +8,8 @@ import { MODULE_ID } from "../config.mjs";
  * @mixin
  */
 export function SettingCollectionMixin(Base, settingKey) {
+  const semaphore = new foundry.utils.Semaphore(1);
+
   return class extends Base {
 
     /**
@@ -48,8 +50,10 @@ export function SettingCollectionMixin(Base, settingKey) {
      * @returns {Promise<Base>}  The newly created instance.
      */
     static async create(data) {
-      const all = this.getAll();
-      await this.setAll([...all.map(e => e.toObject()), data]);
+      await semaphore.add(async () => {
+        const all = this.getAll();
+        await this.setAll([...all.map(e => e.toObject()), data]);
+      });
       return this.getAll().at(-1);
     }
 
@@ -61,7 +65,9 @@ export function SettingCollectionMixin(Base, settingKey) {
      * @returns {Promise<void>}
      */
     static async delete(id) {
-      await this.setAll(this.getAll().filter(e => e._id !== id).map(e => e.toObject()));
+      await semaphore.add(async () => {
+        await this.setAll(this.getAll().filter(e => e._id !== id).map(e => e.toObject()));
+      });
     }
 
     /* -------------------------------------------- */
@@ -69,12 +75,16 @@ export function SettingCollectionMixin(Base, settingKey) {
     /**
      * Merge a partial update into a single instance.
      * @param {string} id
-     * @param {object} updateData  Fields to merge into the instance's current data.
+     * @param {object|function(Base): object} updateData  Fields to merge, or a function computing them
+     *                                                     from the freshest persisted instance.
      * @returns {Promise<void>}
      */
     static async update(id, updateData) {
-      const all = this.getAll();
-      await this.setAll(all.map(e => e._id === id ? { ...e.toObject(), ...updateData } : e.toObject()));
+      await semaphore.add(async () => {
+        const all = this.getAll();
+        const data = (typeof updateData === "function") ? updateData(all.find(e => e._id === id)) : updateData;
+        await this.setAll(all.map(e => e._id === id ? { ...e.toObject(), ...data } : e.toObject()));
+      });
     }
   };
 }

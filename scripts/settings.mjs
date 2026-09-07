@@ -119,9 +119,11 @@ export function registerSettings() {
     type: HomebrewConfig
   });
 
-  CONFIG.queries[`${MODULE_ID}.updateShop`] = async ({ shopId, updateData }) => {
+  CONFIG.queries[`${MODULE_ID}.updatePlayerDiscount`] = async ({ shopId, actorUuid, updateData }, { user }) => {
     if ( !game.user.isGM ) return;
-    await Shop.update(shopId, updateData);
+    const actor = fromUuidSync(actorUuid);
+    if ( !actor?.testUserPermission(user, "OWNER") ) return;
+    await Shop.update(shopId, Shop.mergePlayerDiscount(actorUuid, { hagglingLocks: updateData?.hagglingLocks }));
   };
 
   CONFIG.queries[`${MODULE_ID}.spotlight`] = async ({ shopId }) => {

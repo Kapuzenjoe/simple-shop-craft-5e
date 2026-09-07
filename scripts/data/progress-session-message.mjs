@@ -74,7 +74,8 @@ export class ProgressSessionMessageData extends foundry.abstract.DataModel {
     }
 
     const session = new ProgressSessionMessageData(flag);
-    html.querySelector('[data-action="endProgress"]')?.addEventListener("click", () => session.#endProgress(message));
+    const endProgress = foundry.utils.throttle(() => session.#endProgress(message), 1000);
+    html.querySelector('[data-action="endProgress"]')?.addEventListener("click", endProgress);
   }
 
   /* -------------------------------------------- */

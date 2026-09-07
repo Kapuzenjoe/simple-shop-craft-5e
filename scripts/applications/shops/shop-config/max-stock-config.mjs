@@ -88,7 +88,7 @@ export default class MaxStockConfig extends BaseShopConfig {
     context.fields = [
       {
         field: stockFields.max, name: "max", value: entry.stock.max,
-        placeholder: typeDefault ?? "∞", disabled: this.#restockMode !== "normal",
+        placeholder: typeDefault ?? 0, disabled: this.#restockMode !== "normal",
         label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StockMax"), hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StockMaxHint")
       },
       {

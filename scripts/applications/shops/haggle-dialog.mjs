@@ -63,6 +63,15 @@ export default class HaggleDialog extends Dialog5e {
 
   /* -------------------------------------------- */
 
+  /**
+   * Whether every Charisma skill is haggling-locked, cached during content preparation for reuse
+   * in the footer.
+   * @type {boolean}
+   */
+  #allSkillsLocked = false;
+
+  /* -------------------------------------------- */
+
   /** @inheritDoc */
   async _prepareContentContext(context, options) {
     context = await super._prepareContentContext(context, options);
@@ -85,11 +94,13 @@ export default class HaggleDialog extends Dialog5e {
     if ( chaSkills.some(([value]) => shop.isHagglingLocked(actorUuid, value)) ) {
       context.hint += ` ${_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.HagglingSomeLocked")}`;
     }
+    const unlockedSkill = chaSkills.find(([value]) => !shop.isHagglingLocked(actorUuid, value));
+    this.#allSkillsLocked = !unlockedSkill;
     context.fields = [
       {
         field: new foundry.data.fields.StringField({ blank: false, required: true }), name: "skill",
         label: _loc("DND5E.Skill"),
-        value: chaSkills.find(([value]) => !shop.isHagglingLocked(actorUuid, value))?.[0] ?? chaSkills[0]?.[0],
+        value: unlockedSkill?.[0] ?? chaSkills[0]?.[0],
         options: chaSkills.map(([value, s]) => ({
           value,
           label: shop.isHagglingLocked(actorUuid, value)
@@ -113,6 +124,15 @@ export default class HaggleDialog extends Dialog5e {
 
   /* -------------------------------------------- */
 
+  /** @inheritDoc */
+  async _prepareFooterContext(context, options) {
+    context = await super._prepareFooterContext(context, options);
+    context.buttons[0].disabled = this.#allSkillsLocked;
+    return context;
+  }
+
+  /* -------------------------------------------- */
+
   /**
    * Handle rolling the haggle check and applying a lock on failure.
    * @this {HaggleDialog}
@@ -126,15 +146,14 @@ export default class HaggleDialog extends Dialog5e {
     if ( !actor ) return;
     const data = foundry.utils.expandObject(formData.object);
     if ( this.shopSheet.shop.isHagglingLocked(actor.uuid, data.skill) ) return;
-    const rolls = await actor.rollSkill({
-      skill: data.skill, target: this.#dc,
-      advantage: data.attitude === "friendly", disadvantage: data.attitude === "hostile"
-    });
+    await this.close();
+    const attitudeMod = data.attitude === "friendly" ? { advantage: true }
+      : data.attitude === "hostile" ? { disadvantage: true } : {};
+    const rolls = await actor.rollSkill({ skill: data.skill, target: this.#dc, ...attitudeMod });
     if ( rolls?.[0]?.isFailure ) {
       const existing = this.shopSheet.shop.playerDiscounts.find(pd => pd.actor === actor.uuid);
       const hagglingLocks = { ...existing?.hagglingLocks, [data.skill]: game.time.worldTime };
       await this.onUpdatePlayerDiscount(actor.uuid, { hagglingLocks });
     }
-    await this.close();
   }
 }

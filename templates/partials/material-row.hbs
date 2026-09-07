@@ -75,13 +75,15 @@
             </div>
             <div class="item-detail item-quantity">
                 <a class="adjustment-button always-interactive" data-action="stepMaterialQuantity"
-                   data-index="{{ ../index }}" data-item-id="{{ this.id }}" data-step="-1" data-max="{{ this.available }}"
+                   data-index="{{ ../index }}" data-item-id="{{ this.id }}" data-step="-1"
+                   data-max="{{ this.available }}" data-physical-max="{{ this.quantity }}"
                    aria-label="{{ localize 'DND5E.Decrease' }}">
                     <i class="fa-solid fa-minus" inert></i>
                 </a>
                 <span class="value">{{ this.selected }}</span>
                 <a class="adjustment-button always-interactive" data-action="stepMaterialQuantity"
-                   data-index="{{ ../index }}" data-item-id="{{ this.id }}" data-step="1" data-max="{{ this.available }}"
+                   data-index="{{ ../index }}" data-item-id="{{ this.id }}" data-step="1"
+                   data-max="{{ this.available }}" data-physical-max="{{ this.quantity }}"
                    aria-label="{{ localize 'DND5E.Increase' }}">
                     <i class="fa-solid fa-plus" inert></i>
                 </a>

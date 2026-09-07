@@ -1,4 +1,5 @@
 import { ShopItemEntry } from "../../data/shop-data.mjs";
+import { resolveItemPrice, toCopper } from "../../utils.mjs";
 
 /**
  * @import ShopSheet from "./shop-sheet.mjs";
@@ -102,10 +103,17 @@ export default class FillFromTableDialog extends Dialog5e {
       results.filter(r => r.type === "document").map(r => fromUuid(r.documentUuid))
     );
 
+    const settlementCap = this.shopSheet.shop.settlementCap;
+    const capCP = settlementCap?.value != null ? toCopper(settlementCap.value, settlementCap.denomination) : null;
+
     const counted = new Map();
     let skipped = 0;
     for ( const item of drawnItems ) {
       if ( !CONFIG.Item.dataModels[item?.type]?.inventorySection ) { skipped++; continue; }
+      if ( capCP != null ) {
+        const price = resolveItemPrice(item);
+        if ( price && (toCopper(price.value, price.denomination) > capCP) ) { skipped++; continue; }
+      }
       const entry = item.system.identifier ? { identifier: item.system.identifier } : { uuid: item.uuid };
       const key = ShopItemEntry.key(entry);
       const existing = counted.get(key);
