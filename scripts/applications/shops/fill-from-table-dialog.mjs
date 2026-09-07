@@ -1,7 +1,8 @@
 import { ShopItemEntry } from "../../data/shop-data.mjs";
+import { resolveItemPrice, toCopper } from "../../utils.mjs";
 
 /**
- * @import { default as ShopSheet } from "./shop-sheet.mjs";
+ * @import ShopSheet from "./shop-sheet.mjs";
  */
 
 const { Dialog5e } = game.dnd5e.applications.api;
@@ -31,9 +32,7 @@ export default class FillFromTableDialog extends Dialog5e {
     buttons: [
       { action: "fill", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.FillFromTable", icon: "fas fa-table-list", default: true }
     ],
-    form: { handler: FillFromTableDialog.#onSubmit },
-    shopSheet: null,
-    onFilled: null
+    form: { handler: FillFromTableDialog.#onSubmit }
   };
 
   /* -------------------------------------------- */
@@ -44,11 +43,15 @@ export default class FillFromTableDialog extends Dialog5e {
     content: { template: "modules/simple-shop-craft-5e/templates/partials/config-dialog-content.hbs" }
   };
 
+  /* -------------------------------------------- */
+
   /**
    * The shop editor this dialog was opened from.
    * @type {ShopSheet}
    */
   shopSheet;
+
+  /* -------------------------------------------- */
 
   /**
    * Callback receiving the resolved item entries.
@@ -100,10 +103,17 @@ export default class FillFromTableDialog extends Dialog5e {
       results.filter(r => r.type === "document").map(r => fromUuid(r.documentUuid))
     );
 
+    const settlementCap = this.shopSheet.shop.settlementCap;
+    const capCP = settlementCap?.value != null ? toCopper(settlementCap.value, settlementCap.denomination) : null;
+
     const counted = new Map();
     let skipped = 0;
     for ( const item of drawnItems ) {
       if ( !CONFIG.Item.dataModels[item?.type]?.inventorySection ) { skipped++; continue; }
+      if ( capCP != null ) {
+        const price = resolveItemPrice(item);
+        if ( price && (toCopper(price.value, price.denomination) > capCP) ) { skipped++; continue; }
+      }
       const entry = item.system.identifier ? { identifier: item.system.identifier } : { uuid: item.uuid };
       const key = ShopItemEntry.key(entry);
       const existing = counted.get(key);

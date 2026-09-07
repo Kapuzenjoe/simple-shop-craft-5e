@@ -270,9 +270,3 @@ out a campaign's shops, and where players go to open one for themselves.
     </td>
   </tr>
 </table>
-
----
-
-## What's Next
-
-- Non-item services: spellcasting, hirelings, food & lodging

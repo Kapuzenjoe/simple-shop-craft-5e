@@ -1,5 +1,10 @@
-import { HOURS_PER_USE, MODULE_ID } from "../config.mjs";
-import { deductActorCurrencyChecked, resolveEntries } from "../utils.mjs";
+import { MODULE_ID } from "../config.mjs";
+import {
+  deductActorCurrencyChecked, formatDuration, isCalendarModeActive, maxHoursPerWorkday, resolveEntries,
+  shouldHandleWorldTimeAdvance
+} from "../utils.mjs";
+
+import ProgressHoursDialog from "../applications/craft/progress-hours-dialog.mjs";
 
 const { DocumentUUIDField, NumberField, SchemaField, StringField } = foundry.data.fields;
 
@@ -20,6 +25,12 @@ const ACTIVITY_TYPE = "utility";
 const PROGRESS_BLOCK_REGEX = /<div class="simple-shop-craft-5e craft-progress">[\s\S]*?<\/div>/;
 
 /**
+ * Template used to render a craft-progress chat card.
+ * @type {string}
+ */
+const PROGRESS_TEMPLATE = "modules/simple-shop-craft-5e/templates/chat/progress-card.hbs";
+
+/**
  * A data model that represents a craft in progress, tracked via a consumable item's own flags.
  * @extends {foundry.abstract.DataModel<InProgressCraftData>}
  * @mixes InProgressCraftData
@@ -34,10 +45,14 @@ export class InProgressCraft extends foundry.abstract.DataModel {
         identifier: new StringField({ blank: true }),
         uuid: new DocumentUUIDField({ type: "Item", blank: true })
       }),
+      targetQuantity: new NumberField({ required: true, initial: 1, integer: true, min: 1 }),
       activityId: new StringField({ blank: true }),
       totalHours: new NumberField({ required: true, initial: 0 }),
       hoursPerUse: new NumberField({ initial: null, nullable: true }),
-      progress: new NumberField({ required: true, initial: 0 })
+      progress: new NumberField({ required: true, initial: 0 }),
+      pendingStart: new NumberField({ initial: null, nullable: true }),
+      pendingHours: new NumberField({ initial: null, nullable: true }),
+      pendingMessageId: new StringField({ blank: true })
     };
   }
 
@@ -77,8 +92,8 @@ export class InProgressCraft extends foundry.abstract.DataModel {
     if ( itemsToDelete.length ) await actor.deleteEmbeddedDocuments("Item", itemsToDelete);
 
     const inProgress = new InProgressCraft({
-      recipeId: craft.recipeId, targetItem: craft.targetItem, activityId: foundry.utils.randomID(),
-      totalHours: craft.totalHours, hoursPerUse: craft.hoursPerUse, progress: 0
+      recipeId: craft.recipeId, targetItem: craft.targetItem, targetQuantity: craft.targetQuantity,
+      activityId: foundry.utils.randomID(), totalHours: craft.totalHours, hoursPerUse: craft.hoursPerUse, progress: 0
     });
     const [item] = await actor.createEmbeddedDocuments("Item", [{
       name: _loc("SIMPLE_SHOP_CRAFT_5E.Craft.InProgressName", { name: craft.targetName }),
@@ -87,7 +102,6 @@ export class InProgressCraft extends foundry.abstract.DataModel {
       system: {
         quantity: 1, price: craft.halfPrice ?? { value: 0, denomination: "gp" },
         weight: craft.weight ?? { value: 0, units: "lb" },
-        uses: { max: "1", recovery: [{ period: "lr", type: "recoverAll" }] },
         description: { value: inProgress.applyProgressDescription("") }
       },
       flags: { [MODULE_ID]: { craft: inProgress.toObject() } }
@@ -100,34 +114,157 @@ export class InProgressCraft extends foundry.abstract.DataModel {
   /* -------------------------------------------- */
 
   /**
-   * Handle a use of the "Progress Craft" activity: advance progress, complete the craft once full.
+   * Handle configuring a use of the "Progress Craft" activity: replace dnd5e's own usage dialog with one
+   * that lets the player choose how many hours of progress this use contributes.
    * @param {Activity} activity
+   * @param {ActivityUseConfiguration} usageConfig
+   * @param {ActivityDialogConfiguration} dialogConfig
+   * @param {ActivityMessageConfiguration} messageConfig
+   * @returns {boolean|void}  Explicitly returns `false` to prevent activity use while a session is pending.
+   */
+  static onPreUseActivity(activity, usageConfig, dialogConfig, messageConfig) {
+    const item = activity.item;
+    const flag = item?.getFlag(MODULE_ID, "craft");
+    if ( !flag || (flag.activityId !== activity.id) ) return;
+
+    if ( flag.pendingStart != null ) {
+      ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.Craft.SessionPending", { localize: true });
+      return false;
+    }
+
+    const actor = item.actor;
+    const dailyMax = maxHoursPerWorkday();
+    const workedToday = actor?.getFlag(MODULE_ID, "hoursWorkedToday") ?? 0;
+    const remainingToday = Math.max(0, dailyMax - workedToday);
+    const craft = new InProgressCraft(flag);
+    const max = Math.min(remainingToday, craft.totalHours - craft.progress);
+    usageConfig.scaling = 0;
+    dialogConfig.applicationClass = ProgressHoursDialog;
+    dialogConfig.options = { max, initial: Math.min(max, craft.hoursPerUse ?? max), workedToday, dailyMax };
+    messageConfig.create = false;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle a use of the "Progress Craft" activity: in calendar mode, start a pending session instead of
+   * crediting progress immediately; otherwise advance progress right away, completing the craft once full.
+   * @param {Activity} activity
+   * @param {ActivityUseConfiguration} usageConfig
    * @returns {Promise<void>}
    */
-  static async onPostUseActivity(activity) {
+  static async onPostUseActivity(activity, usageConfig) {
     const item = activity.item;
     const flag = item?.getFlag(MODULE_ID, "craft");
     if ( !flag || (flag.activityId !== activity.id) ) return;
 
     const craft = new InProgressCraft(flag);
-    craft.updateSource({ progress: craft.progress + (craft.hoursPerUse ?? HOURS_PER_USE) });
-    if ( craft.progress >= craft.totalHours ) {
-      await craft.complete(item);
+    const hoursThisUse = usageConfig.simpleShopCraft5e?.hoursThisUse ?? craft.hoursPerUse ?? maxHoursPerWorkday();
+
+    if ( isCalendarModeActive() ) {
+      const { ProgressSessionMessageData } = await import("./progress-session-message.mjs");
+      const message = await ProgressSessionMessageData.create(item, item.actor, hoursThisUse);
+      craft.updateSource({
+        pendingStart: game.time.worldTime, pendingHours: hoursThisUse, pendingMessageId: message.id
+      });
+      await item.update({ [`flags.${MODULE_ID}.craft`]: craft.toObject() });
       return;
     }
 
-    await activity.update({ "description.chatFlavor": craft.#progressLabel() });
+    await craft.creditProgress(item, hoursThisUse);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Credit progress hours toward this craft, post a progress-update chat message (or complete the craft
+   * once its total is reached), and persist the result.
+   * @param {Item5e} item   The in-progress craft item.
+   * @param {number} hours  Hours of progress to credit.
+   * @returns {Promise<void>}
+   */
+  async creditProgress(item, hours) {
+    const roundToMinute = value => Math.round(value * 60) / 60;
+    this.updateSource({ progress: roundToMinute(this.progress + hours) });
+
+    const actor = item.actor;
+    if ( actor ) {
+      const workedToday = actor.getFlag(MODULE_ID, "hoursWorkedToday") ?? 0;
+      await actor.setFlag(MODULE_ID, "hoursWorkedToday", roundToMinute(workedToday + hours));
+    }
+
+    await ChatMessage.create({
+      content: await foundry.applications.handlebars.renderTemplate(PROGRESS_TEMPLATE, {
+        itemImg: item.img, itemName: item.name, actorName: actor?.name ?? "",
+        hoursWorkedLabel: _loc("SIMPLE_SHOP_CRAFT_5E.Craft.ProgressCard.HoursWorked", {
+          hours: formatDuration(hours, { days: false })
+        }),
+        progressLabel: this.#progressLabel()
+      }),
+      speaker: ChatMessage.getSpeaker({ actor })
+    });
+
+    if ( this.progress >= this.totalHours ) {
+      await this.complete(item);
+      return;
+    }
+
+    await item.system.activities.get(this.activityId)?.update({ "description.chatFlavor": this.#progressLabel() });
     await item.update({
-      [`flags.${MODULE_ID}.craft`]: craft.toObject(),
-      "system.description.value": craft.applyProgressDescription(item.system.description.value ?? "")
+      [`flags.${MODULE_ID}.craft`]: this.toObject(),
+      "system.description.value": this.applyProgressDescription(item.system.description.value ?? "")
     });
   }
 
   /* -------------------------------------------- */
 
   /**
+   * Resolve this craft's currently pending calendar-mode session: credit the full planned hours once
+   * naturally elapsed, or only the hours actually elapsed so far if ended early.
+   * @param {Item5e} item
+   * @param {object} [options={}]
+   * @param {boolean} [options.early=false]  End the session now instead of waiting out its planned duration.
+   * @returns {Promise<void>}
+   */
+  async resolvePendingSession(item, { early=false }={}) {
+    if ( this.pendingStart == null ) return;
+    const elapsedHours = Math.max(0, (game.time.worldTime - this.pendingStart) / 3600);
+    const hours = early ? Math.min(this.pendingHours, elapsedHours) : this.pendingHours;
+    const messageId = this.pendingMessageId;
+    this.updateSource({ pendingStart: null, pendingHours: null, pendingMessageId: "" });
+    await this.creditProgress(item, hours);
+    const { ProgressSessionMessageData } = await import("./progress-session-message.mjs");
+    await ProgressSessionMessageData.resolve(messageId);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle Foundry's `updateWorldTime` hook.
+   * @param {number} worldTime
+   * @param {number} dt
+   * @returns {Promise<void>}
+   */
+  static async onUpdateWorldTime(worldTime, dt) {
+    if ( !shouldHandleWorldTimeAdvance(dt) ) return;
+
+    for ( const actor of game.actors ) {
+      for ( const item of actor.items ) {
+        const flag = item.getFlag(MODULE_ID, "craft");
+        if ( flag?.pendingStart == null ) continue;
+        const craft = new InProgressCraft(flag);
+        if ( (worldTime - craft.pendingStart) / 3600 < craft.pendingHours ) continue;
+        await craft.resolvePendingSession(item);
+      }
+    }
+  }
+
+  /* -------------------------------------------- */
+
+  /**
    * Self-healing: on every character sheet render, recreate a deleted "Progress Craft" activity and
-   * refresh a missing or stale progress block in the description of any in-progress craft item.
+   * reconcile it to the current activity definition, and refresh a missing or stale progress block in
+   * the description of any in-progress craft item.
    * @param {Application5e} app
    * @returns {Promise<void>}
    */
@@ -140,12 +277,26 @@ export class InProgressCraft extends foundry.abstract.DataModel {
       if ( !flag?.activityId ) continue;
       const craft = new InProgressCraft(flag);
 
-      if ( !item.system.activities?.get(craft.activityId) ) await craft.createActivity(item);
+      await craft.createActivity(item);
 
       const description = item.system.description.value ?? "";
       const updated = craft.applyProgressDescription(description);
       if ( updated !== description ) await item.update({ "system.description.value": updated });
     }
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle a completed rest: reset the actor's tracked crafting hours for the day on a long rest.
+   * @param {Actor5e} actor
+   * @param {object} result
+   * @param {RestConfiguration} config
+   * @returns {Promise<void>}
+   */
+  static async onRestCompleted(actor, result, config) {
+    if ( config.type !== "long" ) return;
+    await actor.unsetFlag(MODULE_ID, "hoursWorkedToday");
   }
 
   /* -------------------------------------------- */
@@ -170,13 +321,31 @@ export class InProgressCraft extends foundry.abstract.DataModel {
    * @returns {Promise<void>}
    */
   async createActivity(item) {
-    await item.createActivity(ACTIVITY_TYPE, {
+    const data = {
       _id: this.activityId,
       name: _loc("SIMPLE_SHOP_CRAFT_5E.Craft.ProgressActivityName"),
       description: { chatFlavor: this.#progressLabel() },
-      activation: this.#resolveActivation(),
-      consumption: { targets: [{ type: "itemUses", target: "", value: "1" }] }
-    }, { renderSheet: false });
+      activation: { type: "action", value: null }
+    };
+    const activity = item.system.activities?.get(this.activityId);
+    if ( activity && !this.#activityNeedsUpdate(activity, data) ) return;
+    await item.createActivity(ACTIVITY_TYPE, data, { renderSheet: false });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Determine whether a live activity's definition has drifted from its intended values.
+   * @param {Activity} activity  The activity as currently stored on the item.
+   * @param {object} data        The intended activity data, as passed to `Item5e#createActivity()`.
+   * @returns {boolean}
+   */
+  #activityNeedsUpdate(activity, data) {
+    return (activity.name !== data.name)
+      || (activity.description.chatFlavor !== data.description.chatFlavor)
+      || (activity.activation.type !== data.activation.type)
+      || (activity.activation.value !== data.activation.value)
+      || (activity.consumption?.targets?.length > 0);
   }
 
   /* -------------------------------------------- */
@@ -200,6 +369,7 @@ export class InProgressCraft extends foundry.abstract.DataModel {
 
     const itemData = fullItem.toObject();
     delete itemData._id;
+    if ( fullItem.type !== "container" ) itemData.system.quantity = this.targetQuantity;
 
     const existing = (fullItem.type !== "container") && fullItem.system.identifier
       ? actor.items.find(i => (i.id !== item.id) && (i.system.identifier === fullItem.system.identifier))
@@ -224,27 +394,13 @@ export class InProgressCraft extends foundry.abstract.DataModel {
   /* -------------------------------------------- */
 
   /**
-   * Format this craft's progress as a localized workdays label, e.g. "2/5".
+   * Format this craft's progress as a localized duration ratio, e.g. "2h 30min/8h".
    * @returns {string}
    */
   #progressLabel() {
-    const hoursPerUse = this.hoursPerUse ?? HOURS_PER_USE;
-    const completed = this.progress / hoursPerUse;
-    const total = Math.ceil(this.totalHours / hoursPerUse);
-    return _loc("SIMPLE_SHOP_CRAFT_5E.Craft.ProgressActivityFlavor", { completed, total });
+    return _loc("SIMPLE_SHOP_CRAFT_5E.Craft.ProgressActivityFlavor", {
+      progress: formatDuration(this.progress), total: formatDuration(this.totalHours)
+    });
   }
 
-  /* -------------------------------------------- */
-
-  /**
-   * Resolve this craft's hours-per-use to a valid, whole-number activity activation: whole hours stay
-   * `type: "hour"`, anything else (e.g. a 30-minute recipe) converts to whole minutes.
-   * @returns {{ type: "hour"|"minute", value: number }}
-   */
-  #resolveActivation() {
-    const hoursPerUse = this.hoursPerUse ?? HOURS_PER_USE;
-    return Number.isInteger(hoursPerUse)
-      ? { type: "hour", value: Math.max(1, hoursPerUse) }
-      : { type: "minute", value: Math.max(1, Math.round(hoursPerUse * 60)) };
-  }
 }

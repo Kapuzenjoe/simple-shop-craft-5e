@@ -4,7 +4,7 @@ import { Shop, ShopItemEntry } from "../../../data/shop-data.mjs";
 import BaseShopConfig from "./base-shop-config.mjs";
 
 /**
- * @import { default as ShopSheet } from "../shop-sheet.mjs";
+ * @import ShopSheet from "../shop-sheet.mjs";
  */
 
 /**
@@ -15,10 +15,10 @@ import BaseShopConfig from "./base-shop-config.mjs";
  * @param {(updateData: object) => Promise<void>} options.onUpdate
  */
 export default class MaxStockConfig extends BaseShopConfig {
-  constructor({ shopSheet, entryKey: key, onUpdate, ...options }={}) {
+  constructor({ shopSheet, entryKey, onUpdate, ...options }={}) {
     super(options);
     this.shopSheet = shopSheet;
-    this.entryKey = key;
+    this.entryKey = entryKey;
     this.onUpdate = onUpdate;
     this.#restockMode = this.#entry.restockMode;
   }
@@ -30,10 +30,7 @@ export default class MaxStockConfig extends BaseShopConfig {
     id: "max-stock-config-{id}",
     window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.StockMax" },
     position: { width: 480 },
-    form: { handler: MaxStockConfig.#onSubmit },
-    shopSheet: null,
-    entryKey: null,
-    onUpdate: null
+    form: { handler: MaxStockConfig.#onSubmit }
   };
 
   /* -------------------------------------------- */
@@ -91,7 +88,7 @@ export default class MaxStockConfig extends BaseShopConfig {
     context.fields = [
       {
         field: stockFields.max, name: "max", value: entry.stock.max,
-        placeholder: typeDefault ?? "∞", disabled: this.#restockMode !== "normal",
+        placeholder: typeDefault ?? 0, disabled: this.#restockMode !== "normal",
         label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StockMax"), hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StockMaxHint")
       },
       {

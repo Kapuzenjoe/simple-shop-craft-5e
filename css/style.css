@@ -94,6 +94,35 @@
     }
   }
 
+  .item-quantity {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .adjustment-button {
+    cursor: pointer;
+    color: var(--color-text-secondary);
+  }
+
+  .stepper-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .stepper-label {
+    font-size: var(--font-size-11);
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+  }
+
+  .note.warn {
+    color: var(--dnd5e-color-note-warn);
+    border-inline-start: 3px solid var(--dnd5e-color-note-warn);
+    padding-inline-start: 8px;
+  }
+
   .card-tray {
     margin-inline: 0;
   }

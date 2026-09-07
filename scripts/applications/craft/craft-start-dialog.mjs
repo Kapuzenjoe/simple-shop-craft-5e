@@ -1,10 +1,9 @@
-import { HOURS_PER_USE } from "../../config.mjs";
 import { CraftMessageData } from "../../data/craft-message.mjs";
 import { Recipe } from "../../data/recipe-data.mjs";
 import {
-  applyDropArea, applyLoadingTooltip, breakdownCopper, buildItemTableSections, effectiveCraftCost, needsDefaultPrice,
-  openItemSheet, resolveBundleSizes, resolveEntries, resolveItemPrice, resolveTotalHours, selectableActors,
-  subtypeOptions, toCopper
+  applyDropArea, applyLoadingTooltip, breakdownCopper, buildItemTableSections, effectiveCraftCost, maxHoursPerWorkday,
+  needsDefaultPrice, openItemSheet, resolveBundleSizes, resolveEntries, resolveItemPrice, resolveTotalHours,
+  selectableActors, subtypeOptions, toCopper
 } from "../../utils.mjs";
 
 const { Dialog5e } = game.dnd5e.applications.api;
@@ -30,11 +29,10 @@ export default class CraftStartDialog extends Dialog5e {
     position: { width: 420, height: "auto" },
     actions: {
       openItemSheet: CraftStartDialog.#openItemSheet,
-      removeMaterial: CraftStartDialog.#removeFreeformMaterial,
-      stepMaterialQuantity: CraftStartDialog.#stepMaterialCandidate,
-      startCraft: CraftStartDialog.#startCraft
-    },
-    recipeId: null
+      removeMaterial: CraftStartDialog.#removeMaterial,
+      startCraft: CraftStartDialog.#startCraft,
+      stepMaterialQuantity: CraftStartDialog.#stepMaterialQuantity
+    }
   };
 
   /* -------------------------------------------- */
@@ -43,7 +41,7 @@ export default class CraftStartDialog extends Dialog5e {
   static PARTS = {
     ...super.PARTS,
     content: {
-      template: "modules/simple-shop-craft-5e/templates/craft-start-dialog/content.hbs",
+      template: "modules/simple-shop-craft-5e/templates/craft/craft-start-dialog/content.hbs",
       templates: [
         "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs",
         "modules/simple-shop-craft-5e/templates/partials/item-table.hbs"
@@ -298,6 +296,7 @@ export default class CraftStartDialog extends Dialog5e {
       });
     });
     const bundleSizes = await resolveBundleSizes([...rawCandidates.flat(), ...freeformItems]);
+    const allocated = new Map(freeformItems.map(item => [item.id, 1]));
 
     const fixedLines = materialsResolved.map(({ entry, item }, index) => {
       if ( entry.criteria?.type ) {
@@ -306,10 +305,13 @@ export default class CraftStartDialog extends Dialog5e {
           .filter(i => materialValueCP(i, bundleSizes.get(i.id)) >= (minValueCP ?? 0))
           .map(i => {
             const valueCP = materialValueCP(i, bundleSizes.get(i.id));
+            const available = Math.max(0, i.system.quantity - (allocated.get(i.id) ?? 0));
+            const selected = Math.min(this.#materialQuantities.get(`${index}:${i.id}`) ?? 0, available);
+            allocated.set(i.id, (allocated.get(i.id) ?? 0) + selected);
             return {
-              id: i.id, name: i.name, img: i.img, uuid: i.uuid, owned: i.system.quantity,
-              selected: Math.min(this.#materialQuantities.get(`${index}:${i.id}`) ?? 0, i.system.quantity),
-              valueCP, price: breakdownCopper(valueCP)
+              id: i.id, name: i.name, img: i.img, uuid: i.uuid, available, selected, valueCP,
+              quantity: i.system.quantity,
+              price: breakdownCopper(valueCP)
             };
           });
         const suppliedUnits = candidates.reduce((sum, c) => sum + c.selected, 0);
@@ -331,10 +333,13 @@ export default class CraftStartDialog extends Dialog5e {
         ? actor.items.filter(i => i.system.identifier === materialIdentifier)
         : [];
       const owned = ownedStacks[0] ?? null;
-      const ownedQuantity = ownedStacks.reduce((sum, i) => sum + i.system.quantity, 0);
+      const ownedQuantity = ownedStacks.reduce(
+        (sum, i) => sum + Math.max(0, i.system.quantity - (allocated.get(i.id) ?? 0)), 0
+      );
       const maxUnits = Math.min(ownedQuantity, entry.quantity);
       const overrideKey = owned ? `${index}:${owned.id}` : null;
       const suppliedUnits = owned ? Math.min(this.#materialQuantities.get(overrideKey) ?? 0, maxUnits) : 0;
+      if ( owned ) allocated.set(owned.id, (allocated.get(owned.id) ?? 0) + suppliedUnits);
       const itemBundleSize = (item?.system?.quantity > 1) ? item.system.quantity : 1;
       const itemValueCP = (entry.value?.value != null)
         ? toCopper(entry.value.value, entry.value.denomination)
@@ -357,7 +362,7 @@ export default class CraftStartDialog extends Dialog5e {
     const requiredMet = fixedLines.every(l => !l.required || l.slotMet);
     const requiredAvailable = fixedLines.every(l => {
       if ( !l.required ) return true;
-      if ( l.criteria ) return l.candidates.reduce((sum, c) => sum + c.owned, 0) >= l.quantity;
+      if ( l.criteria ) return l.candidates.reduce((sum, c) => sum + c.available, 0) >= l.quantity;
       return l.ownedQuantity >= l.quantity;
     });
 
@@ -387,8 +392,8 @@ export default class CraftStartDialog extends Dialog5e {
     const canStart = !!actor && !!targetItem && toolEligible && skillEligible && requiredMet
       && (materialsMet || (this.#fillWithGold && !goldInsufficient));
 
-    const totalHours = resolveTotalHours(recipe, craftCost);
-    const hoursPerUse = Math.min(HOURS_PER_USE, totalHours);
+    const totalHours = resolveTotalHours(recipe, craftCost, targetItem);
+    const hoursPerUse = Math.min(maxHoursPerWorkday(), totalHours);
 
     return {
       recipe, actor, targetItem, craftCost, fixedLines, freeformItems,
@@ -428,7 +433,7 @@ export default class CraftStartDialog extends Dialog5e {
    * @param {Event} event         Triggering click event.
    * @param {HTMLElement} target  Button that was clicked.
    */
-  static #removeFreeformMaterial(event, target) {
+  static #removeMaterial(event, target) {
     this.#freeformIds.delete(target.dataset.itemId);
     this.render({ parts: ["content", "footer"] });
   }
@@ -441,11 +446,13 @@ export default class CraftStartDialog extends Dialog5e {
    * @param {Event} event         Triggering click event.
    * @param {HTMLElement} target  Button that was clicked.
    */
-  static #stepMaterialCandidate(event, target) {
+  static #stepMaterialQuantity(event, target) {
     const key = `${target.dataset.index}:${target.dataset.itemId}`;
     const step = Number(target.dataset.step);
     const max = Number(target.dataset.max ?? Infinity);
-    this.#materialQuantities.set(key, Math.min(max, Math.max(0, (this.#materialQuantities.get(key) ?? 0) + step)));
+    const physicalMax = Number(target.dataset.physicalMax ?? max);
+    const current = Math.min(this.#materialQuantities.get(key) ?? 0, max);
+    this.#materialQuantities.set(key, Math.min(physicalMax, Math.max(0, current + step)));
     this.render({ parts: ["content", "footer"] });
   }
 

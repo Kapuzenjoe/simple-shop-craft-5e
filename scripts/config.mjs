@@ -13,7 +13,13 @@ export const MODULE_ID = "simple-shop-craft-5e";
  */
 export const SETTING_KEYS = {
   SHOPS: "shops",
-  RECIPES: "recipes"
+  RECIPES: "recipes",
+  DEFAULT_BUY_MODIFIER: "defaultBuyModifier",
+  DEFAULT_SELL_MODIFIER: "defaultSellModifier",
+  DEFAULT_GOLD_POOL: "defaultGoldPool",
+  DEFAULT_STOCK_MAGIC_RULE: "defaultStockMagicRule",
+  MAX_HOURS_PER_WORKDAY: "maxHoursPerWorkday",
+  CALENDAR_MODE: "calendarMode"
 };
 
 /**
@@ -60,6 +66,15 @@ export const DEFAULT_STOCK_BY_TYPE = {
 };
 
 /**
+ * Setting key for a given item type's default stock quantity.
+ * @param {string} type
+ * @returns {string}
+ */
+export function defaultStockKey(type) {
+  return `defaultStock${type.charAt(0).toUpperCase()}${type.slice(1)}`;
+}
+
+/**
  * Item types eligible for the magic-item stock exemption.
  * @type {Set<string>}
  */
@@ -86,6 +101,26 @@ export const RESTOCK_MODES = {
 };
 
 /**
+ * Calendar-coupled crafting override modes.
+ * @type {Record<string, { label: string }>}
+ */
+export const CALENDAR_MODES = {
+  default: { label: "SIMPLE_SHOP_CRAFT_5E.Settings.Homebrew.CalendarMode.Default" },
+  on: { label: "SIMPLE_SHOP_CRAFT_5E.Settings.Homebrew.CalendarMode.On" },
+  off: { label: "SIMPLE_SHOP_CRAFT_5E.Settings.Homebrew.CalendarMode.Off" }
+};
+
+/**
+ * Unlock behaviors for a recipe.
+ * @type {Record<string, { label: string }>}
+ */
+export const UNLOCK_MODES = {
+  individual: { label: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.UnlockModeIndividual" },
+  all: { label: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.UnlockModeAll" },
+  toolProficiency: { label: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.UnlockModeToolProficient" }
+};
+
+/**
  * Hours of progress granted per use of the "Progress Craft" activity (one downtime workday), per DMG
  * 2024 crafting rules.
  * @type {number}
@@ -93,7 +128,7 @@ export const RESTOCK_MODES = {
 export const HOURS_PER_USE = 8;
 
 /**
- * Default gp price per rarity, per DMG 2024 "Magic Item Values by Rarity".
+ * Default gp price per rarity, per DMG 2024 "Magic Item Rarities and Values".
  * @type {Record<string, { durable: number, consumable: number }>}
  */
 export const RARITY_DEFAULT_PRICES = {

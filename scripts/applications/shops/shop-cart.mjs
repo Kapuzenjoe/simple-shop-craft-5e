@@ -2,7 +2,7 @@ import { PurchaseMessageData } from "../../data/purchase-message.mjs";
 import { breakdownCopper } from "../../utils.mjs";
 
 /**
- * @import { default as ShopSheet } from "./shop-sheet.mjs";
+ * @import ShopSheet from "./shop-sheet.mjs";
  */
 
 const { Dialog5e } = game.dnd5e.applications.api;
@@ -24,8 +24,7 @@ export default class ShopCart extends Dialog5e {
     classes: ["simple-shop-craft-5e", "shop-cart", "standard-form"],
     window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopCart.Title", resizable: true },
     position: { width: 400 },
-    form: { handler: ShopCart.#onSubmit, closeOnSubmit: false },
-    shopSheet: null
+    form: { handler: ShopCart.#onSubmit, closeOnSubmit: false }
   };
 
   /* -------------------------------------------- */
@@ -33,8 +32,10 @@ export default class ShopCart extends Dialog5e {
   /** @override */
   static PARTS = {
     ...super.PARTS,
-    content: { template: "modules/simple-shop-craft-5e/templates/shop-cart/content.hbs" }
+    content: { template: "modules/simple-shop-craft-5e/templates/shops/shop-cart/content.hbs" }
   };
+
+  /* -------------------------------------------- */
 
   /**
    * The shop editor this cart belongs to.

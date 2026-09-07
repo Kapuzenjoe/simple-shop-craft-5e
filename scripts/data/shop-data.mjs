@@ -1,10 +1,11 @@
 import {
   DEFAULT_STOCK_BY_TYPE, MAGIC_EXEMPT_TYPES, RESTOCK_MODES, SETTING_KEYS, SPELL_SCROLL_LEVELS, STOCK_MAGIC_RULES
 } from "../config.mjs";
-import { calendariaDayOfWeek, calendariaWeekdaysPassed, isCalendariaActive } from "../integrations/calendaria.mjs";
+import { calendariaDayOfWeek, isCalendariaActive } from "../integrations/calendaria.mjs";
 import {
-  breakdownCopper, currencyRows, deductActorCurrencyChecked, excludeFilter, isDnd5eAutoRecoveryEnabled,
-  isShopPackSource, itemRefKey, needsDefaultPrice, resolveEntries, resolveItemPrice, secondsPerDay, toCopper
+  breakdownCopper, currencyRows, deductActorCurrencyChecked, excludeFilter, isCalendarModeActive, secondsPerDay,
+  isShopPackSource, itemRarity, itemRefKey, needsDefaultPrice, resolveEntries, resolveItemPrice, resolveRarityPrice,
+  shouldHandleWorldTimeAdvance, toCopper
 } from "../utils.mjs";
 
 import { EnchantedItemBlueprint } from "./enchanted-item-blueprint.mjs";
@@ -53,7 +54,7 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
   }
 
   /* -------------------------------------------- */
-  /*  Data Migration                               */
+  /*  Data Migration                              */
   /* -------------------------------------------- */
 
   /** @inheritDoc */
@@ -154,15 +155,19 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
 
     for ( const type of typeConfigs.keys() ) {
       const filters = [
-        { k: "system.source.rules", o: "in", v: [rules, null, undefined] },
+        { o: "NOT", v: { o: "OR", v: [
+          { k: "system.rarity", o: "in", v: ["artifact"] },
+          { k: "system.rarities", o: "hasany", v: ["artifact"] }
+        ] } },
         excludeFilter("system.type.value", ["natural"]),
-        excludeFilter("system.rarity", ["artifact"]),
         excludeFilter("system.identifier", ["spell-scroll", "enspelled-staff", "enspelled-weapon", "enspelled-armor"])
       ];
       const results = await game.dnd5e.applications.CompendiumBrowser.fetch(Item, {
-        types: new Set([type]), filters
+        types: new Set([type]), filters, indexFields: new Set(["system.source"])
       });
-      const fromShopPack = results.filter(index => isShopPackSource(index.uuid));
+      const fromShopPack = results
+        .filter(index => [rules, null, undefined].includes(index.system?.source?.rules))
+        .filter(index => isShopPackSource(index.uuid));
       pool.push(...fromShopPack.map(index => ({ kind: "item", index })));
     }
 
@@ -173,7 +178,6 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
       if ( spellFilter.levels ) allowedLevels = allowedLevels.filter(l => spellFilter.levels.has(l));
       if ( allowedLevels.length ) {
         const filters = [
-          { k: "system.source.rules", o: "in", v: [rules, null, undefined] },
           { k: "system.level", o: "in", v: allowedLevels }
         ];
         if ( spellFilter.schools ) filters.push({ k: "system.school", o: "in", v: Array.from(spellFilter.schools) });
@@ -187,9 +191,10 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
           filters.push({ k: "system.identifier", o: "in", v: Array.from(identifiers) });
         }
         const results = await game.dnd5e.applications.CompendiumBrowser.fetch(Item, {
-          types: new Set(["spell"]), filters
+          types: new Set(["spell"]), filters, indexFields: new Set(["system.source"])
         });
-        pool.push(...results.map(index => ({ kind: "spell", index })));
+        const bySourceRules = results.filter(index => [rules, null, undefined].includes(index.system?.source?.rules));
+        pool.push(...bySourceRules.map(index => ({ kind: "spell", index })));
       }
     }
 
@@ -219,6 +224,12 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
       const [candidate] = pool.splice(Math.floor(Math.random() * pool.length), 1);
 
       if ( candidate.kind === "spell" ) {
+        if ( capCP != null ) {
+          const rarity = Object.entries(SPELL_SCROLL_LEVELS)
+            .find(([, levels]) => levels.includes(candidate.index.system.level))?.[0];
+          const price = resolveRarityPrice(rarity, { isConsumable: true });
+          if ( price && (toCopper(price.value, price.denomination) > capCP) ) continue;
+        }
         const entry = {
           spellScroll: { spellUuid: candidate.index.uuid }, stock: { max: null, current: 1 }, restockMode: "exclude"
         };
@@ -231,10 +242,10 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
       if ( (magic === "magic") && !isMagic ) continue;
       if ( (magic === "mundane") && isMagic ) continue;
       const hasEnchant = candidateItem.system.activities?.some(a => a.type === "enchant");
-      if ( !hasEnchant && !candidateItem.system.price?.value && !(isMagic && candidateItem.system.rarity) ) continue;
+      if ( !hasEnchant && !candidateItem.system.price?.value && !(isMagic && itemRarity(candidateItem)) ) continue;
 
       if ( !hasEnchant || candidateItem.system.type?.baseItem ) {
-        if ( rarities && !rarities.has(candidateItem.system.rarity || "") ) continue;
+        if ( rarities && !rarities.has(itemRarity(candidateItem)) ) continue;
         const wantedSubtypes = typeConfigs.get(candidateItem.type);
         if ( wantedSubtypes && !wantedSubtypes.has(candidateItem.system.type?.value) ) continue;
         if ( capCP != null ) {
@@ -294,8 +305,7 @@ export class ShopPlayerDiscount extends foundry.abstract.DataModel {
       actor: new DocumentUUIDField({ type: "Actor" }),
       buyModifier: new NumberField({ initial: null, nullable: true, integer: true, min: -100, max: 1000 }),
       sellModifier: new NumberField({ initial: null, nullable: true, integer: true, min: -100, max: 1000 }),
-      hagglingLocked: new BooleanField({ initial: false }),
-      hagglingTimestamp: new NumberField({ initial: null, nullable: true, integer: true })
+      hagglingLocks: new TypedObjectField(new NumberField({ integer: true }), { initial: () => ({}) })
     };
   }
 }
@@ -368,6 +378,26 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
   /* -------------------------------------------- */
 
   /**
+   * Merge an update into one actor's playerDiscounts entry, creating one with no discount overrides yet
+   * if it doesn't already exist.
+   * @param {string} actorUuid
+   * @param {object} updateData
+   * @returns {function(Shop): object}  Update function for {@link Shop.update}.
+   */
+  static mergePlayerDiscount(actorUuid, updateData) {
+    return shop => {
+      const existing = shop.playerDiscounts.map(pd => pd.toObject());
+      const index = existing.findIndex(pd => pd.actor === actorUuid);
+      const playerDiscounts = index >= 0
+        ? existing.map((pd, i) => i === index ? { ...pd, ...updateData } : pd)
+        : [...existing, { actor: actorUuid, buyModifier: null, sellModifier: null, ...updateData }];
+      return { playerDiscounts };
+    };
+  }
+
+  /* -------------------------------------------- */
+
+  /**
    * Resolve this shop's effective gold pool for buy-back transactions, summed to copper.
    * @returns {number|null}  Copper amount available, or `null` if unlimited (no cap enforced).
    */
@@ -392,19 +422,33 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
     const isMagic = props?.has?.("mgc") ?? props?.includes?.("mgc") ?? false;
     const { magicRule, byType } = stockDefaults;
     const exempt = isMagic
-      && ((magicRule === "none") || ((magicRule === "gear") && MAGIC_EXEMPT_TYPES.has(item.type)));
+      && ((magicRule === "all") || ((magicRule === "gear") && MAGIC_EXEMPT_TYPES.has(item.type)));
     return exempt ? null : (byType[item.type] ?? null);
   }
 
   /* -------------------------------------------- */
 
   /**
-   * Whether an actor is currently locked out from Haggling for this shop after a failed Influence check.
+   * Whether an actor is currently locked out from Haggling with a specific Charisma skill for this shop,
+   * after failing an Influence check "in the same way" within the last 24 hours.
+   * @param {string} [actorUuid]
+   * @param {string} skill
+   * @returns {boolean}
+   */
+  isHagglingLocked(actorUuid, skill) {
+    return !!(actorUuid && this.playerDiscounts.find(pd => pd.actor === actorUuid)?.hagglingLocks?.[skill]);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Whether an actor has any currently active Haggling lock for this shop, regardless of skill.
    * @param {string} [actorUuid]
    * @returns {boolean}
    */
-  isHagglingLocked(actorUuid) {
-    return !!(actorUuid && this.playerDiscounts.find(pd => pd.actor === actorUuid)?.hagglingLocked);
+  hasHagglingLocks(actorUuid) {
+    const locks = actorUuid && this.playerDiscounts.find(pd => pd.actor === actorUuid)?.hagglingLocks;
+    return !!locks && (Object.keys(locks).length > 0);
   }
 
   /* -------------------------------------------- */
@@ -644,9 +688,13 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
 
       let hagglingChanged = false;
       const playerDiscounts = shop.playerDiscounts.map(pd => {
-        if ( !pd.hagglingLocked || (Math.floor((worldTime - pd.hagglingTimestamp) / perDay) < 1) ) return pd.toObject();
+        const locks = pd.hagglingLocks ?? {};
+        const remaining = Object.fromEntries(
+          Object.entries(locks).filter(([, timestamp]) => Math.floor((worldTime - timestamp) / perDay) < 1)
+        );
+        if ( Object.keys(remaining).length === Object.keys(locks).length ) return pd.toObject();
         hagglingChanged = true;
-        return { ...pd.toObject(), hagglingLocked: false, hagglingTimestamp: null };
+        return { ...pd.toObject(), hagglingLocks: remaining };
       });
       if ( hagglingChanged ) updateData.playerDiscounts = playerDiscounts;
 
@@ -657,32 +705,20 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
   /* -------------------------------------------- */
 
   /**
-   * Handle Calendaria's day-change hook — fires once per `updateWorldTime` call, even for multi-day jumps.
-   * @param {{ previous: object, current: object }} data
-   * @returns {Promise<void>}
-   */
-  static async onCalendariaDayChange(data) {
-    const weekdaysPassed = calendariaWeekdaysPassed(data);
-    if ( weekdaysPassed === undefined ) return;
-    await Shop.handleDayChange(game.time.worldTime, weekdaysPassed);
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Handle dnd5e's `updateWorldTime` hook, filtered to actual day changes.
+   * Handle Foundry's `updateWorldTime` hook, restocking due shops and clearing expired haggling locks.
    * @param {number} worldTime
    * @param {number} dt
-   * @param {object} options
    * @returns {Promise<void>}
    */
-  static async onUpdateWorldTime(worldTime, dt, options) {
-    if ( dt <= 0 ) return;
-    const midnights = options.dnd5e?.deltas?.midnights;
-    if ( !(midnights > 0) ) return;
-    if ( !isDnd5eAutoRecoveryEnabled() ) return;
+  static async onUpdateWorldTime(worldTime, dt) {
+    if ( !shouldHandleWorldTimeAdvance(dt) ) return;
+    if ( !isCalendarModeActive() ) return;
+    const perDay = secondsPerDay();
+    const midnights = Math.floor(worldTime / perDay) - Math.floor((worldTime - dt) / perDay);
+    if ( midnights <= 0 ) return;
     const weekLength = game.time.calendar.days.values.length;
-    const dayOfWeek = game.time.calendar.timeToComponents(worldTime).dayOfWeek;
+    const dayOfWeek = isCalendariaActive()
+      ? calendariaDayOfWeek(worldTime) : game.time.calendar.timeToComponents(worldTime).dayOfWeek;
     const weekdaysPassed = (midnights >= weekLength)
       ? null
       : Array.from({ length: midnights }, (_, i) => (dayOfWeek - i + weekLength) % weekLength);
@@ -705,7 +741,7 @@ export function newEntryStock(item, stockDefaults) {
   const isMagic = item.system.properties?.has("mgc") ?? false;
   if ( isMagic ) {
     const { magicRule } = stockDefaults;
-    const exempt = (magicRule === "none") || ((magicRule === "gear") && MAGIC_EXEMPT_TYPES.has(item.type));
+    const exempt = (magicRule === "all") || ((magicRule === "gear") && MAGIC_EXEMPT_TYPES.has(item.type));
     if ( exempt ) return { stock: { max: null, current: 1 }, restockMode: "exclude" };
   }
   const max = Shop.defaultStockMax(item, stockDefaults);

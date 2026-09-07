@@ -51,11 +51,11 @@
         },
         "unlockedFor": {
           "label": "Unlocked For",
-          "hint": "Actors who may start this craft. Ignored if \"Open to All\" is checked."
+          "hint": "Actors who may always start this craft, regardless of Unlock Mode below."
         },
-        "openToAll": {
-          "label": "Open to All",
-          "hint": "Any player may start this craft, regardless of the list above."
+        "unlockMode": {
+          "label": "Unlock Mode",
+          "hint": "Who else may start this craft, in addition to the actors listed above."
         },
         "materialPrice": {
           "label": "Material Price",
@@ -146,7 +146,55 @@
       "RequiredMaterialsValue": "Required Materials Value",
       "CraftValueIgnored": "Crafting value is ignored for this recipe.",
       "MaterialCriteriaTypeRequired": "Choose an item type.",
-      "Unlock": "Unlock"
+      "Unlock": "Unlock",
+      "UnlockModeIndividual": "Individual",
+      "UnlockModeAll": "Open to All",
+      "UnlockModeToolProficient": "Tool-Proficient"
+    },
+    "Settings": {
+      "Defaults": {
+        "Name": "Defaults",
+        "Label": "Configure Defaults",
+        "Hint": "Configure default values applied when creating a new shop.",
+        "Groups": {
+          "ShopDefaults": "Shop Defaults"
+        },
+        "BuyModifier": {
+          "Name": "Default Buy Modifier",
+          "Hint": "Set the Buy Modifier a newly created shop starts with. Negative values lower item prices, positive values raise them."
+        },
+        "SellModifier": {
+          "Name": "Default Sell Modifier",
+          "Hint": "Set the Sell Modifier a newly created shop starts with. Negative values lower item prices, positive values raise them."
+        },
+        "GoldPool": {
+          "Name": "Default Gold Pool",
+          "Hint": "Set the starting Gold Pool amount (in gp) a newly created shop begins with."
+        },
+        "StockMagicRule": {
+          "Name": "Default Magic-Item Stock Rule",
+          "Hint": "Set the magic-item stock exemption rule a newly created shop begins with."
+        }
+      },
+      "Homebrew": {
+        "Name": "Homebrew",
+        "Label": "Configure Homebrew",
+        "Hint": "Configure optional house-rule overrides for this module's mechanics.",
+        "Groups": {
+          "Crafting": "Crafting"
+        },
+        "MaxHoursPerWorkday": {
+          "Name": "Max Hours per Workday",
+          "Hint": "Limit the crafting hours a single Progress Craft use may add toward a recipe. A workday is 8 hours per the crafting rules; raise this only as a deliberate house rule."
+        },
+        "CalendarMode": {
+          "Name": "Calendar Mode",
+          "Hint": "Whether shop restock, haggling resets, and crafting progress follow calendar time passage or need manual handling. Default: automatic, active when Calendaria, Ember, or dnd5e's own \"Daily Recovery Mode\" is set to Calendar Recovery.",
+          "Default": "Default (Auto-Detect)",
+          "On": "Always On",
+          "Off": "Always Off"
+        }
+      }
     },
     "ShopEditor": {
       "Title": "Edit Shop",
@@ -191,7 +239,8 @@
       "HagglingAttitude": "Attitude",
       "HagglingCurrent": "Current Discount",
       "HagglingRoll": "Roll",
-      "HagglingLocked": "Haggling Locked",
+      "HagglingLocked": "Locked",
+      "HagglingSomeLocked": "Skills used in a recent failed attempt are on cooldown for 24 hours.",
       "HagglingUnlock": "Reset Haggling Lock",
       "EditPlayers": "Edit Player Discounts",
       "Players": {
@@ -212,6 +261,7 @@
       "OpeningHoursMinute": "Min",
       "OpeningHoursAlways": "Always Open",
       "OpeningHoursHint": "Players can't open this shop outside these hours.",
+      "OpeningHoursNoCalendarHint": "Requires Calendar Mode to be active to track time of day.",
       "ClosedWeekdays": "Closed Weekdays",
       "ClosedFestivals": "Closed Festivals",
       "StatusOverride": "Status Override",
@@ -245,7 +295,7 @@
       "StockMagicRuleHint": "Which Magical items skip the default stock below and are excluded from restock instead.",
       "RestockDays": "Restock Days",
       "RestockDaysHint": "On the selected weekdays, this shop's stock and gold pool reset to their maximum at the next in-game day change.",
-      "AutoRestockNoCalendarHint": "Requires an active calendar (dnd5e's own or Calendaria) to track elapsed days.",
+      "AutoRestockNoCalendarHint": "Requires Calendar Mode to be active to track elapsed days.",
       "AutoRestockNever": "Never",
       "PriceTooltip": "Edit Price",
       "PriceOverrideHint": "Override this item's default price for this shop.",
@@ -320,10 +370,27 @@
     "Craft": {
       "InProgressName": "Crafting: {name}",
       "ProgressActivityName": "Progress Craft",
-      "ProgressActivityFlavor": "The crafting progresses ({completed}/{total} workdays).",
-      "CompleteMessage": "{name} is finished and has been added to {actor}'s inventory."
+      "ProgressActivityFlavor": "The crafting progresses ({progress}/{total}).",
+      "CompleteMessage": "{name} is finished and has been added to {actor}'s inventory.",
+      "NoWorkdayRemaining": "You have no workday hours remaining today for crafting.",
+      "SessionPending": "A crafting session is already in progress for this item.",
+      "ProgressCard": {
+        "HoursWorked": "Worked {hours}."
+      },
+      "ProgressSession": {
+        "Started": "Started crafting — planned {hours}.",
+        "EndProgress": "End Progress"
+      },
+      "ProgressHoursDialog": {
+        "Title": "Progress Craft",
+        "Confirm": "Confirm",
+        "Progress": "Progress",
+        "NoAmountSelected": "Enter at least some progress time.",
+        "HoursHint": "Progress this use contributes toward the craft ({worked} of {daily} worked today)."
+      }
     },
     "Shop": "Shop",
+    "CrafterFeat": "Crafter Feat",
     "Owner": "Owner",
     "Recipe": "Recipe",
     "Unknown": "Unknown",

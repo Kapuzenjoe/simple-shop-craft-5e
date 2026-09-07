@@ -1,5 +1,5 @@
 /**
- * @import { default as ShopSheet } from "./shop-sheet.mjs";
+ * @import ShopSheet from "./shop-sheet.mjs";
  */
 
 const { Dialog5e } = game.dnd5e.applications.api;
@@ -26,9 +26,7 @@ export default class HaggleDialog extends Dialog5e {
     buttons: [
       { action: "roll", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.HagglingRoll", icon: "fa-solid fa-dice-d20", default: true }
     ],
-    form: { handler: HaggleDialog.#onSubmit },
-    shopSheet: null,
-    onUpdatePlayerDiscount: null
+    form: { handler: HaggleDialog.#onSubmit }
   };
 
   /* -------------------------------------------- */
@@ -39,17 +37,23 @@ export default class HaggleDialog extends Dialog5e {
     content: { template: "modules/simple-shop-craft-5e/templates/partials/config-dialog-content.hbs" }
   };
 
+  /* -------------------------------------------- */
+
   /**
    * The shop editor this dialog belongs to.
    * @type {ShopSheet}
    */
   shopSheet;
 
+  /* -------------------------------------------- */
+
   /**
    * Callback receiving a haggling-lock update for the acting actor.
    * @type {(actorUuid: string, updateData: object) => Promise<void>}
    */
   onUpdatePlayerDiscount;
+
+  /* -------------------------------------------- */
 
   /**
    * DC computed for the current NPC, cached during content preparation for reuse on submit.
@@ -59,13 +63,24 @@ export default class HaggleDialog extends Dialog5e {
 
   /* -------------------------------------------- */
 
+  /**
+   * Whether every Charisma skill is haggling-locked, cached during content preparation for reuse
+   * in the footer.
+   * @type {boolean}
+   */
+  #allSkillsLocked = false;
+
+  /* -------------------------------------------- */
+
   /** @inheritDoc */
   async _prepareContentContext(context, options) {
     context = await super._prepareContentContext(context, options);
     context.legend = this.options.window?.title;
-    const playerOverride = this.shopSheet.shop.resolvePlayerOverride(this.shopSheet.selectedActorUuid);
-    const effectiveBuy = this.shopSheet.shop.buyModifier + (playerOverride.buy ?? 0);
-    const effectiveSell = this.shopSheet.shop.sellModifier + (playerOverride.sell ?? 0);
+    const actorUuid = this.shopSheet.selectedActorUuid;
+    const shop = this.shopSheet.shop;
+    const playerOverride = shop.resolvePlayerOverride(actorUuid);
+    const effectiveBuy = shop.buyModifier + (playerOverride.buy ?? 0);
+    const effectiveSell = shop.sellModifier + (playerOverride.sell ?? 0);
     const chaSkills = Object.entries(CONFIG.DND5E.skills).filter(([, s]) => s.ability === "cha");
     const npc = this.shopSheet.shop.npc ? await fromUuid(this.shopSheet.shop.npc) : null;
     this.#dc = Math.max(15, npc?.system.abilities?.int?.value ?? 0);
@@ -76,10 +91,22 @@ export default class HaggleDialog extends Dialog5e {
     context.hint = `${_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.HagglingCurrent")}: `
       + `${_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Buy")} ${effectiveBuy}% / `
       + `${_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Sell")} ${effectiveSell}% (DC ${this.#dc})`;
+    if ( chaSkills.some(([value]) => shop.isHagglingLocked(actorUuid, value)) ) {
+      context.hint += ` ${_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.HagglingSomeLocked")}`;
+    }
+    const unlockedSkill = chaSkills.find(([value]) => !shop.isHagglingLocked(actorUuid, value));
+    this.#allSkillsLocked = !unlockedSkill;
     context.fields = [
       {
-        field: new foundry.data.fields.StringField(), name: "skill",
-        label: _loc("DND5E.Skill"), options: chaSkills.map(([value, s]) => ({ value, label: s.label }))
+        field: new foundry.data.fields.StringField({ blank: false, required: true }), name: "skill",
+        label: _loc("DND5E.Skill"),
+        value: unlockedSkill?.[0] ?? chaSkills[0]?.[0],
+        options: chaSkills.map(([value, s]) => ({
+          value,
+          label: shop.isHagglingLocked(actorUuid, value)
+            ? `${s.label} (${_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.HagglingLocked")})` : s.label,
+          disabled: shop.isHagglingLocked(actorUuid, value)
+        }))
       },
       {
         field: new foundry.data.fields.StringField(), name: "attitude",
@@ -97,6 +124,15 @@ export default class HaggleDialog extends Dialog5e {
 
   /* -------------------------------------------- */
 
+  /** @inheritDoc */
+  async _prepareFooterContext(context, options) {
+    context = await super._prepareFooterContext(context, options);
+    context.buttons[0].disabled = this.#allSkillsLocked;
+    return context;
+  }
+
+  /* -------------------------------------------- */
+
   /**
    * Handle rolling the haggle check and applying a lock on failure.
    * @this {HaggleDialog}
@@ -109,15 +145,15 @@ export default class HaggleDialog extends Dialog5e {
     const actor = fromUuidSync(this.shopSheet.selectedActorUuid);
     if ( !actor ) return;
     const data = foundry.utils.expandObject(formData.object);
-    const rolls = await actor.rollSkill({
-      skill: data.skill, target: this.#dc,
-      advantage: data.attitude === "friendly", disadvantage: data.attitude === "hostile"
-    });
-    if ( rolls?.[0] ) {
-      await this.onUpdatePlayerDiscount(
-        actor.uuid, rolls[0].isFailure ? { hagglingLocked: true, hagglingTimestamp: game.time.worldTime } : {}
-      );
-    }
+    if ( this.shopSheet.shop.isHagglingLocked(actor.uuid, data.skill) ) return;
     await this.close();
+    const attitudeMod = data.attitude === "friendly" ? { advantage: true }
+      : data.attitude === "hostile" ? { disadvantage: true } : {};
+    const rolls = await actor.rollSkill({ skill: data.skill, target: this.#dc, ...attitudeMod });
+    if ( rolls?.[0]?.isFailure ) {
+      const existing = this.shopSheet.shop.playerDiscounts.find(pd => pd.actor === actor.uuid);
+      const hagglingLocks = { ...existing?.hagglingLocks, [data.skill]: game.time.worldTime };
+      await this.onUpdatePlayerDiscount(actor.uuid, { hagglingLocks });
+    }
   }
 }

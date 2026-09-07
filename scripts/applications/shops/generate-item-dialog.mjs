@@ -3,7 +3,7 @@ import { subtypeOptions } from "../../utils.mjs";
 
 /**
  * @import { ShopItemEntryData } from "../../_types.mjs";
- * @import { default as ShopSheet } from "./shop-sheet.mjs";
+ * @import ShopSheet from "./shop-sheet.mjs";
  */
 
 const { Dialog5e } = game.dnd5e.applications.api;
@@ -43,9 +43,7 @@ export default class GenerateItemDialog extends Dialog5e {
     ],
     actions: {
       generate: GenerateItemDialog.#generate
-    },
-    shopSheet: null,
-    onGenerated: null
+    }
   };
 
   /* -------------------------------------------- */
@@ -53,7 +51,7 @@ export default class GenerateItemDialog extends Dialog5e {
   /** @override */
   static PARTS = {
     ...super.PARTS,
-    content: { template: "modules/simple-shop-craft-5e/templates/generate-item-dialog/content.hbs" }
+    content: { template: "modules/simple-shop-craft-5e/templates/shops/generate-item-dialog/content.hbs" }
   };
 
   /* -------------------------------------------- */

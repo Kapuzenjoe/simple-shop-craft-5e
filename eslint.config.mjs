@@ -3,7 +3,7 @@ import jsdoc from "eslint-plugin-jsdoc";
 import globals from "globals";
 
 export default [
-  { ignores: ["node_modules/", "packs/", "temp/"] },
+  { ignores: ["node_modules/", "packs/", "temp/", "foundry/"] },
   {
     languageOptions: {
       ecmaVersion: "latest",
@@ -170,7 +170,7 @@ export default [
       }],
       "prefer-template": "warn",
       "@stylistic/quote-props": ["warn", "as-needed", { keywords: false }],
-      "@stylistic/quotes": ["warn", "double", { avoidEscape: true, allowTemplateLiterals: false }],
+      "@stylistic/quotes": ["warn", "double", { avoidEscape: true, allowTemplateLiterals: "never" }],
       "@stylistic/semi": "warn",
       "@stylistic/space-before-blocks": ["warn", "always"],
       "@stylistic/space-before-function-paren": ["warn", {

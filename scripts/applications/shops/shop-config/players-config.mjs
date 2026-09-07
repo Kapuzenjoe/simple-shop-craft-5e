@@ -1,7 +1,7 @@
 import BaseShopConfig from "./base-shop-config.mjs";
 
 /**
- * @import { default as ShopSheet } from "../shop-sheet.mjs";
+ * @import ShopSheet from "../shop-sheet.mjs";
  */
 
 /**
@@ -30,10 +30,7 @@ export default class PlayersConfig extends BaseShopConfig {
     actions: {
       removePlayerDiscount: PlayersConfig.#removePlayerDiscount,
       resetHaggling: PlayersConfig.#resetHaggling
-    },
-    shopSheet: null,
-    onUpdate: null,
-    onUpdatePlayerDiscount: null
+    }
   };
 
   /* -------------------------------------------- */
@@ -41,8 +38,10 @@ export default class PlayersConfig extends BaseShopConfig {
   /** @override */
   static PARTS = {
     ...super.PARTS,
-    content: { template: "modules/simple-shop-craft-5e/templates/players-config/content.hbs" }
+    content: { template: "modules/simple-shop-craft-5e/templates/shops/shop-config/players-config/content.hbs" }
   };
+
+  /* -------------------------------------------- */
 
   /**
    * The shop editor this config belongs to.
@@ -85,8 +84,8 @@ export default class PlayersConfig extends BaseShopConfig {
       return {
         index, actorUuid: uuid, actorImg: actor?.img, actorName: actor?.name,
         buyModifier: existing?.buyModifier ?? null, sellModifier: existing?.sellModifier ?? null,
-        hagglingLocked: !!existing?.hagglingLocked,
-        template: "modules/simple-shop-craft-5e/templates/shop-sheet/players-dialog-row.hbs"
+        hagglingLocked: this.shopSheet.shop.hasHagglingLocks(uuid),
+        template: "modules/simple-shop-craft-5e/templates/shops/shop-sheet/players-dialog-row.hbs"
       };
     });
     context.table = {
@@ -130,8 +129,7 @@ export default class PlayersConfig extends BaseShopConfig {
       actor: uuid,
       buyModifier: existing.get(uuid)?.buyModifier ?? null,
       sellModifier: existing.get(uuid)?.sellModifier ?? null,
-      hagglingLocked: existing.get(uuid)?.hagglingLocked ?? false,
-      hagglingTimestamp: existing.get(uuid)?.hagglingTimestamp ?? null
+      hagglingLocks: existing.get(uuid)?.hagglingLocks ?? {}
     }));
     await this.onUpdate({ playerDiscounts });
   }
@@ -163,7 +161,7 @@ export default class PlayersConfig extends BaseShopConfig {
    */
   static async #resetHaggling(event, target) {
     const uuid = target.closest("li")?.dataset.actorUuid;
-    await this.onUpdatePlayerDiscount(uuid, { hagglingLocked: false, hagglingTimestamp: null });
+    await this.onUpdatePlayerDiscount(uuid, { hagglingLocks: {} });
     this.render({ parts: ["content"] });
   }
 
@@ -184,8 +182,7 @@ export default class PlayersConfig extends BaseShopConfig {
       actor: row.actor,
       buyModifier: ((row.buy === "") || (row.buy == null)) ? null : Number(row.buy),
       sellModifier: ((row.sell === "") || (row.sell == null)) ? null : Number(row.sell),
-      hagglingLocked: existing.get(row.actor)?.hagglingLocked ?? false,
-      hagglingTimestamp: existing.get(row.actor)?.hagglingTimestamp ?? null
+      hagglingLocks: existing.get(row.actor)?.hagglingLocks ?? {}
     }));
     await this.onUpdate({ playerDiscounts });
   }

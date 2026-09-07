@@ -1,4 +1,4 @@
-import { MODULE_ID } from "../../config.mjs";
+import { MODULE_ID, UNLOCK_MODES } from "../../config.mjs";
 import { Recipe, RecipeMaterial } from "../../data/recipe-data.mjs";
 import {
   applyDropArea, applyLoadingTooltip, breakdownCopper, buildItemTableSections, currencyRows, effectiveCraftCost,
@@ -50,7 +50,7 @@ export default class RecipeSheet extends Application5e {
   /** @override */
   static PARTS = {
     content: {
-      template: "modules/simple-shop-craft-5e/templates/recipe-sheet/content.hbs",
+      template: "modules/simple-shop-craft-5e/templates/craft/recipe-sheet/content.hbs",
       templates: [
         "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs",
         "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs",
@@ -132,6 +132,8 @@ export default class RecipeSheet extends Application5e {
       for ( const part of breakdownCopper(toCopper(context.craftCost.gold, "gp")) ) craftCostBreakdown[part.denomination] = part.value;
     }
     const thresholdCP = recipe.craftThreshold(context.craftCost, targetResolved.item);
+    const targetBundleSize = (targetResolved.item?.system?.quantity > 1) ? targetResolved.item.system.quantity : 1;
+    const durationScale = recipe.targetQuantity / targetBundleSize;
 
     const materialsResolved = await resolveEntries(recipe.materials);
     const materialRows = materialsResolved.map((r, index) => ({ ...r, index })).map(r => {
@@ -210,7 +212,10 @@ export default class RecipeSheet extends Application5e {
     context.materialPriceRows = currencyRows(recipe.materialPrice, "materialPrice.", craftCostBreakdown);
     context.unlockFields = [
       { field: fields.unlockedFor, name: "unlockedFor", value: Array.from(recipe.unlockedFor) },
-      { field: fields.openToAll, name: "openToAll", value: recipe.openToAll }
+      {
+        field: fields.unlockMode, name: "unlockMode", value: recipe.unlockMode,
+        options: Object.entries(UNLOCK_MODES).map(([value, { label }]) => ({ value, label: _loc(label) }))
+      }
     ];
     context.toolFields = [
       {
@@ -227,7 +232,7 @@ export default class RecipeSheet extends Application5e {
       {
         field: fields.durationOverride.fields.value, name: "durationOverride.value", value: recipe.durationOverride.value,
         input: (field, config) => foundry.applications.fields.createNumberInput(config),
-        placeholder: context.craftCost ? String(context.craftCost.days) : undefined
+        placeholder: context.craftCost ? String(context.craftCost.days * durationScale) : undefined
       },
       {
         field: fields.durationOverride.fields.units, name: "durationOverride.units", value: recipe.durationOverride.units,
@@ -351,10 +356,7 @@ export default class RecipeSheet extends Application5e {
    * @returns {Promise<void>}
    */
   static async #editTargetItem() {
-    const selection = await game.dnd5e.applications.CompendiumBrowser.select({
-      tab: "physical", selection: { min: 1, max: 1 }
-    });
-    const uuid = selection?.size ? Array.from(selection)[0] : null;
+    const uuid = await game.dnd5e.applications.CompendiumBrowser.selectOne({ tab: "physical" });
     const item = uuid ? await fromUuid(uuid) : null;
     if ( !item ) return;
 
@@ -425,7 +427,7 @@ export default class RecipeSheet extends Application5e {
       {
         label: "SIMPLE_SHOP_CRAFT_5E.RemoveMaterial",
         icon: '<i class="fas fa-trash" inert></i>',
-        onClick: (event, target) => RecipeSheet.#removeMaterial.call(this, event, target)
+        onClick: (event, target) => this.#removeMaterial(target)
       }
     ];
   }
@@ -518,12 +520,10 @@ export default class RecipeSheet extends Application5e {
 
   /**
    * Handle removing a material.
-   * @this {RecipeSheet}
-   * @param {Event} event         Triggering click event.
-   * @param {HTMLElement} target  Button that was clicked.
+   * @param {HTMLElement} target  Row element the context menu was triggered for.
    * @returns {Promise<void>}
    */
-  static async #removeMaterial(event, target) {
+  async #removeMaterial(target) {
     const index = Number(target.dataset.index);
     const materials = this.recipe.materials.filter((m, i) => i !== index).map(m => m.toObject());
     await Recipe.update(this.recipeId, { materials });
@@ -542,8 +542,6 @@ export default class RecipeSheet extends Application5e {
     this.render();
   }
 
-  /* -------------------------------------------- */
-  /*  Helpers                                     */
   /* -------------------------------------------- */
 
   /**

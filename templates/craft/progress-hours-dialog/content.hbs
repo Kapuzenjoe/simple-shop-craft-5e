@@ -1,0 +1,42 @@
+<section class="tab active progress-hours-dialog-content">
+    <fieldset>
+        <legend>{{ localize legend }}</legend>
+        <div class="form-group split-group">
+            <label>
+                {{ label }}
+                {{#if warn}}<i class="fa-solid fa-triangle-exclamation warning"></i>{{/if}}
+            </label>
+            <div class="form-fields">
+                <div class="stepper-field">
+                    <label class="stepper-label">{{ localize "DND5E.ACTIVATION.Type.Hour.Header" }}</label>
+                    <div class="item-quantity">
+                        <a class="adjustment-button always-interactive" data-action="stepAmount" data-field="hours"
+                           data-step="-1" aria-label="{{ localize 'DND5E.Decrease' }}">
+                            <i class="fa-solid fa-minus" inert></i>
+                        </a>
+                        <span class="value">{{ hours }}</span>
+                        <a class="adjustment-button always-interactive" data-action="stepAmount" data-field="hours"
+                           data-step="1" aria-label="{{ localize 'DND5E.Increase' }}">
+                            <i class="fa-solid fa-plus" inert></i>
+                        </a>
+                    </div>
+                </div>
+                <div class="stepper-field">
+                    <label class="stepper-label">{{ localize "DND5E.ACTIVATION.Type.Minute.Header" }}</label>
+                    <div class="item-quantity">
+                        <a class="adjustment-button always-interactive" data-action="stepAmount" data-field="minutes"
+                           data-step="-5" aria-label="{{ localize 'DND5E.Decrease' }}">
+                            <i class="fa-solid fa-minus" inert></i>
+                        </a>
+                        <span class="value">{{ minutes }}</span>
+                        <a class="adjustment-button always-interactive" data-action="stepAmount" data-field="minutes"
+                           data-step="5" aria-label="{{ localize 'DND5E.Increase' }}">
+                            <i class="fa-solid fa-plus" inert></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {{#if hint}}<p class="hint">{{{ hint }}}</p>{{/if}}
+        </div>
+    </fieldset>
+</section>
