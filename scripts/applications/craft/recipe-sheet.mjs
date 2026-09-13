@@ -1,9 +1,9 @@
-import { MODULE_ID, UNLOCK_MODES } from "../../config.mjs";
+import { SPELL_SCROLL_SOURCES, UNLOCK_MODES } from "../../config.mjs";
 import { Recipe, RecipeMaterial } from "../../data/recipe-data.mjs";
 import {
-  applyDropArea, applyLoadingTooltip, breakdownCopper, buildItemTableSections, currencyRows, effectiveCraftCost,
-  getCurrencyOptions, goldPoolCurrencies, isDefaultIdentifier, itemRefKey, resolveEntries, resolveIdentifierIndex,
-  resolveItemPrice, subtypeOptions, toCopper
+  applyDropArea, applyLoadingTooltip, breakdownCopper, buildItemTableSections, currencyRows,
+  currencyValueField, goldPoolCurrencies, isDefaultIdentifier, isSpellScrollItem, itemRefKey, recipeCraftCost,
+  resolveEntries, resolveIdentifierIndex, resolveItemPrice, subtypeOptions, toCopper
 } from "../../utils.mjs";
 import BaseShopConfig from "../shops/shop-config/base-shop-config.mjs";
 
@@ -117,16 +117,8 @@ export default class RecipeSheet extends Application5e {
 
     const [targetResolved] = await resolveEntries([recipe.targetItem]);
     context.targetItem = targetResolved.item;
-    this.#targetItemName = targetResolved.item?.name ?? null;
-    context.craftCost = null;
-    if ( targetResolved.item?.uuid ) {
-      try {
-        const fullItem = await fromUuid(targetResolved.item.uuid);
-        if ( fullItem?.system?.getCraftCost ) context.craftCost = await effectiveCraftCost(fullItem);
-      } catch ( err ) {
-        console.warn(`${MODULE_ID} | Failed to compute craft cost for ${targetResolved.item.name}:`, err);
-      }
-    }
+    this.#targetItemName = recipe.displayName(targetResolved.item);
+    context.craftCost = await recipeCraftCost(recipe, targetResolved.item);
     const craftCostBreakdown = Object.fromEntries(goldPoolCurrencies().map(d => [d, 0]));
     if ( context.craftCost ) {
       for ( const part of breakdownCopper(toCopper(context.craftCost.gold, "gp")) ) craftCostBreakdown[part.denomination] = part.value;
@@ -198,9 +190,22 @@ export default class RecipeSheet extends Application5e {
     context.identityFields = [
       {
         field: fields.name, name: "name", value: recipe.name,
-        placeholder: targetResolved.item?.name || _loc("SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder")
+        placeholder: this.#targetItemName
       }
     ];
+    context.spellScrollFields = recipe.spellScroll ? [
+      {
+        field: fields.spellScroll.fields.level, name: "spellScroll.level", value: recipe.spellScroll.level,
+        label: _loc("SIMPLE_SHOP_CRAFT_5E.RecipeEditor.SpellScrollLevel"),
+        options: Object.entries(CONFIG.DND5E.spellLevels).map(([value, label]) => ({ value, label: _loc(label) }))
+      },
+      {
+        field: fields.spellScroll.fields.spellSource, name: "spellScroll.spellSource",
+        value: recipe.spellScroll.spellSource,
+        label: _loc("SIMPLE_SHOP_CRAFT_5E.RecipeEditor.SpellScrollSource"),
+        options: Object.entries(SPELL_SCROLL_SOURCES).map(([value, { label }]) => ({ value, label: _loc(label) }))
+      }
+    ] : null;
     context.materialFields = [
       {
         field: fields.allowFreeformMaterials, name: "allowFreeformMaterials", value: recipe.allowFreeformMaterials
@@ -361,11 +366,19 @@ export default class RecipeSheet extends Application5e {
     if ( !item ) return;
 
     const skillProficiencies = new Set(this.recipe.skillProficiencies);
+    const toolProficiencies = new Set(this.recipe.toolProficiencies);
     if ( item.system.properties?.has("mgc") ) skillProficiencies.add("arc");
+    let spellScroll = null;
+    if ( isSpellScrollItem(item) ) {
+      skillProficiencies.add("arc");
+      toolProficiencies.add("calligrapher");
+      spellScroll = { level: 0, spellSource: "prepared" };
+    }
     const targetItem = await itemEntryRef(item);
     const targetQuantity = (item.system.quantity > 1) ? item.system.quantity : 1;
     await Recipe.update(this.recipeId, {
-      targetItem, targetQuantity, img: item.img, skillProficiencies: Array.from(skillProficiencies)
+      targetItem, targetQuantity, img: item.img, skillProficiencies: Array.from(skillProficiencies),
+      toolProficiencies: Array.from(toolProficiencies), spellScroll
     });
     this.render();
   }
@@ -390,8 +403,16 @@ export default class RecipeSheet extends Application5e {
         data.img = item.img;
         data.targetQuantity = (item.system.quantity > 1) ? item.system.quantity : 1;
         const skillProficiencies = new Set(data.skillProficiencies ?? this.recipe.skillProficiencies);
+        const toolProficiencies = new Set(data.toolProficiencies ?? this.recipe.toolProficiencies);
         if ( item.system.properties?.has("mgc") ) skillProficiencies.add("arc");
+        data.spellScroll = null;
+        if ( isSpellScrollItem(item) ) {
+          skillProficiencies.add("arc");
+          toolProficiencies.add("calligrapher");
+          data.spellScroll = { level: 0, spellSource: "prepared" };
+        }
         data.skillProficiencies = Array.from(skillProficiencies);
+        data.toolProficiencies = Array.from(toolProficiencies);
       }
     }
     if ( data.materialPrice ) {
@@ -442,20 +463,15 @@ export default class RecipeSheet extends Application5e {
   async #editMaterialValue(target) {
     const index = Number(target.dataset.index);
     const entry = this.recipe.materials[index];
-    const valueFields = RecipeMaterial.schema.fields.value.fields;
 
     const dialog = new BaseShopConfig({
       window: { title: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.ChangeValue" },
       fields: [
-        {
-          field: valueFields.value, name: "value", value: entry.value?.value,
-          label: _loc("DND5E.Price"), hint: _loc("SIMPLE_SHOP_CRAFT_5E.RecipeEditor.MaterialValueHint")
-        },
-        {
-          field: valueFields.denomination, name: "denomination",
-          value: entry.value?.denomination ?? CONFIG.DND5E.defaultCurrency,
-          label: _loc("DND5E.Currency"), options: getCurrencyOptions()
-        }
+        currencyValueField({
+          label: _loc("DND5E.Price"), hint: _loc("SIMPLE_SHOP_CRAFT_5E.RecipeEditor.MaterialValueHint"),
+          field: RecipeMaterial.schema.fields.value, valueName: "value", value: entry.value?.value,
+          denominationName: "denomination", denomination: entry.value?.denomination ?? CONFIG.DND5E.defaultCurrency
+        })
       ],
       form: {
         handler: async (event, form, formData) => {
@@ -538,7 +554,9 @@ export default class RecipeSheet extends Application5e {
    * @returns {Promise<void>}
    */
   static async #removeTargetItem() {
-    await Recipe.update(this.recipeId, { targetItem: { identifier: "", uuid: "" }, img: Recipe.DEFAULT_ICON });
+    await Recipe.update(this.recipeId, {
+      targetItem: { identifier: "", uuid: "" }, img: Recipe.DEFAULT_ICON, spellScroll: null
+    });
     this.render();
   }
 

@@ -28,6 +28,32 @@
     </ol>
 </fieldset>
 
+{{#if recipe.spellScroll}}
+<fieldset class="card-tray">
+    <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.Spell" }}</legend>
+    {{#if spellField}}
+    {{> "dnd5e.fieldlist" spellField}}
+    {{else if noEligibleSpell}}
+    <p class="hint warning">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.NoEligibleSpell" }}</p>
+    {{else if chosenSpell}}
+    <ol class="value-list unlist">
+        <li class="value-row">
+            <img class="gold-icon" src="{{ chosenSpell.img }}" alt="{{ chosenSpell.name }}">
+            <div class="name-stacked"><span class="title">{{ chosenSpell.name }}</span></div>
+            <button type="button" class="unbutton control-button" data-action="removeSpell" data-tooltip
+                    aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.CraftStart.RemoveSpell' }}">
+                <i class="fa-solid fa-xmark" inert></i>
+            </button>
+        </li>
+    </ol>
+    {{else}}
+    <button type="button" data-action="chooseSpell">
+        {{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.ChooseSpell" }}
+    </button>
+    {{/if}}
+</fieldset>
+{{/if}}
+
 {{#if chosenToolKey}}
 <fieldset>
     <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.Tool" }}</legend>

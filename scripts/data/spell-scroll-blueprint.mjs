@@ -1,3 +1,5 @@
+import { createSpellScroll } from "../utils.mjs";
+
 const { DocumentUUIDField } = foundry.data.fields;
 
 /**
@@ -27,11 +29,7 @@ export class SpellScrollBlueprint extends foundry.abstract.DataModel {
    * @returns {Promise<Item5e|null>}
    */
   async resolve() {
-    const scroll = await Item.implementation.createScrollFromCompendiumSpell(this.spellUuid, { dialog: false });
-    if ( !scroll ) return null;
-    const level = scroll.system.activities?.find(a => a.type === "cast")?.spell?.level ?? 0;
     const spell = await fromUuid(this.spellUuid);
-    scroll.updateSource({ "system.identifier": `spell-scroll-${level}-${spell?.system.identifier ?? spell?.id}` });
-    return scroll;
+    return spell ? createSpellScroll(spell) : null;
   }
 }

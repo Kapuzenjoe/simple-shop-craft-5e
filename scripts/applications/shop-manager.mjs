@@ -2,12 +2,14 @@ import { MODULE_ID } from "../config.mjs";
 import { Recipe } from "../data/recipe-data.mjs";
 import { Shop } from "../data/shop-data.mjs";
 import {
-  applyItemSort, applyListControls, applyLoadingTooltip, breakdownCopper, buildItemTableSections, effectiveCraftCost,
-  finalizeGroups, formatDuration, resolveEntries, resolveTotalHours, toCopper
+  applyItemSort, applyListControls, applyLoadingTooltip, breakdownCopper, buildItemTableSections,
+  confirmDeleteShop, finalizeGroups, formatDuration, recipeCraftCost, resolveEntries, resolveTotalHours,
+  spotlightShop, toCopper
 } from "../utils.mjs";
 
 import CraftStartDialog from "./craft/craft-start-dialog.mjs";
 import RecipeSheet from "./craft/recipe-sheet.mjs";
+import VendorConfig from "./shops/shop-config/vendor-config.mjs";
 import ShopCreateDialog from "./shops/shop-create-dialog.mjs";
 import ShopSheet from "./shops/shop-sheet.mjs";
 
@@ -51,8 +53,8 @@ export default class ShopManager extends Application5e {
     actions: {
       createRecipe: ShopManager.#createRecipe,
       createShop: ShopManager.#createShop,
-      editRecipe: ShopManager.#editRecipe,
       editShop: ShopManager.#editShop,
+      importRecipes: ShopManager.#importRecipes,
       startCraft: ShopManager.#startCraft,
       toggleActive: ShopManager.#toggleActive
     }
@@ -183,16 +185,9 @@ export default class ShopManager extends Application5e {
       ? recipes
       : recipes.filter(r => r.canCraft(actor));
     const targetResolved = await resolveEntries(visibleRecipes.map(r => r.targetItem));
-    const craftCosts = await Promise.all(targetResolved.map(async ({ item }) => {
-      if ( !item?.uuid ) return null;
-      try {
-        const fullItem = await fromUuid(item.uuid);
-        return fullItem?.system?.getCraftCost ? effectiveCraftCost(fullItem) : null;
-      } catch ( err ) {
-        console.warn(`${MODULE_ID} | Failed to resolve craft cost for ${item.uuid}:`, err);
-        return null;
-      }
-    }));
+    const craftCosts = await Promise.all(
+      targetResolved.map(({ item }, index) => recipeCraftCost(visibleRecipes[index], item))
+    );
     const toolLabel = key => game.dnd5e.documents.Trait.keyLabel(key, { trait: "tool" });
     const skillLabel = key => _loc(CONFIG.DND5E.skills[key]?.label ?? key);
     const unlockedDisplay = recipe => {
@@ -210,7 +205,7 @@ export default class ShopManager extends Application5e {
         const materialValueCP = recipe.craftThreshold(craftCosts[index], item);
         return {
           recipe,
-          displayName: recipe.name || item?.name || _loc("SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder"),
+          displayName: recipe.displayName(item),
           itemUuid: item?.uuid ?? null,
           ...unlockedDisplay(recipe),
           toolProfTooltip: Array.from(recipe.toolProficiencies).map(toolLabel).filter(Boolean).join("\n"),
@@ -318,6 +313,67 @@ export default class ShopManager extends Application5e {
   /* -------------------------------------------- */
 
   /**
+   * Handle importing one or more recipes, each from its own exported JSON file.
+   * @this {ShopManager}
+   * @returns {Promise<void>}
+   */
+  static async #importRecipes() {
+    await foundry.applications.api.DialogV2.wait({
+      window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Import" },
+      position: { width: 400 },
+      content: `<form autocomplete="off">
+        <p class="hint">${_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.ImportHint")}</p>
+        <div class="form-group">
+          <label for="data">${_loc("DOCUMENT.ImportSource")}</label>
+          <div class="form-fields">
+            <input type="file" name="data" accept=".json" multiple>
+          </div>
+        </div>
+      </form>`,
+      buttons: [
+        {
+          action: "import", label: "DOCUMENT.ImportData", icon: "fa-solid fa-file-import", default: true,
+          callback: async (event, button) => {
+            const files = button.form.elements.data.files;
+            if ( !files.length ) return ui.notifications.error("DOCUMENT.ImportDataError", { localize: true });
+            const created = [];
+            const updated = [];
+            for ( const file of files ) {
+              try {
+                const data = JSON.parse(await foundry.utils.readTextFromFile(file));
+                const name = data.name || data.targetItem?.identifier || data.targetItem?.uuid
+                  || _loc("SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder");
+                if ( Recipe.get(data._id) ) {
+                  await Recipe.update(data._id, data);
+                  updated.push(name);
+                } else {
+                  await Recipe.create(data);
+                  created.push(name);
+                }
+              } catch ( err ) {
+                console.error(err);
+              }
+            }
+            const parts = [];
+            if ( created.length ) {
+              parts.push(_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.ImportCreated", { names: created.join(", ") }));
+            }
+            if ( updated.length ) {
+              parts.push(_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.ImportUpdated", { names: updated.join(", ") }));
+            }
+            if ( parts.length ) ui.notifications.info(parts.join(" "));
+            else ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.ImportNone", { localize: true });
+          }
+        },
+        { action: "no", label: "COMMON.Cancel", icon: "fa-solid fa-xmark" }
+      ]
+    });
+    this.render();
+  }
+
+  /* -------------------------------------------- */
+
+  /**
    * Handle creating a new shop: small name/starter-pack prompt, then opens the full edit view.
    * @this {ShopManager}
    * @returns {Promise<void>}
@@ -329,13 +385,11 @@ export default class ShopManager extends Application5e {
   /* -------------------------------------------- */
 
   /**
-   * Handle opening the editor for an existing recipe.
-   * @this {ShopManager}
-   * @param {Event} event         Triggering click event.
-   * @param {HTMLElement} target  Button that was clicked.
+   * Open the editor for an existing recipe.
+   * @param {string} recipeId
    */
-  static #editRecipe(event, target) {
-    new RecipeSheet({ recipeId: target.dataset.recipeId }).render({ force: true });
+  #editRecipe(recipeId) {
+    new RecipeSheet({ recipeId }).render({ force: true });
   }
 
   /* -------------------------------------------- */
@@ -400,6 +454,7 @@ export default class ShopManager extends Application5e {
    * @param {HTMLElement} html  Rendered Item Directory element.
    */
   static injectSidebarButton(html) {
+    if ( html.querySelector(".header-actions .open-shop-manager") ) return;
     const button = document.createElement("button");
     button.type = "button";
     button.classList.add("open-shop-manager");
@@ -419,11 +474,34 @@ export default class ShopManager extends Application5e {
   _getRecipeContextOptions(recipe) {
     return [
       {
+        label: "DND5E.ItemEdit",
+        icon: '<i class="fa-solid fa-pen-to-square fa-fw"></i>',
+        onClick: () => this.#editRecipe(recipe._id)
+      },
+      {
+        label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Export",
+        icon: '<i class="fa-solid fa-file-export fa-fw"></i>',
+        onClick: () => this.#exportRecipe(recipe)
+      },
+      {
         label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Delete",
         icon: '<i class="fa-solid fa-trash fa-fw"></i>',
         onClick: () => this.#confirmDeleteRecipe(recipe)
       }
     ];
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle exporting a recipe to a JSON file.
+   * @param {Recipe} recipe
+   * @returns {void}
+   */
+  #exportRecipe(recipe) {
+    const data = recipe.toObject();
+    const filename = ["simple-shop-craft-5e-recipe", recipe.name?.slugify(), recipe._id].filterJoin("-");
+    foundry.utils.saveDataToFile(JSON.stringify(data, null, 2), "application/json", `${filename}.json`);
   }
 
   /* -------------------------------------------- */
@@ -442,6 +520,16 @@ export default class ShopManager extends Application5e {
           : "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Activate",
         icon: `<i class="fa-solid fa-toggle-${shop.active ? "off" : "on"} fa-fw"></i>`,
         onClick: () => this.#setShopActive(shop, !shop.active)
+      },
+      {
+        label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.VendorSettings",
+        icon: '<i class="fa-solid fa-cog fa-fw"></i>',
+        onClick: () => this.#editVendorSettings(shop)
+      },
+      {
+        label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Spotlight",
+        icon: '<i class="fa-solid fa-bullhorn fa-fw"></i>',
+        onClick: () => spotlightShop(shop._id)
       },
       {
         label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Duplicate",
@@ -481,10 +569,7 @@ export default class ShopManager extends Application5e {
    * @returns {Promise<void>}
    */
   async #confirmDeleteShop(shop) {
-    const confirmed = await foundry.applications.api.DialogV2.confirm({
-      window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Delete" },
-      content: `<p>${_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.DeleteConfirm")}</p>`
-    });
+    const confirmed = await confirmDeleteShop();
     if ( !confirmed ) return;
     await Shop.delete(shop._id);
     this.render();
@@ -498,10 +583,31 @@ export default class ShopManager extends Application5e {
    * @returns {Promise<void>}
    */
   async #duplicateShop(shop) {
-    const clone = shop.toObject();
-    delete clone._id;
-    clone.name = _loc("DOCUMENT.CopyOf", { name: shop.name });
-    await Shop.create(clone);
+    await Shop.duplicate(shop);
+    this.render();
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Open the Vendor Settings dialog for a shop.
+   * @param {Shop} shop
+   */
+  #editVendorSettings(shop) {
+    new VendorConfig({ shop, onUpdate: updateData => this.#updateVendorSettings(shop, updateData) })
+      .render({ force: true });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Persist a Vendor Settings update from the shop list.
+   * @param {Shop} shop
+   * @param {object} updateData
+   * @returns {Promise<void>}
+   */
+  async #updateVendorSettings(shop, updateData) {
+    await Shop.update(shop._id, updateData);
     this.render();
   }
 

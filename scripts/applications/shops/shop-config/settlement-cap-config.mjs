@@ -1,6 +1,6 @@
 import { SETTLEMENT_CAPS } from "../../../config.mjs";
 import { Shop } from "../../../data/shop-data.mjs";
-import { getCurrencyOptions } from "../../../utils.mjs";
+import { currencyValueField } from "../../../utils.mjs";
 
 import BaseShopConfig from "./base-shop-config.mjs";
 
@@ -109,14 +109,11 @@ export default class SettlementCapConfig extends BaseShopConfig {
       }
     ];
     context.customFields = (this.#preset === "custom") ? [
-      {
-        field: capFields.value, name: "settlementCapValue", value: this.#customValue,
-        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SettlementCapValue")
-      },
-      {
-        field: capFields.denomination, name: "settlementCapDenomination",
-        value: this.#customDenomination, options: getCurrencyOptions(), label: _loc("DND5E.Currency")
-      }
+      currencyValueField({
+        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SettlementCapValue"),
+        field: Shop.schema.fields.settlementCap, valueName: "settlementCapValue", value: this.#customValue,
+        denominationName: "settlementCapDenomination", denomination: this.#customDenomination
+      })
     ] : null;
     return context;
   }

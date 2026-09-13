@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.0
+
+- Added a Services tab for shops (#8):
+  - Added Service Items — mark any Buy-tab item as a Service; purchasing only deducts money, no item transfer.
+  - Added Lodging (room tiers with a price and description) and Hireling (Skilled/Untrained, optionally linked to an Actor) as service types with no backing item.
+  - Added an "Add Service" menu (From Compendium, By UUID, Add Lodging, Add Hireling).
+- Added Export to JSON and Import from JSON for recipes, letting them be shared between worlds.
+- Added spell-scroll recipes: pick "Spell Scroll" as a recipe's Target Item to let the crafting player choose one of their own spells (Prepared, Owned, or Any from Compendium) — one recipe per spell level (#7).
+- Changed a shop's Buy/Services item controls and the Recipe list's Edit button to a shared right-click context menu, for a consistent way to manage rows across the module.
+- Changed a shop's Duplicate, Delete, Vendor Settings, and Show to All Players actions to be available both from its own editor and from the Shop Manager's shop list, and merged Rename into Vendor Settings.
+- Fixed the "Open Shop Manager" button in the Items sidebar occasionally duplicating itself (#21).
+- Reworked the Buy tab's "Add Items" button:
+  - Added a dialog to choose how to add an item — From Compendium or By UUID.
+  - Added detection of Enchant-item and Spell-Scroll templates when adding from the Compendium, prompting to pick a base item or spell instead of skipping them.
+
 ## 0.4.0
 
 - Added an automatic 20% buy discount on nonmagical items for an actor with the PHB 2024 "Crafter" feat (#6).

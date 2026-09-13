@@ -28,10 +28,6 @@
         {{/if}}
         <div class="item-detail item-controls always-visible">
             {{#if @root.isGM}}
-            <button type="button" class="unbutton config-button item-control item-action" data-action="editRecipe"
-                    data-recipe-id="{{ recipe._id }}" data-tooltip aria-label="{{ localize 'DND5E.ItemEdit' }}">
-                <i class="fa-solid fa-pen-to-square" inert></i>
-            </button>
             <button type="button" class="unbutton config-button item-control always-interactive" data-context-menu
                     aria-label="{{ localize 'DND5E.AdditionalControls' }}">
                 <i class="fa-solid fa-ellipsis-vertical" inert></i>

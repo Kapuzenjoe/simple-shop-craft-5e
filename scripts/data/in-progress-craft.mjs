@@ -1,7 +1,7 @@
 import { MODULE_ID } from "../config.mjs";
 import {
-  deductActorCurrencyChecked, formatDuration, isCalendarModeActive, maxHoursPerWorkday, resolveEntries,
-  shouldHandleWorldTimeAdvance
+  createSpellScroll, deductActorCurrencyChecked, formatDuration, isCalendarModeActive, maxHoursPerWorkday,
+  resolveEntries, shouldHandleWorldTimeAdvance
 } from "../utils.mjs";
 
 import ProgressHoursDialog from "../applications/craft/progress-hours-dialog.mjs";
@@ -46,6 +46,7 @@ export class InProgressCraft extends foundry.abstract.DataModel {
         uuid: new DocumentUUIDField({ type: "Item", blank: true })
       }),
       targetQuantity: new NumberField({ required: true, initial: 1, integer: true, min: 1 }),
+      spellUuid: new DocumentUUIDField({ type: "Item", blank: true }),
       activityId: new StringField({ blank: true }),
       totalHours: new NumberField({ required: true, initial: 0 }),
       hoursPerUse: new NumberField({ initial: null, nullable: true }),
@@ -93,7 +94,8 @@ export class InProgressCraft extends foundry.abstract.DataModel {
 
     const inProgress = new InProgressCraft({
       recipeId: craft.recipeId, targetItem: craft.targetItem, targetQuantity: craft.targetQuantity,
-      activityId: foundry.utils.randomID(), totalHours: craft.totalHours, hoursPerUse: craft.hoursPerUse, progress: 0
+      spellUuid: craft.spellUuid || "", activityId: foundry.utils.randomID(),
+      totalHours: craft.totalHours, hoursPerUse: craft.hoursPerUse, progress: 0
     });
     const [item] = await actor.createEmbeddedDocuments("Item", [{
       name: _loc("SIMPLE_SHOP_CRAFT_5E.Craft.InProgressName", { name: craft.targetName }),
@@ -360,8 +362,14 @@ export class InProgressCraft extends foundry.abstract.DataModel {
     const actor = item.actor;
     if ( !actor ) return;
 
-    const [resolved] = await resolveEntries([this.targetItem]);
-    const fullItem = resolved.item?.uuid ? await fromUuid(resolved.item.uuid) : null;
+    let fullItem;
+    if ( this.spellUuid ) {
+      const spell = await fromUuid(this.spellUuid);
+      fullItem = spell ? await createSpellScroll(spell) : null;
+    } else {
+      const [resolved] = await resolveEntries([this.targetItem]);
+      fullItem = resolved.item?.uuid ? await fromUuid(resolved.item.uuid) : null;
+    }
     if ( !fullItem ) {
       ui.notifications.error("SIMPLE_SHOP_CRAFT_5E.CraftCard.MissingItem", { localize: true });
       return;

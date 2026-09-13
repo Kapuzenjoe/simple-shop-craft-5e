@@ -1,9 +1,9 @@
 import { CraftMessageData } from "../../data/craft-message.mjs";
 import { Recipe } from "../../data/recipe-data.mjs";
 import {
-  applyDropArea, applyLoadingTooltip, breakdownCopper, buildItemTableSections, effectiveCraftCost, maxHoursPerWorkday,
-  needsDefaultPrice, openItemSheet, resolveBundleSizes, resolveEntries, resolveItemPrice, resolveTotalHours,
-  selectableActors, subtypeOptions, toCopper
+  applyDropArea, applyLoadingTooltip, breakdownCopper, buildItemTableSections, maxHoursPerWorkday,
+  needsDefaultPrice, openItemSheet, recipeCraftCost, resolveBundleSizes, resolveEntries, resolveItemPrice,
+  resolveTotalHours, selectableActors, subtypeOptions, toCopper
 } from "../../utils.mjs";
 
 const { Dialog5e } = game.dnd5e.applications.api;
@@ -28,8 +28,10 @@ export default class CraftStartDialog extends Dialog5e {
     window: { resizable: true },
     position: { width: 420, height: "auto" },
     actions: {
+      chooseSpell: CraftStartDialog.#chooseSpell,
       openItemSheet: CraftStartDialog.#openItemSheet,
       removeMaterial: CraftStartDialog.#removeMaterial,
+      removeSpell: CraftStartDialog.#removeSpell,
       startCraft: CraftStartDialog.#startCraft,
       stepMaterialQuantity: CraftStartDialog.#stepMaterialQuantity
     }
@@ -116,6 +118,14 @@ export default class CraftStartDialog extends Dialog5e {
   /* -------------------------------------------- */
 
   /**
+   * UUID of the chosen spell for a spell-scroll recipe.
+   * @type {string|null}
+   */
+  #chosenSpellUuid = null;
+
+  /* -------------------------------------------- */
+
+  /**
    * The currently selected crafting actor.
    * @type {Actor5e|null}
    */
@@ -137,7 +147,7 @@ export default class CraftStartDialog extends Dialog5e {
 
   /** @override */
   get title() {
-    return this.recipe?.name || this.#targetItemName || _loc("SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder");
+    return this.#targetItemName || _loc("SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder");
   }
 
   /* -------------------------------------------- */
@@ -155,10 +165,12 @@ export default class CraftStartDialog extends Dialog5e {
         this.#workshopClaimed = false;
         this.#fillWithGold = false;
         this.#materialQuantities.clear();
+        this.#chosenSpellUuid = null;
       }
       else if ( event.target.name === "toolKey" ) this.#toolKey = event.target.value;
       else if ( event.target.name === "workshopClaimed" ) this.#workshopClaimed = event.target.checked;
       else if ( event.target.name === "fillWithGold" ) this.#fillWithGold = event.target.checked;
+      else if ( event.target.name === "spellUuid" ) this.#chosenSpellUuid = event.target.value || null;
       else return;
       this.render({ parts: ["content", "footer"] });
     });
@@ -174,7 +186,7 @@ export default class CraftStartDialog extends Dialog5e {
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
     context.state = await this.#computeState();
-    this.#targetItemName = context.state.targetItem?.name ?? null;
+    this.#targetItemName = context.state.recipe.displayName(context.state.targetItem);
     return context;
   }
 
@@ -191,9 +203,26 @@ export default class CraftStartDialog extends Dialog5e {
     ].map(o => ({ ...o, selected: o.value === this.selectedActorUuid }));
     context.recipe = state.recipe;
     context.targetItem = state.targetItem;
-    context.displayName = state.recipe.name || state.targetItem?.name
-      || _loc("SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder");
+    context.displayName = this.#targetItemName;
     context.noActor = !state.actor;
+
+    context.spellField = null;
+    context.noEligibleSpell = false;
+    context.chosenSpell = null;
+    if ( state.recipe.spellScroll ) {
+      if ( state.recipe.spellScroll.spellSource === "compendium" ) {
+        context.chosenSpell = state.chosenSpell;
+      } else {
+        context.noEligibleSpell = !state.spellOptions.length;
+        if ( state.spellOptions.length ) {
+          context.spellField = [{
+            field: new foundry.data.fields.StringField(), name: "spellUuid", value: state.chosenSpell?.uuid ?? "",
+            options: state.spellOptions.map(i => ({ value: i.uuid, label: i.name }))
+          }];
+        }
+      }
+    }
+
     context.materialsTable = buildMaterialsTable(state);
     context.allowFreeform = state.recipe.allowFreeformMaterials;
     context.suppliedParts = breakdownCopper(state.suppliedCP);
@@ -268,18 +297,31 @@ export default class CraftStartDialog extends Dialog5e {
 
     const [targetResolved] = await resolveEntries([recipe.targetItem]);
     const targetItem = targetResolved.item;
-    let craftCost = null;
+    const craftCost = await recipeCraftCost(recipe, targetItem);
     let weight = null;
     let halfPrice = null;
-    if ( targetItem?.uuid ) {
+    if ( !recipe.spellScroll && targetItem?.uuid ) {
       const fullTargetItem = await fromUuid(targetItem.uuid);
-      if ( fullTargetItem?.system?.getCraftCost ) craftCost = await effectiveCraftCost(fullTargetItem);
       if ( fullTargetItem ) {
         weight = { ...fullTargetItem.system.weight };
         halfPrice = {
           value: Math.floor(fullTargetItem.system.price.value / 2),
           denomination: fullTargetItem.system.price.denomination
         };
+      }
+    }
+
+    let spellOptions = null;
+    let chosenSpell = null;
+    if ( recipe.spellScroll ) {
+      if ( recipe.spellScroll.spellSource === "compendium" ) {
+        chosenSpell = this.#chosenSpellUuid ? await fromUuid(this.#chosenSpellUuid) : null;
+      } else {
+        spellOptions = actor ? actor.items.filter(i => (i.type === "spell")
+          && (i.system.level === recipe.spellScroll.level)
+          && ((recipe.spellScroll.spellSource !== "prepared") || i.system.preparation?.prepared)) : [];
+        chosenSpell = spellOptions.find(i => i.uuid === this.#chosenSpellUuid) ?? spellOptions[0] ?? null;
+        this.#chosenSpellUuid = chosenSpell?.uuid ?? null;
       }
     }
 
@@ -389,7 +431,8 @@ export default class CraftStartDialog extends Dialog5e {
     const skillProficient = !!actor && skillKeys.some(k => (actor.system.skills[k]?.value ?? 0) > 0);
     const skillEligible = !skillKeys.length || skillProficient;
 
-    const canStart = !!actor && !!targetItem && toolEligible && skillEligible && requiredMet
+    const spellChosen = !recipe.spellScroll || !!chosenSpell;
+    const canStart = !!actor && !!targetItem && spellChosen && toolEligible && skillEligible && requiredMet
       && (materialsMet || (this.#fillWithGold && !goldInsufficient));
 
     const totalHours = resolveTotalHours(recipe, craftCost, targetItem);
@@ -400,7 +443,7 @@ export default class CraftStartDialog extends Dialog5e {
       suppliedCP, thresholdCP, shortfallCP, materialsMet, goldCP, goldInsufficient,
       toolKeys, chosenToolKey, proficient, toolOwned, toolEligible, skillProficient,
       skillRequired: skillKeys.length > 0, canStart, totalHours,
-      hoursPerUse, weight, halfPrice, requiredMet, requiredAvailable
+      hoursPerUse, weight, halfPrice, requiredMet, requiredAvailable, spellOptions, chosenSpell
     };
   }
 
@@ -473,6 +516,34 @@ export default class CraftStartDialog extends Dialog5e {
   /* -------------------------------------------- */
 
   /**
+   * Handle picking the spell for a compendium-source spell-scroll recipe, locked to its configured level.
+   * @this {CraftStartDialog}
+   * @returns {Promise<void>}
+   */
+  static async #chooseSpell() {
+    const uuid = await game.dnd5e.applications.CompendiumBrowser.selectOne({
+      tab: "spells",
+      filters: { locked: { level: { min: this.recipe.spellScroll.level, max: this.recipe.spellScroll.level } } }
+    });
+    if ( !uuid ) return;
+    this.#chosenSpellUuid = uuid;
+    this.render({ parts: ["content", "footer"] });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle clearing the chosen compendium spell.
+   * @this {CraftStartDialog}
+   */
+  static #removeSpell() {
+    this.#chosenSpellUuid = null;
+    this.render({ parts: ["content", "footer"] });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
    * Handle requesting the craft start: sends a GM-confirmation chat card.
    * @this {CraftStartDialog}
    * @returns {Promise<void>}
@@ -489,8 +560,8 @@ export default class CraftStartDialog extends Dialog5e {
       ...state.freeformItems.map(item => ({ item, quantity: 1 }))
     ];
     await CraftMessageData.create({
-      actor: state.actor, recipe: state.recipe, targetItem: state.targetItem,
-      materialLines,
+      actor: state.actor, recipe: state.recipe, targetItem: state.chosenSpell ?? state.targetItem,
+      materialLines, spellUuid: state.chosenSpell?.uuid ?? null,
       goldCP: state.goldCP, toolKey: state.chosenToolKey, totalHours: state.totalHours,
       hoursPerUse: state.hoursPerUse, weight: state.weight, halfPrice: state.halfPrice
     });

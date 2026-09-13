@@ -1,11 +1,12 @@
 import { MODULE_ID } from "../config.mjs";
 
 import { EnchantedItemBlueprint } from "./enchanted-item-blueprint.mjs";
+import { LodgingBlueprint } from "./lodging-blueprint.mjs";
 import { Shop } from "./shop-data.mjs";
 import { SpellScrollBlueprint } from "./spell-scroll-blueprint.mjs";
 
 const {
-  ArrayField, DocumentUUIDField, EmbeddedDataField, FilePathField, NumberField, SchemaField, StringField
+  ArrayField, BooleanField, DocumentUUIDField, EmbeddedDataField, FilePathField, NumberField, SchemaField, StringField
 } = foundry.data.fields;
 
 /**
@@ -46,10 +47,13 @@ export class PurchaseMessageData extends foundry.abstract.DataModel {
       actorUuid: new DocumentUUIDField({ type: "Actor" }),
       actorName: new StringField(),
       buyLines: new ArrayField(new SchemaField({
+        _id: new StringField({ blank: true }),
         identifier: new StringField({ blank: true }),
         uuid: new DocumentUUIDField({ type: "Item", blank: true }),
         generated: new EmbeddedDataField(EnchantedItemBlueprint, { nullable: true, initial: null }),
         spellScroll: new EmbeddedDataField(SpellScrollBlueprint, { nullable: true, initial: null }),
+        lodging: new EmbeddedDataField(LodgingBlueprint, { nullable: true, initial: null }),
+        isService: new BooleanField({ initial: false }),
         name: new StringField(), img: new FilePathField({ categories: ["IMAGE"] }),
         quantity: new NumberField(), priceCP: new NumberField(), bundleSize: new NumberField({ initial: 1 }),
         subtotal: currencyPartsField()
@@ -81,8 +85,9 @@ export class PurchaseMessageData extends foundry.abstract.DataModel {
       shopId: shopSheet.shopId, shopName: shopSheet.shop.name, shopImg: shopSheet.shop.img,
       actorUuid: actor.uuid, actorName: actor.name,
       buyLines: buyLines.map(row => ({
-        identifier: row.entry.identifier, uuid: row.entry.uuid,
+        _id: row.entry._id, identifier: row.entry.identifier, uuid: row.entry.uuid,
         generated: row.entry.generated ?? null, spellScroll: row.entry.spellScroll ?? null,
+        lodging: row.entry.lodging ?? null, isService: row.entry.isService ?? false,
         name: row.item.name, img: row.item.img, quantity: row.cartQuantity, priceCP: row.priceCP,
         bundleSize: row.bundleSize ?? 1, subtotal: row.subtotal
       })),
@@ -130,7 +135,8 @@ export class PurchaseMessageData extends foundry.abstract.DataModel {
    */
   async renderContent() {
     return foundry.applications.handlebars.renderTemplate(TEMPLATE, {
-      ...this.toObject(), pending: this.status === "pending", statusLabel: _loc(STATUS_LABELS[this.status])
+      ...this.toObject(), pending: this.status === "pending", statusLabel: _loc(STATUS_LABELS[this.status]),
+      buyLines: this.buyLines.filter(l => !l.isService), serviceLines: this.buyLines.filter(l => l.isService)
     });
   }
 

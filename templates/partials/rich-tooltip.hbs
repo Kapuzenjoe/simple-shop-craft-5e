@@ -1,0 +1,30 @@
+{{!-- Mirrors dnd5e's own item tooltip layout (systems/dnd5e/templates/items/parts/item-tooltip.hbs),
+      copied instead of referenced since that path isn't a public API and trimmed to the fields this
+      module's synthesized entries use. --}}
+<section class="content">
+    <section class="header">
+        <div class="top">
+            <img src="{{ img }}" alt="{{ name }}">
+            <div class="name name-stacked">
+                <span class="title">{{ name }}</span>
+                <span class="subtitle">{{{ subtitle }}}</span>
+            </div>
+        </div>
+        <div class="bottom">
+            <div class="price">
+                {{#if price}}
+                <i class="currency {{ price.denomination }}"></i>
+                <span>{{ dnd5e-numberFormat price.value }}</span>
+                {{/if}}
+            </div>
+        </div>
+    </section>
+    {{#if description}}<section class="description">{{{ description }}}</section>{{/if}}
+    {{#if properties}}
+    <ul class="pills">
+        {{#each properties}}
+        <li class="pill transparent"><span class="label">{{ this }}</span></li>
+        {{/each}}
+    </ul>
+    {{/if}}
+</section>

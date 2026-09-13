@@ -1,4 +1,4 @@
-<li class="item{{#if suppressed}} suppressed{{/if}}" data-name="{{ itemName }}" data-price="{{ priceCP }}"
+<li class="item{{#if suppressed}} suppressed{{/if}}" data-id="{{ key }}" data-key="{{ key }}" data-name="{{ itemName }}" data-price="{{ priceCP }}"
     {{#if suppressed}}{{#unless @root.editable}}hidden{{/unless}}{{/if}}>
     <div class="item-row">
         <div class="item-detail item-cart">
@@ -17,6 +17,10 @@
              role="button" aria-label="{{ itemName }}">
             {{> "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs"
                 img=itemImg name=itemName bundleSize=bundleSize }}
+            {{#if entry.hireling.actorUuid}}
+            <i class="fa-solid fa-link linked-actor-icon" data-action="openLinkedActor" data-key="{{ key }}"
+               data-tooltip="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.OpenLinkedActor' }}"></i>
+            {{/if}}
             {{#if suppressed}}
             {{#if @root.editable}}
             <i class="fa-solid fa-triangle-exclamation warning" data-tooltip="{{ suppressReason }}"></i>
@@ -49,7 +53,9 @@
             {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=priceDisplay}}
             {{/if}}
         </div>
+        {{#unless entry.isService}}
         {{> "modules/simple-shop-craft-5e/templates/partials/item-weight-cell.hbs" weight=weight }}
+        {{/unless}}
         <div class="item-detail item-quantity">
             {{#if (and @root.editable @root.isEditMode)}}
             <button type="button" class="unbutton config-button item-control item-action" data-action="editMaxStock"
@@ -70,11 +76,10 @@
             {{/if}}
         </div>
         <div class="item-detail item-controls">
-            {{#if (and @root.editable @root.isEditMode)}}
-            <button type="button" class="unbutton config-button item-control item-action"
-                    data-action="removeItem" data-key="{{ key }}"
-                    data-tooltip aria-label="{{ localize 'DND5E.ItemDelete' }}">
-                <i class="fas fa-trash" inert></i>
+            {{#if @root.editable}}
+            <button type="button" class="unbutton config-button item-control always-interactive" data-context-menu
+                    aria-label="{{ localize 'DND5E.AdditionalControls' }}">
+                <i class="fa-solid fa-ellipsis-vertical" inert></i>
             </button>
             {{/if}}
         </div>

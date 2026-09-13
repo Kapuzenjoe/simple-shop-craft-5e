@@ -5,25 +5,21 @@ import { currencyRows, goldPoolCurrencies } from "../../../utils.mjs";
 import BaseShopConfig from "./base-shop-config.mjs";
 
 /**
- * @import ShopSheet from "../shop-sheet.mjs";
- */
-
-/**
  * Dialog to edit a shop's money pool and default stock per item type.
  * @param {object} options
- * @param {ShopSheet} options.shopSheet
+ * @param {Shop} options.shop
  * @param {(updateData: object) => Promise<void>} options.onUpdate
  */
 export default class VendorConfig extends BaseShopConfig {
-  constructor({ shopSheet, onUpdate, ...options }={}) {
+  constructor({ shop, onUpdate, ...options }={}) {
     super(options);
-    this.shopSheet = shopSheet;
+    this.shop = shop;
     this.onUpdate = onUpdate;
-    this.#unlimited = !!this.shopSheet.shop.goldPool.unlimited;
-    this.#amounts = { ...this.shopSheet.shop.goldPool.max };
-    this.#sellDisabled = !!this.shopSheet.shop.goldPool.sellDisabled;
-    this.#stockByType = { ...this.shopSheet.shop.stockDefaults.byType };
-    this.#magicRule = this.shopSheet.shop.stockDefaults.magicRule;
+    this.#unlimited = !!this.shop.goldPool.unlimited;
+    this.#amounts = { ...this.shop.goldPool.max };
+    this.#sellDisabled = !!this.shop.goldPool.sellDisabled;
+    this.#stockByType = { ...this.shop.stockDefaults.byType };
+    this.#magicRule = this.shop.stockDefaults.magicRule;
   }
 
   /* -------------------------------------------- */
@@ -46,10 +42,10 @@ export default class VendorConfig extends BaseShopConfig {
   /* -------------------------------------------- */
 
   /**
-   * The shop editor this config belongs to.
-   * @type {ShopSheet}
+   * The shop being configured.
+   * @type {Shop}
    */
-  shopSheet;
+  shop;
 
   /* -------------------------------------------- */
 
@@ -104,6 +100,10 @@ export default class VendorConfig extends BaseShopConfig {
   /** @inheritDoc */
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
+
+    context.nameFields = [
+      { field: Shop.schema.fields.name, name: "name", value: this.shop.name }
+    ];
 
     context.moneyFields = [
       {
@@ -166,7 +166,7 @@ export default class VendorConfig extends BaseShopConfig {
    */
   static async #onSubmit(event, form, formData) {
     const data = foundry.utils.expandObject(formData.object);
-    const currentGoldPool = this.shopSheet.shop.goldPool;
+    const currentGoldPool = this.shop.goldPool;
     const sellDisabled = !!data.sellDisabled;
     const unlimited = sellDisabled ? currentGoldPool.unlimited : !!data.unlimited;
     const max = sellDisabled ? currentGoldPool.max : goldPoolCurrencies().reduce((obj, denom) => {
@@ -175,7 +175,7 @@ export default class VendorConfig extends BaseShopConfig {
     }, {});
 
     const byType = Object.fromEntries(
-      Object.keys(this.shopSheet.shop.stockDefaults.byType).map(type => {
+      Object.keys(this.shop.stockDefaults.byType).map(type => {
         const raw = data.stockByType?.[type];
         const value = ((raw === "") || (raw == null)) ? null : Math.max(0, Math.round(raw));
         return [type, value];
@@ -183,6 +183,7 @@ export default class VendorConfig extends BaseShopConfig {
     );
 
     await this.onUpdate({
+      name: data.name || this.shop.name,
       goldPool: { ...currentGoldPool, max, unlimited, sellDisabled },
       stockDefaults: { byType, magicRule: data.magicRule ?? "gear" }
     });

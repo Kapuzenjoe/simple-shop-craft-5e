@@ -81,9 +81,12 @@ export default class ShopCart extends Dialog5e {
   async _prepareContentContext(context, options) {
     context = await super._prepareContentContext(context, options);
     const state = this.#computeState();
-    context.buyRows = state.lines.map(row => ({
+    const buyRows = state.lines.map(row => ({
+      isService: row.entry.isService,
       img: row.item.img, name: row.item.name, quantity: row.cartQuantity, subtotal: row.subtotal
     }));
+    context.buyRows = buyRows.filter(row => !row.isService);
+    context.serviceRows = buyRows.filter(row => row.isService);
     context.sellRows = state.sellLines.map(row => ({
       img: row.item.img, name: row.item.name, quantity: row.sellQuantity, subtotal: row.subtotal
     }));

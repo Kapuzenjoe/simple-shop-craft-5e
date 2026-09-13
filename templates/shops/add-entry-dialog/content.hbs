@@ -1,0 +1,20 @@
+<section>
+    <fieldset class="card unlist">
+        {{#each methods}}
+        <li>
+            <label>
+                <i class="{{ icon }} fa-fw"></i>
+                <span>{{ label }}</span>
+                <input type="radio" name="method" value="{{ value }}" required {{ checked selected }}>
+            </label>
+        </li>
+        {{#if isUuid}}
+        {{#if ../showUuidField}}
+        <li class="uuid-field-row">
+            {{> "dnd5e.fieldlist" ../uuidField}}
+        </li>
+        {{/if}}
+        {{/if}}
+        {{/each}}
+    </fieldset>
+</section>

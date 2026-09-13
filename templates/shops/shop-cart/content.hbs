@@ -17,6 +17,24 @@
     </fieldset>
     {{/if}}
 
+    {{#if serviceRows.length}}
+    <fieldset class="card-tray">
+        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Services" }}</legend>
+        <ol class="value-list unlist">
+            {{#each serviceRows}}
+            <li class="value-row">
+                <img class="gold-icon" src="{{ this.img }}" alt="{{ this.name }}">
+                <div class="name-stacked">
+                    <span class="title">{{ this.name }}</span>
+                    <span class="subtitle">&times;{{ this.quantity }}</span>
+                </div>
+                {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=this.subtotal }}
+            </li>
+            {{/each}}
+        </ol>
+    </fieldset>
+    {{/if}}
+
     {{#if sellRows.length}}
     <fieldset class="card-tray">
         <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.Selling" }}</legend>

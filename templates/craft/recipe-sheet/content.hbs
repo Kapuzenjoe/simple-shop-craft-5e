@@ -27,6 +27,13 @@
     {{/if}}
 </fieldset>
 
+{{#if spellScrollFields}}
+<fieldset>
+    <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.SpellScroll" }}</legend>
+    {{> "dnd5e.fieldlist" spellScrollFields}}
+</fieldset>
+{{/if}}
+
 {{#if targetItem}}
 <fieldset>
     <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.Recipe" }}</legend>

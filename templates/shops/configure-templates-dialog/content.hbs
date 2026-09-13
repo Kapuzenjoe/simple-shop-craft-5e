@@ -1,0 +1,49 @@
+<section>
+    {{#each rows}}
+    <fieldset>
+        <div class="value-row">
+            {{> "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs" img=itemImg name=itemName }}
+        </div>
+        {{#if (eq kind "spellScroll")}}
+        <div class="value-row">
+            {{> "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs" img=spellImg name=spellName }}
+            <button type="button" class="unbutton config-button item-control item-action" data-action="pickSpell"
+                    data-row="{{ index }}" data-tooltip
+                    aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.PickSpell' }}">
+                <i class="fa-solid fa-magnifying-glass" inert></i>
+            </button>
+        </div>
+        {{else}}
+        {{#if hasMultipleProfiles}}
+        <div class="form-group">
+            <label>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.EnchantProfile" }}</label>
+            <select data-action="changeProfile" data-row="{{ index }}">
+                {{#each profileOptions}}
+                <option value="{{ value }}" {{#if (eq value ../profileIndex)}}selected{{/if}}>{{ label }}</option>
+                {{/each}}
+            </select>
+        </div>
+        {{/if}}
+        {{#if baseItemOptions}}
+        <div class="form-group">
+            <label>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.BaseItem" }}</label>
+            <select name="baseItem-{{ index }}">
+                {{#each baseItemOptions}}
+                <option value="{{ value }}">{{ label }}</option>
+                {{/each}}
+            </select>
+        </div>
+        {{else}}
+        <div class="value-row">
+            {{> "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs" img=baseItemImg name=baseItemName }}
+            <button type="button" class="unbutton config-button item-control item-action" data-action="pickBaseItem"
+                    data-row="{{ index }}" data-tooltip
+                    aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.PickBaseItem' }}">
+                <i class="fa-solid fa-magnifying-glass" inert></i>
+            </button>
+        </div>
+        {{/if}}
+        {{/if}}
+    </fieldset>
+    {{/each}}
+</section>

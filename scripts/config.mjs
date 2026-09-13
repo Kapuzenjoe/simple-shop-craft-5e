@@ -101,6 +101,44 @@ export const RESTOCK_MODES = {
 };
 
 /**
+ * Nightly lodging tiers and their default price, per PHB 2024 "Food, Drink, and Lodging".
+ * @type {Record<string, { label: string, price: { value: number, denomination: string } }>}
+ */
+export const LODGING_TIERS = {
+  squalid: { label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.LodgingSqualid", price: { value: 7, denomination: "cp" } },
+  poor: { label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.LodgingPoor", price: { value: 1, denomination: "sp" } },
+  modest: { label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.LodgingModest", price: { value: 5, denomination: "sp" } },
+  comfortable: {
+    label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.LodgingComfortable", price: { value: 8, denomination: "sp" }
+  },
+  wealthy: { label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.LodgingWealthy", price: { value: 2, denomination: "gp" } },
+  aristocratic: {
+    label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.LodgingAristocratic", price: { value: 4, denomination: "gp" }
+  }
+};
+
+/**
+ * Hireling types and their default daily price, per PHB 2024 "Hirelings" (Messenger deliberately excluded).
+ * @type {Record<string, { label: string, price: { value: number, denomination: string } }>}
+ */
+export const HIRELING_TYPES = {
+  skilled: { label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.HirelingSkilled", price: { value: 2, denomination: "gp" } },
+  untrained: { label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.HirelingUntrained", price: { value: 2, denomination: "sp" } }
+};
+
+/**
+ * Synthesized item type used for a shop's item-less Lodging entries.
+ * @type {string}
+ */
+export const LODGING_ITEM_TYPE = "lodging";
+
+/**
+ * Synthesized item type used for a shop's item-less Hireling entries.
+ * @type {string}
+ */
+export const HIRELING_ITEM_TYPE = "hireling";
+
+/**
  * Calendar-coupled crafting override modes.
  * @type {Record<string, { label: string }>}
  */
@@ -118,6 +156,16 @@ export const UNLOCK_MODES = {
   individual: { label: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.UnlockModeIndividual" },
   all: { label: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.UnlockModeAll" },
   toolProficiency: { label: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.UnlockModeToolProficient" }
+};
+
+/**
+ * Which of an actor's spells are eligible for a spell-scroll recipe.
+ * @type {Record<string, { label: string }>}
+ */
+export const SPELL_SCROLL_SOURCES = {
+  prepared: { label: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.SpellScrollSourcePrepared" },
+  owned: { label: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.SpellScrollSourceOwned" },
+  compendium: { label: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.SpellScrollSourceCompendium" }
 };
 
 /**

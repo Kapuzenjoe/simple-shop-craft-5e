@@ -9,6 +9,8 @@ import {
 } from "../utils.mjs";
 
 import { EnchantedItemBlueprint } from "./enchanted-item-blueprint.mjs";
+import { HirelingBlueprint } from "./hireling-blueprint.mjs";
+import { LodgingBlueprint } from "./lodging-blueprint.mjs";
 import { migrateRestockMode } from "./migration.mjs";
 import { SettingCollectionMixin } from "./setting-collection.mjs";
 import { SpellScrollBlueprint } from "./spell-scroll-blueprint.mjs";
@@ -36,6 +38,7 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
   static defineSchema() {
     return {
       identifier: new StringField({ blank: true }),
+      _id: new DocumentIdField({ initial: () => foundry.utils.randomID() }),
       uuid: new DocumentUUIDField({ type: "Item", blank: true }),
       stock: new SchemaField({
         max: new NumberField({ initial: null, nullable: true, integer: true, min: 0 }),
@@ -49,7 +52,10 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
       }),
       bundleSize: new NumberField({ initial: null, nullable: true, integer: true, min: 1 }),
       generated: new EmbeddedDataField(EnchantedItemBlueprint, { nullable: true, initial: null }),
-      spellScroll: new EmbeddedDataField(SpellScrollBlueprint, { nullable: true, initial: null })
+      spellScroll: new EmbeddedDataField(SpellScrollBlueprint, { nullable: true, initial: null }),
+      isService: new BooleanField({ initial: false }),
+      lodging: new EmbeddedDataField(LodgingBlueprint, { nullable: true, initial: null }),
+      hireling: new EmbeddedDataField(HirelingBlueprint, { nullable: true, initial: null })
     };
   }
 
@@ -77,7 +83,7 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
       return [entry.generated.baseItemUuid, entry.generated.enchantItemUuid, entry.generated.effectId].join("|");
     }
     if ( entry.spellScroll ) return entry.spellScroll.spellUuid;
-    return itemRefKey(entry);
+    return itemRefKey(entry) || entry._id;
   }
 
   /* -------------------------------------------- */
@@ -89,13 +95,15 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
    * @returns {Promise<{ entry: ShopItemEntryData, item: object|null }[]>}
    */
   static async resolveMany(entries) {
-    const plain = entries.filter(e => !e.generated && !e.spellScroll);
+    const plain = entries.filter(e => !e.generated && !e.spellScroll && !e.lodging && !e.hireling);
     const plainResolved = await resolveEntries(plain);
     const byEntry = new Map(plainResolved.map(r => [r.entry, r]));
 
     return Promise.all(entries.map(async entry => {
       if ( entry.generated ) return { entry, item: await new EnchantedItemBlueprint(entry.generated).resolve() };
       if ( entry.spellScroll ) return { entry, item: await new SpellScrollBlueprint(entry.spellScroll).resolve() };
+      if ( entry.lodging ) return { entry, item: new LodgingBlueprint(entry.lodging).resolve() };
+      if ( entry.hireling ) return { entry, item: await new HirelingBlueprint(entry.hireling).resolve() };
       return byEntry.get(entry);
     }));
   }
@@ -292,6 +300,8 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
   }
 }
 
+/* -------------------------------------------- */
+
 /**
  * A data model that represents a per-actor discount override for a shop.
  * @extends {foundry.abstract.DataModel<ShopPlayerDiscountData>}
@@ -393,6 +403,20 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
         : [...existing, { actor: actorUuid, buyModifier: null, sellModifier: null, ...updateData }];
       return { playerDiscounts };
     };
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Create a copy of a shop, named "Copy of X".
+   * @param {Shop} shop
+   * @returns {Promise<ShopData>}
+   */
+  static async duplicate(shop) {
+    const clone = shop.toObject();
+    delete clone._id;
+    clone.name = _loc("DOCUMENT.CopyOf", { name: shop.name });
+    return Shop.create(clone);
   }
 
   /* -------------------------------------------- */
@@ -585,12 +609,14 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
 
     const resolved = await ShopItemEntry.resolveMany(
       purchase.buyLines.map(line => ({
-        identifier: line.identifier, uuid: line.uuid, generated: line.generated, spellScroll: line.spellScroll
+        identifier: line.identifier, uuid: line.uuid, generated: line.generated, spellScroll: line.spellScroll,
+        lodging: line.lodging
       }))
     );
     const itemsToCreate = [];
     const itemUpdates = [];
     for ( const [index, line] of purchase.buyLines.entries() ) {
+      if ( line.isService ) continue;
       const indexEntry = resolved[index].item;
       const totalQuantity = line.quantity * line.bundleSize;
 

@@ -1,5 +1,9 @@
 <section class="tab active config-content">
     <fieldset>
+        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.ShopName" }}</legend>
+        {{> "dnd5e.fieldlist" nameFields}}
+    </fieldset>
+    <fieldset>
         <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GoldPool" }}</legend>
         {{> "dnd5e.fieldlist" moneyFields}}
         {{#if currencyRows}}

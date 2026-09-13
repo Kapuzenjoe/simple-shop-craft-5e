@@ -65,6 +65,7 @@ export default class FillFromTableDialog extends Dialog5e {
   async _prepareContentContext(context, options) {
     context = await super._prepareContentContext(context, options);
     context.legend = this.options.window?.title;
+    context.extraContent = `<p class="note warn">${_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.FillFromTableExhaustedHint")}</p>`;
     context.fields = [
       {
         field: new DocumentUUIDField({ type: "RollTable", required: true }), name: "table",

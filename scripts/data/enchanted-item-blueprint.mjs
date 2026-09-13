@@ -92,29 +92,23 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
    * @returns {Promise<Item5e|null>}
    */
   static async findEnchantableBaseItem(activity, wantedSubtypes=null) {
-    const restrictionUuids = EnchantedItemBlueprint.#parseRestrictionUuids(activity.item);
-    if ( restrictionUuids.length ) {
-      const pool = [...restrictionUuids];
+    const candidates = await EnchantedItemBlueprint.resolveBaseItemCandidates(activity);
+
+    if ( "explicit" in candidates ) {
+      const pool = candidates.explicit.filter(item => !wantedSubtypes || wantedSubtypes.has(item.system.type?.value));
       while ( pool.length ) {
-        const [uuid] = pool.splice(Math.floor(Math.random() * pool.length), 1);
-        const candidate = await fromUuid(uuid);
-        if ( !candidate ) continue;
-        if ( wantedSubtypes && !wantedSubtypes.has(candidate.system.type?.value) ) continue;
+        const [candidate] = pool.splice(Math.floor(Math.random() * pool.length), 1);
         if ( activity.canEnchant(candidate) === true ) return candidate;
       }
       return null;
     }
 
+    const { types, categoryFilters, filters } = candidates;
     const itemType = activity.restrictions.type || activity.item.type;
-    const types = new Set([itemType]);
     const rules = game.dnd5e.settings.rulesVersion === "modern" ? "2024" : "2014";
-    const categoryFilters = EnchantedItemBlueprint.#parseRestrictionCategory(activity.item);
     const results = await game.dnd5e.applications.CompendiumBrowser.fetch(Item, {
-      types, indexFields: new Set(["system.source"]), filters: [
-        excludeFilter("system.type.value", ["natural"]),
-        ...categoryFilters,
-        ...(wantedSubtypes ? [{ k: "system.type.value", o: "in", v: wantedSubtypes }] : [])
-      ]
+      types, indexFields: new Set(["system.source"]),
+      filters: wantedSubtypes ? [...filters, { k: "system.type.value", o: "in", v: wantedSubtypes }] : filters
     });
 
     const fromShopPack = results
@@ -130,6 +124,29 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
       if ( activity.canEnchant(fullCandidate) === true ) return fullCandidate;
     }
     return null;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Resolve an enchant activity's own base-item restriction from its description header — either a fixed
+   * list of explicitly named base items, or a type/category filter set for a `CompendiumBrowser` search.
+   * @param {EnchantActivity} activity
+   * @returns {Promise<{ explicit: Item5e[] }|{ types: Set<string>, categoryFilters: object[], filters: object[] }>}
+   */
+  static async resolveBaseItemCandidates(activity) {
+    const restrictionUuids = EnchantedItemBlueprint.#parseRestrictionUuids(activity.item);
+    if ( restrictionUuids.length ) {
+      const items = (await Promise.all(restrictionUuids.map(uuid => fromUuid(uuid)))).filter(item => item);
+      return { explicit: items };
+    }
+    const itemType = activity.restrictions.type || activity.item.type;
+    const categoryFilters = EnchantedItemBlueprint.#parseRestrictionCategory(activity.item);
+    const filters = [excludeFilter("system.type.value", ["natural"]), ...categoryFilters];
+    if ( !activity.restrictions.allowMagical ) {
+      filters.push({ o: "NOT", v: { k: "system.properties", o: "has", v: "mgc" } });
+    }
+    return { types: new Set([itemType]), categoryFilters, filters };
   }
 
   /* -------------------------------------------- */

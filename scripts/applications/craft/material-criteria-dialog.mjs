@@ -1,5 +1,5 @@
 import { RecipeMaterial } from "../../data/recipe-data.mjs";
-import { getCurrencyOptions, subtypeOptions } from "../../utils.mjs";
+import { currencyValueField, subtypeOptions } from "../../utils.mjs";
 
 const { Dialog5e } = game.dnd5e.applications.api;
 
@@ -75,14 +75,10 @@ export default class MaterialCriteriaDialog extends Dialog5e {
         label: _loc("SIMPLE_SHOP_CRAFT_5E.RecipeEditor.MaterialCriteriaSubtype"),
         options: [{ value: "", label: _loc("SIMPLE_SHOP_CRAFT_5E.RecipeEditor.MaterialCriteriaAny") }, ...subtypes]
       }] : []),
-      {
-        field: RecipeMaterial.schema.fields.value.fields.value, name: "value",
-        label: _loc("DND5E.Price")
-      },
-      {
-        field: RecipeMaterial.schema.fields.value.fields.denomination, name: "denomination",
-        value: CONFIG.DND5E.defaultCurrency, label: _loc("DND5E.Currency"), options: getCurrencyOptions()
-      }
+      currencyValueField({
+        label: _loc("DND5E.Price"), field: RecipeMaterial.schema.fields.value,
+        valueName: "value", denominationName: "denomination", denomination: CONFIG.DND5E.defaultCurrency
+      })
     ];
     return context;
   }
