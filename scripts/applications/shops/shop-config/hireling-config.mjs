@@ -96,6 +96,19 @@ export default class HirelingConfig extends BaseShopConfig {
 
   /* -------------------------------------------- */
 
+  /**
+   * Close instead of rendering once the edited entry no longer exists.
+   * @see dnd5e — EffectChangeConfig#_canRender()
+   */
+  _canRender(options) {
+    if ( this.rendered && !this.#entry ) {
+      this.close();
+      return false;
+    }
+  }
+
+  /* -------------------------------------------- */
+
   /** @inheritDoc */
   async _prepareContext(options) {
     const context = await super._prepareContext(options);

@@ -1,6 +1,6 @@
 import { createSpellScroll } from "../utils.mjs";
 
-const { DocumentUUIDField } = foundry.data.fields;
+const { DocumentUUIDField, FilePathField, StringField } = foundry.data.fields;
 
 /**
  * @import { SpellScrollBlueprintData } from "../_types.mjs";
@@ -17,7 +17,9 @@ export class SpellScrollBlueprint extends foundry.abstract.DataModel {
   /** @override */
   static defineSchema() {
     return {
-      spellUuid: new DocumentUUIDField({ type: "Item", blank: true })
+      spellUuid: new DocumentUUIDField({ type: "Item", blank: true }),
+      img: new FilePathField({ categories: ["IMAGE"], blank: true }),
+      identifier: new StringField({ blank: true })
     };
   }
 
@@ -30,6 +32,10 @@ export class SpellScrollBlueprint extends foundry.abstract.DataModel {
    */
   async resolve() {
     const spell = await fromUuid(this.spellUuid);
-    return spell ? createSpellScroll(spell) : null;
+    if ( !spell ) return null;
+    const scroll = await createSpellScroll(spell);
+    if ( this.img ) scroll.updateSource({ img: this.img });
+    if ( this.identifier ) scroll.updateSource({ "system.identifier": this.identifier });
+    return scroll;
   }
 }

@@ -1,6 +1,6 @@
 import { excludeFilter, isShopPackSource, itemRarity } from "../utils.mjs";
 
-const { DocumentUUIDField, StringField } = foundry.data.fields;
+const { DocumentUUIDField, FilePathField, StringField } = foundry.data.fields;
 
 /**
  * @import { EnchantedItemBlueprintData } from "../_types.mjs";
@@ -30,7 +30,9 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
     return {
       baseItemUuid: new DocumentUUIDField({ type: "Item", blank: true }),
       enchantItemUuid: new DocumentUUIDField({ type: "Item", blank: true }),
-      effectId: new StringField({ blank: true })
+      effectId: new StringField({ blank: true }),
+      img: new FilePathField({ categories: ["IMAGE"], blank: true }),
+      identifier: new StringField({ blank: true })
     };
   }
 
@@ -45,7 +47,10 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
     const enchantItem = await fromUuid(this.enchantItemUuid);
     const effect = enchantItem?.effects.get(this.effectId);
     if ( !baseItem || !effect ) return null;
-    return EnchantedItemBlueprint.#synthesize(baseItem, enchantItem, effect);
+    const item = EnchantedItemBlueprint.#synthesize(baseItem, enchantItem, effect);
+    if ( this.img ) item.updateSource({ img: this.img });
+    if ( this.identifier ) item.updateSource({ "system.identifier": this.identifier });
+    return item;
   }
 
   /* -------------------------------------------- */
@@ -138,7 +143,7 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
     const restrictionUuids = EnchantedItemBlueprint.#parseRestrictionUuids(activity.item);
     if ( restrictionUuids.length ) {
       const items = (await Promise.all(restrictionUuids.map(uuid => fromUuid(uuid)))).filter(item => item);
-      return { explicit: items };
+      return { explicit: items, label: EnchantedItemBlueprint.#describeExplicit(items) };
     }
     const itemType = activity.restrictions.type || activity.item.type;
     const categoryFilters = EnchantedItemBlueprint.#parseRestrictionCategory(activity.item);
@@ -146,7 +151,27 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
     if ( !activity.restrictions.allowMagical ) {
       filters.push({ o: "NOT", v: { k: "system.properties", o: "has", v: "mgc" } });
     }
-    return { types: new Set([itemType]), categoryFilters, filters };
+    return {
+      types: new Set([itemType]), categoryFilters, filters,
+      label: EnchantedItemBlueprint.#describeRestriction(itemType, categoryFilters)
+    };
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Resolve the `system.identifier` an enchanted item's synthesis produces for a given base item, enchant
+   * item, and effect profile.
+   * @param {Item5e} baseItem
+   * @param {Item5e} enchantItem
+   * @param {ActiveEffect5e} effect
+   * @returns {string}
+   */
+  static resolveIdentifier(baseItem, enchantItem, effect) {
+    const bonusChange = effect.system.changes?.find(change => change.key === "system.magicalBonus");
+    return bonusChange
+      ? `${baseItem.system.identifier}-${bonusChange.value}`
+      : `${enchantItem.system.identifier}-${baseItem.system.identifier}`;
   }
 
   /* -------------------------------------------- */
@@ -196,10 +221,7 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
       else itemData.system.rarity = enchantRarity;
     }
 
-    const bonusChange = effect.system.changes?.find(change => change.key === "system.magicalBonus");
-    itemData.system.identifier = bonusChange
-      ? `${itemData.system.identifier}-${bonusChange.value}`
-      : `${enchantItem.system.identifier}-${itemData.system.identifier}`;
+    itemData.system.identifier = EnchantedItemBlueprint.resolveIdentifier(baseItem, enchantItem, effect);
 
     return new Item.implementation(itemData);
   }
@@ -243,6 +265,40 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
       filters.push({ k: "system.type.value", o: "in", v: ["ammo"] });
     }
     return filters;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Describe an explicit base-item restriction as a disjunction of item names.
+   * @param {Item5e[]} items
+   * @returns {string}
+   */
+  static #describeExplicit(items) {
+    return game.i18n.getListFormatter({ type: "disjunction" }).format(items.map(item => item.name));
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Describe a type/category base-item restriction, e.g. "Weapon (Simple Weapon or Martial Weapon)".
+   * @see dnd5e — EnchantActivity#canEnchant()
+   * @param {string} itemType
+   * @param {FilterDescription[]} categoryFilters
+   * @returns {string}
+   */
+  static #describeRestriction(itemType, categoryFilters) {
+    const typeLabel = _loc(CONFIG.Item.typeLabels[itemType]);
+    const registry = CONFIG.Item.dataModels[itemType]?.itemCategories ?? {};
+    const categories = categoryFilters
+      .filter(f => (f.k === "system.type.value") && (f.o === "in"))
+      .flatMap(f => f.v)
+      .map(key => {
+        const config = registry[key];
+        return (foundry.utils.getType(config) === "string") ? config : (config?.label ?? key);
+      });
+    if ( !categories.length ) return typeLabel;
+    return `${typeLabel} (${game.i18n.getListFormatter({ type: "disjunction" }).format(categories)})`;
   }
 
   /* -------------------------------------------- */

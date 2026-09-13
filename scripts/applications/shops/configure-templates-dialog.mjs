@@ -1,4 +1,5 @@
 import { EnchantedItemBlueprint } from "../../data/enchanted-item-blueprint.mjs";
+import { createSpellScroll } from "../../utils.mjs";
 
 const { Dialog5e } = game.dnd5e.applications.api;
 
@@ -16,12 +17,12 @@ export default class ConfigureTemplatesDialog extends Dialog5e {
     this.isService = isService;
     this.onSubmit = onSubmit;
     this.#rows = templates.map(t => (t.kind === "spellScroll")
-      ? { kind: "spellScroll", item: t.item, spell: null }
+      ? { kind: "spellScroll", item: t.item, spell: null, previewScroll: null, imgOverride: "", identifierOverride: "" }
       : {
         kind: "enchant", item: t.item,
         profiles: EnchantedItemBlueprint.getEnchantmentProfiles(t.item)
           .filter(p => EnchantedItemBlueprint.resolveProfileRarity(t.item, p.effect) !== "artifact"),
-        profileIndex: 0, candidates: null, baseItem: null
+        profileIndex: 0, candidates: null, baseItem: null, imgOverride: "", identifierOverride: ""
       });
   }
 
@@ -35,8 +36,7 @@ export default class ConfigureTemplatesDialog extends Dialog5e {
     position: { width: 480 },
     actions: {
       pickSpell: ConfigureTemplatesDialog.#pickSpell,
-      pickBaseItem: ConfigureTemplatesDialog.#pickBaseItem,
-      changeProfile: ConfigureTemplatesDialog.#changeProfile
+      pickBaseItem: ConfigureTemplatesDialog.#pickBaseItem
     },
     form: { handler: ConfigureTemplatesDialog.#onSubmit }
   };
@@ -94,7 +94,7 @@ export default class ConfigureTemplatesDialog extends Dialog5e {
   async #resolveRowCandidates(row) {
     const { activity } = row.profiles[row.profileIndex];
     row.candidates = await EnchantedItemBlueprint.resolveBaseItemCandidates(activity);
-    row.baseItem = null;
+    row.baseItem = row.candidates.explicit?.[0] ?? null;
   }
 
   /* -------------------------------------------- */
@@ -104,9 +104,7 @@ export default class ConfigureTemplatesDialog extends Dialog5e {
    * @returns {boolean}
    */
   #isComplete() {
-    return this.#rows.every(row => (row.kind === "spellScroll")
-      ? !!row.spell
-      : !!row.candidates?.explicit || !!row.baseItem);
+    return this.#rows.every(row => (row.kind === "spellScroll") ? !!row.spell : !!row.baseItem);
   }
 
   /* -------------------------------------------- */
@@ -114,19 +112,29 @@ export default class ConfigureTemplatesDialog extends Dialog5e {
   /** @inheritDoc */
   async _prepareContentContext(context, options) {
     context = await super._prepareContentContext(context, options);
-    context.rows = this.#rows.map((row, index) => ({
-      index, kind: row.kind, itemName: row.item.name, itemImg: row.item.img,
-      spellImg: row.spell?.img ?? "icons/svg/hazard.svg",
-      spellName: row.spell?.name ?? _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoSpellPicked"),
-      hasMultipleProfiles: (row.kind === "enchant") && (row.profiles.length > 1),
-      profileOptions: (row.kind === "enchant")
-        ? row.profiles.map((p, i) => ({ value: i, label: p.effect.name })) : null,
-      profileIndex: row.profileIndex,
-      baseItemOptions: (row.kind === "enchant") && row.candidates?.explicit
-        ? row.candidates.explicit.map(item => ({ value: item.uuid, label: item.name })) : null,
-      baseItemImg: row.baseItem?.img ?? "icons/svg/hazard.svg",
-      baseItemName: row.baseItem?.name ?? _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoBaseItemPicked")
-    }));
+    context.imgField = EnchantedItemBlueprint.schema.fields.img;
+    context.identifierField = EnchantedItemBlueprint.schema.fields.identifier;
+    context.rows = this.#rows.map((row, index) => {
+      const pick = (row.kind === "spellScroll")
+        ? (row.spell ? { img: row.previewScroll?.img ?? row.spell.img, name: row.spell.name } : null)
+        : (row.baseItem ? { img: row.baseItem.img, name: row.baseItem.name } : null);
+      const identifierPreview = (row.kind === "spellScroll")
+        ? (row.previewScroll?.system.identifier ?? "")
+        : (row.baseItem
+          ? EnchantedItemBlueprint.resolveIdentifier(row.baseItem, row.item, row.profiles[row.profileIndex].effect)
+          : "");
+      return {
+        index, kind: row.kind, itemName: row.item.name, itemImg: row.item.img,
+        hasMultipleProfiles: (row.kind === "enchant") && (row.profiles.length > 1),
+        profileOptions: (row.kind === "enchant")
+          ? row.profiles.map((p, i) => ({ value: i, label: p.effect.name })) : null,
+        profileIndex: row.profileIndex,
+        baseItemOptions: (row.kind === "enchant") && row.candidates?.explicit
+          ? row.candidates.explicit.map(item => ({ value: item.uuid, label: item.name })) : null,
+        restrictionLabel: (row.kind === "enchant") ? row.candidates?.label : null,
+        pick, imgOverride: row.imgOverride, identifierOverride: row.identifierOverride, identifierPreview
+      };
+    });
     return context;
   }
 
@@ -141,6 +149,25 @@ export default class ConfigureTemplatesDialog extends Dialog5e {
 
   /* -------------------------------------------- */
 
+  /** @inheritDoc */
+  _onChangeForm(formConfig, event) {
+    super._onChangeForm(formConfig, event);
+    const [, prefix, index] = event.target.name?.match(/^(img|identifier|baseItem|profile)-(\d+)$/) ?? [];
+    if ( !prefix ) return;
+    const row = this.#rows[index];
+    if ( prefix === "img" ) row.imgOverride = event.target.value;
+    else if ( prefix === "identifier" ) row.identifierOverride = event.target.value;
+    else if ( prefix === "baseItem" ) {
+      row.baseItem = row.candidates.explicit.find(item => item.uuid === event.target.value) ?? null;
+      this.render({ parts: ["content", "footer"] });
+    } else {
+      row.profileIndex = Number(event.target.value);
+      this.#resolveRowCandidates(row).then(() => this.render({ parts: ["content", "footer"] }));
+    }
+  }
+
+  /* -------------------------------------------- */
+
   /**
    * Handle picking a spell for a Spell Scroll row.
    * @this {ConfigureTemplatesDialog}
@@ -150,22 +177,10 @@ export default class ConfigureTemplatesDialog extends Dialog5e {
   static async #pickSpell(event, target) {
     const row = this.#rows[target.dataset.row];
     const uuid = await game.dnd5e.applications.CompendiumBrowser.selectOne({ tab: "spells" });
-    if ( uuid ) row.spell = await fromUuid(uuid);
-    this.render({ parts: ["content", "footer"] });
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Handle changing an Enchant row's rarity profile.
-   * @this {ConfigureTemplatesDialog}
-   * @param {Event} event
-   * @param {HTMLElement} target
-   */
-  static async #changeProfile(event, target) {
-    const row = this.#rows[target.dataset.row];
-    row.profileIndex = Number(target.value);
-    await this.#resolveRowCandidates(row);
+    if ( uuid ) {
+      row.spell = await fromUuid(uuid);
+      row.previewScroll = await createSpellScroll(row.spell);
+    }
     this.render({ parts: ["content", "footer"] });
   }
 
@@ -204,15 +219,21 @@ export default class ConfigureTemplatesDialog extends Dialog5e {
    * @returns {Promise<void>}
    */
   static async #onSubmit(event, form, formData) {
-    const data = foundry.utils.expandObject(formData.object);
-    const entries = this.#rows.map((row, index) => {
+    const entries = this.#rows.map(row => {
       const shared = { isService: this.isService, stock: { max: null, current: 1 }, restockMode: "exclude" };
-      if ( row.kind === "spellScroll" ) return { ...shared, spellScroll: { spellUuid: row.spell.uuid } };
-      const baseItemUuid = row.candidates.explicit ? data[`baseItem-${index}`] : row.baseItem.uuid;
+      if ( row.kind === "spellScroll" ) {
+        return {
+          ...shared,
+          spellScroll: { spellUuid: row.spell.uuid, img: row.imgOverride, identifier: row.identifierOverride }
+        };
+      }
       const { effect } = row.profiles[row.profileIndex];
       return {
         ...shared,
-        generated: { baseItemUuid, enchantItemUuid: row.item.uuid, effectId: effect.id }
+        generated: {
+          baseItemUuid: row.baseItem.uuid, enchantItemUuid: row.item.uuid, effectId: effect.id,
+          img: row.imgOverride, identifier: row.identifierOverride
+        }
       };
     });
     await this.onSubmit(entries);

@@ -5,8 +5,8 @@ import { EnchantedItemBlueprint } from "../../data/enchanted-item-blueprint.mjs"
 import { newEntryStock, Shop, ShopItemEntry } from "../../data/shop-data.mjs";
 import {
   applyItemSort, applyListControls, applyLoadingTooltip, applyRichTooltip, breakdownCopper, buildItemTableSections,
-  confirmDeleteShop, finalizeGroups, isCalendarModeActive, isSpellScrollItem, needsDefaultPrice, openItemSheet,
-  resolveItemPrice, selectableActors, spotlightShop, toCopper
+  confirmDeleteShop, finalizeGroups, isCalendarModeActive, isSpellScrollItem, itemRef, needsDefaultPrice,
+  openItemSheet, resolveItemPrice, selectableActors, spotlightShop, toCopper
 } from "../../utils.mjs";
 
 import AddEntryDialog from "./add-entry-dialog.mjs";
@@ -816,7 +816,7 @@ export default class ShopSheet extends Application5e {
           const item = await fromUuid(data.uuid);
           if ( !item || !CONFIG.Item.dataModels[item.type]?.inventorySection ) return;
           await this.#mergeItemEntries([
-            { uuid: data.uuid, isService: partId === "services", ...newEntryStock(item, this.shop.stockDefaults) }
+            { ...itemRef(item), isService: partId === "services", ...newEntryStock(item, this.shop.stockDefaults) }
           ]);
         });
       }
@@ -957,7 +957,7 @@ export default class ShopSheet extends Application5e {
         .some(p => EnchantedItemBlueprint.resolveProfileRarity(item, p.effect) !== "artifact") ) {
         templates.push({ kind: "enchant", item });
       } else if ( item.system?.identifier ) {
-        entries.push({ identifier: item.system.identifier, isService, ...newEntryStock(item, this.shop.stockDefaults) });
+        entries.push({ ...itemRef(item), isService, ...newEntryStock(item, this.shop.stockDefaults) });
       }
     }
     if ( entries.length ) await this.#mergeItemEntries(entries);
@@ -985,7 +985,7 @@ export default class ShopSheet extends Application5e {
       return;
     }
     await this.#mergeItemEntries([
-      { uuid, isService, ...newEntryStock(item, this.shop.stockDefaults) }
+      { ...itemRef(item), isService, ...newEntryStock(item, this.shop.stockDefaults) }
     ]);
   }
 

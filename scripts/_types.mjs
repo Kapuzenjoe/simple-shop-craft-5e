@@ -173,6 +173,8 @@
  * @property {string} baseItemUuid      UUID of the base item the enchantment is applied to.
  * @property {string} enchantItemUuid   UUID of the item granting the enchantment.
  * @property {string} effectId          Id of the specific enchantment effect applied.
+ * @property {string} img               Icon override, falls back to the base item's own icon.
+ * @property {string} identifier        Identifier override, falls back to the resolved enchant identifier.
  */
 
 /* -------------------------------------------- */
@@ -180,6 +182,8 @@
 /**
  * @typedef SpellScrollBlueprintData
  * @property {string} spellUuid  UUID of the spell the scroll casts.
+ * @property {string} img         Icon override, falls back to the generated scroll's own icon.
+ * @property {string} identifier  Identifier override, falls back to the resolved scroll identifier.
  */
 
 /* -------------------------------------------- */

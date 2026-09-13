@@ -521,6 +521,10 @@ export default class CraftStartDialog extends Dialog5e {
    * @returns {Promise<void>}
    */
   static async #chooseSpell() {
+    if ( !this.recipe?.spellScroll ) {
+      this.render({ parts: ["content", "footer"] });
+      return;
+    }
     const uuid = await game.dnd5e.applications.CompendiumBrowser.selectOne({
       tab: "spells",
       filters: { locked: { level: { min: this.recipe.spellScroll.level, max: this.recipe.spellScroll.level } } }

@@ -256,14 +256,14 @@ export default class ShopManager extends Application5e {
     new game.dnd5e.applications.ContextMenu5e(this.element, "[data-shop-id]", [], {
       onOpen: element => {
         const shop = Shop.get(element.dataset.shopId);
-        ui.context.menuItems = this._getShopContextOptions(shop);
+        ui.context.menuItems = (game.user.isGM && shop) ? this._getShopContextOptions(shop) : [];
       },
       jQuery: false
     });
     new game.dnd5e.applications.ContextMenu5e(this.element, "[data-recipe-id]", [], {
       onOpen: element => {
         const recipe = Recipe.get(element.dataset.recipeId);
-        ui.context.menuItems = this._getRecipeContextOptions(recipe);
+        ui.context.menuItems = (game.user.isGM && recipe) ? this._getRecipeContextOptions(recipe) : [];
       },
       jQuery: false
     });
@@ -338,6 +338,7 @@ export default class ShopManager extends Application5e {
             if ( !files.length ) return ui.notifications.error("DOCUMENT.ImportDataError", { localize: true });
             const created = [];
             const updated = [];
+            const failed = [];
             for ( const file of files ) {
               try {
                 const data = JSON.parse(await foundry.utils.readTextFromFile(file));
@@ -352,6 +353,7 @@ export default class ShopManager extends Application5e {
                 }
               } catch ( err ) {
                 console.error(err);
+                failed.push(file.name);
               }
             }
             const parts = [];
@@ -363,6 +365,9 @@ export default class ShopManager extends Application5e {
             }
             if ( parts.length ) ui.notifications.info(parts.join(" "));
             else ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.ImportNone", { localize: true });
+            if ( failed.length ) {
+              ui.notifications.warn(_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.ImportFailed", { names: failed.join(", ") }));
+            }
           }
         },
         { action: "no", label: "COMMON.Cancel", icon: "fa-solid fa-xmark" }

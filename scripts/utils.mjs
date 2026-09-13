@@ -490,6 +490,18 @@ export function itemRefKey(entry) {
 /* -------------------------------------------- */
 
 /**
+ * Build an identifier/uuid reference for a resolved item, preferring its `system.identifier` when it isn't
+ * just the unedited default.
+ * @param {Item5e} item
+ * @returns {{ identifier: string }|{ uuid: string }}
+ */
+export function itemRef(item) {
+  return isDefaultIdentifier(item) ? { uuid: item.uuid } : { identifier: item.system.identifier };
+}
+
+/* -------------------------------------------- */
+
+/**
  * Whether an item's own price is unset, meaning a rarity-based fallback price is being shown for it
  * instead.
  * @param {Item5e|null} item
