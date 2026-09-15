@@ -11,6 +11,7 @@
 - Changed a shop's Buy/Services item controls and the Recipe list's Edit button to a shared right-click context menu, for a consistent way to manage rows across the module.
 - Changed a shop's Duplicate, Delete, Vendor Settings, and Show to All Players actions to be available both from its own editor and from the Shop Manager's shop list, and merged Rename into Vendor Settings.
 - Fixed the "Open Shop Manager" button in the Items sidebar occasionally duplicating itself (#21).
+- Fixed a crash when reopening the sheet of a generated (template-based) item a second time without the shop sheet re-rendering in between.
 - Reworked the Buy tab's "Add Items" button:
   - Added a dialog to choose how to add an item — From Compendium or By UUID.
   - Added detection of Enchant-item and Spell-Scroll templates when adding from the Compendium, prompting to pick a base item or spell instead of skipping them.

@@ -3,7 +3,7 @@
     <div class="item-row">
         <div class="item-name item-tooltip rollable" data-action="startCraft" role="button"
              data-recipe-id="{{ recipe._id }}" {{#if itemUuid}}data-uuid="{{ itemUuid }}"{{/if}}>
-            {{> "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs"
+            {{> "modules/simple-shop-craft-5e/templates/shared/item-avatar-name.hbs"
                 img=recipe.img name=displayName bundleSize=bundleSize }}
             {{#if toolProfTooltip}}
             <i class="fa-solid fa-hammer proficiency-icon" data-tooltip="{{ toolProfTooltip }}"
@@ -16,7 +16,7 @@
         </div>
         <div class="item-detail item-materialValue{{#unless materialValueDisplay}} empty{{/unless}}">
             {{#if materialValueDisplay}}
-            {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=materialValueDisplay}}
+            {{> "modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs" parts=materialValueDisplay}}
             {{/if}}
         </div>
         <div class="item-detail item-duration">{{ durationDisplay }}</div>

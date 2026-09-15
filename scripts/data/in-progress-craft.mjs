@@ -37,6 +37,10 @@ const PROGRESS_TEMPLATE = "modules/simple-shop-craft-5e/templates/chat/progress-
  */
 export class InProgressCraft extends foundry.abstract.DataModel {
 
+  /* -------------------------------------------- */
+  /*  Model Configuration                         */
+  /* -------------------------------------------- */
+
   /** @override */
   static defineSchema() {
     return {
@@ -57,6 +61,8 @@ export class InProgressCraft extends foundry.abstract.DataModel {
     };
   }
 
+  /* -------------------------------------------- */
+  /*  Methods                                     */
   /* -------------------------------------------- */
 
   /**
@@ -134,12 +140,8 @@ export class InProgressCraft extends foundry.abstract.DataModel {
       return false;
     }
 
-    const actor = item.actor;
-    const dailyMax = maxHoursPerWorkday();
-    const workedToday = actor?.getFlag(MODULE_ID, "hoursWorkedToday") ?? 0;
-    const remainingToday = Math.max(0, dailyMax - workedToday);
     const craft = new InProgressCraft(flag);
-    const max = Math.min(remainingToday, craft.totalHours - craft.progress);
+    const { dailyMax, workedToday, max } = craft.#remainingBudget(item.actor);
     usageConfig.scaling = 0;
     dialogConfig.applicationClass = ProgressHoursDialog;
     dialogConfig.options = { max, initial: Math.min(max, craft.hoursPerUse ?? max), workedToday, dailyMax };
@@ -161,7 +163,9 @@ export class InProgressCraft extends foundry.abstract.DataModel {
     if ( !flag || (flag.activityId !== activity.id) ) return;
 
     const craft = new InProgressCraft(flag);
-    const hoursThisUse = usageConfig.simpleShopCraft5e?.hoursThisUse ?? craft.hoursPerUse ?? maxHoursPerWorkday();
+    const requested = usageConfig.simpleShopCraft5e?.hoursThisUse ?? craft.hoursPerUse ?? maxHoursPerWorkday();
+    const hoursThisUse = Math.min(requested, craft.#remainingBudget(item.actor).max);
+    if ( hoursThisUse <= 0 ) return;
 
     if ( isCalendarModeActive() ) {
       const { ProgressSessionMessageData } = await import("./progress-session-message.mjs");
@@ -327,27 +331,11 @@ export class InProgressCraft extends foundry.abstract.DataModel {
       _id: this.activityId,
       name: _loc("SIMPLE_SHOP_CRAFT_5E.Craft.ProgressActivityName"),
       description: { chatFlavor: this.#progressLabel() },
-      activation: { type: "action", value: null }
+      activation: { type: "special", value: null }
     };
     const activity = item.system.activities?.get(this.activityId);
     if ( activity && !this.#activityNeedsUpdate(activity, data) ) return;
     await item.createActivity(ACTIVITY_TYPE, data, { renderSheet: false });
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Determine whether a live activity's definition has drifted from its intended values.
-   * @param {Activity} activity  The activity as currently stored on the item.
-   * @param {object} data        The intended activity data, as passed to `Item5e#createActivity()`.
-   * @returns {boolean}
-   */
-  #activityNeedsUpdate(activity, data) {
-    return (activity.name !== data.name)
-      || (activity.description.chatFlavor !== data.description.chatFlavor)
-      || (activity.activation.type !== data.activation.type)
-      || (activity.activation.value !== data.activation.value)
-      || (activity.consumption?.targets?.length > 0);
   }
 
   /* -------------------------------------------- */
@@ -397,6 +385,38 @@ export class InProgressCraft extends foundry.abstract.DataModel {
       speaker: ChatMessage.getSpeaker({ actor }),
       whisper: game.users.filter(u => actor.testUserPermission(u, "OWNER"))
     });
+  }
+
+  /* -------------------------------------------- */
+  /*  Helpers                                     */
+  /* -------------------------------------------- */
+
+  /**
+   * Determine whether a live activity's definition has drifted from its intended values.
+   * @param {Activity} activity  The activity as currently stored on the item.
+   * @param {object} data        The intended activity data, as passed to `Item5e#createActivity()`.
+   * @returns {boolean}
+   */
+  #activityNeedsUpdate(activity, data) {
+    return (activity.name !== data.name)
+      || (activity.description.chatFlavor !== data.description.chatFlavor)
+      || (activity.activation.type !== data.activation.type)
+      || (activity.activation.value !== data.activation.value)
+      || (activity.consumption?.targets?.length > 0);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Resolve the actor's remaining crafting hours for today, capped by this craft's own remaining progress.
+   * @param {Actor5e|null} actor
+   * @returns {{ dailyMax: number, workedToday: number, remainingToday: number, max: number }}
+   */
+  #remainingBudget(actor) {
+    const dailyMax = maxHoursPerWorkday();
+    const workedToday = actor?.getFlag(MODULE_ID, "hoursWorkedToday") ?? 0;
+    const remainingToday = Math.max(0, dailyMax - workedToday);
+    return { dailyMax, workedToday, remainingToday, max: Math.min(remainingToday, this.totalHours - this.progress) };
   }
 
   /* -------------------------------------------- */

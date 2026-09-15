@@ -44,6 +44,10 @@
   .tab[data-tab="shops"], .tab[data-tab="recipes"] {
     padding-bottom: 60px;
   }
+
+  .window-content-actions {
+    display: flex;
+  }
 }
 
 #tooltip.property-attribution.simple-shop-craft-5e table td.attribution-value {
@@ -103,20 +107,17 @@
     }
   }
 
-  .icon-picker-group {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-
-    .form-group { flex: 1; }
-  }
-
   .icon-picker-preview {
+    flex: none;
     width: 32px;
     height: 32px;
     border: 1px solid var(--dnd5e-color-gold);
     border-radius: 4px;
     object-fit: cover;
+  }
+
+  &.configure-templates-dialog .pill-lg {
+    max-width: unset;
   }
 
   &.add-entry-dialog {

@@ -25,6 +25,10 @@ const BASE_ITEM_REGISTRIES = {
  */
 export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
 
+  /* -------------------------------------------- */
+  /*  Model Configuration                         */
+  /* -------------------------------------------- */
+
   /** @override */
   static defineSchema() {
     return {
@@ -36,6 +40,8 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
     };
   }
 
+  /* -------------------------------------------- */
+  /*  Methods                                     */
   /* -------------------------------------------- */
 
   /**
@@ -62,7 +68,7 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
    * @returns {{ activity: EnchantActivity, effect: ActiveEffect5e }[]}
    */
   static getEnchantmentProfiles(item) {
-    const enchantActivities = item.system.activities?.filter(a => a.type === "enchant") ?? [];
+    const enchantActivities = item.system.activities?.getByType("enchant") ?? [];
     return enchantActivities.flatMap(activity => (activity.effects ?? [])
       .filter(profile => !profile.riders?.item?.length)
       .map(profile => ({ activity, effect: item.effects.get(profile._id) }))
@@ -137,7 +143,8 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
    * Resolve an enchant activity's own base-item restriction from its description header — either a fixed
    * list of explicitly named base items, or a type/category filter set for a `CompendiumBrowser` search.
    * @param {EnchantActivity} activity
-   * @returns {Promise<{ explicit: Item5e[] }|{ types: Set<string>, categoryFilters: object[], filters: object[] }>}
+   * @returns {Promise<{ explicit: Item5e[], label: string }
+   *   |{ types: Set<string>, categoryFilters: object[], filters: object[], label: string }>}
    */
   static async resolveBaseItemCandidates(activity) {
     const restrictionUuids = EnchantedItemBlueprint.#parseRestrictionUuids(activity.item);
@@ -174,6 +181,8 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
       : `${enchantItem.system.identifier}-${baseItem.system.identifier}`;
   }
 
+  /* -------------------------------------------- */
+  /*  Helpers                                     */
   /* -------------------------------------------- */
 
   /**
@@ -236,7 +245,7 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
    * @returns {{ activity: EnchantActivity, profile: object }|null}
    */
   static #findProfile(item, profileId) {
-    const enchantActivities = item.system.activities?.filter(a => a.type === "enchant") ?? [];
+    const enchantActivities = item.system.activities?.getByType("enchant") ?? [];
     for ( const activity of enchantActivities ) {
       const profile = activity.effects?.find(p => p._id === profileId);
       if ( profile ) return { activity, profile };

@@ -419,11 +419,11 @@ export function finalizeGroups(groups, { labelFor }={}) {
  */
 export async function preloadHandlebarsTemplates() {
   return foundry.applications.handlebars.loadTemplates([
-    "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs",
-    "modules/simple-shop-craft-5e/templates/partials/currency-inputs.hbs",
-    "modules/simple-shop-craft-5e/templates/partials/item-table.hbs",
-    "modules/simple-shop-craft-5e/templates/partials/rich-tooltip.hbs",
-    "modules/simple-shop-craft-5e/templates/partials/material-row.hbs",
+    "modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs",
+    "modules/simple-shop-craft-5e/templates/shared/currency-inputs.hbs",
+    "modules/simple-shop-craft-5e/templates/shared/item-table.hbs",
+    "modules/simple-shop-craft-5e/templates/shared/rich-tooltip.hbs",
+    "modules/simple-shop-craft-5e/templates/shared/material-row.hbs",
     "modules/simple-shop-craft-5e/templates/shop-manager/recipe-row.hbs",
     "modules/simple-shop-craft-5e/templates/shop-manager/shop-row.hbs",
     "modules/simple-shop-craft-5e/templates/shops/shop-sheet/buy-row.hbs",
@@ -521,7 +521,9 @@ export function needsDefaultPrice(item) {
 export function openItemSheet(item) {
   const sheet = item.sheet;
   if ( !sheet ) return;
-  if ( !item.collection?.has(item.id) ) Object.defineProperty(sheet, "isEditable", { get: () => false });
+  if ( !item.collection?.has(item.id) ) {
+    Object.defineProperty(sheet, "isEditable", { get: () => false, configurable: true });
+  }
   sheet.render(true);
 }
 
@@ -893,7 +895,7 @@ export function applyLoadingTooltip(el) {
  */
 export async function applyRichTooltip(el, data) {
   el.dataset.tooltipHtml = await foundry.applications.handlebars.renderTemplate(
-    "modules/simple-shop-craft-5e/templates/partials/rich-tooltip.hbs", data
+    "modules/simple-shop-craft-5e/templates/shared/rich-tooltip.hbs", data
   );
   el.dataset.tooltipClass = "dnd5e2 dnd5e-tooltip item-tooltip document-tooltip";
   el.dataset.tooltipDirection ??= "LEFT";

@@ -1,27 +1,11 @@
-<section>
+<section class="tab active generate-item-content">
     {{#each rows}}
     <fieldset>
-        <div class="form-group"><label>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Template" }}</label></div>
+        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Template" }}</legend>
         <div class="value-row">
-            {{> "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs" img=itemImg name=itemName }}
+            {{> "modules/simple-shop-craft-5e/templates/shared/item-avatar-name.hbs" img=itemImg name=itemName }}
         </div>
-        <hr>
-        {{#if (eq kind "spellScroll")}}
-        <div class="form-group"><label>{{ localize "TYPES.Item.spell" }}</label></div>
-        <div class="pill-lg {{#unless pick}}empty{{/unless}}" data-action="pickSpell" data-row="{{ index }}">
-            {{#if pick}}
-            <img class="gold-icon" src="{{ pick.img }}" alt="{{ pick.name }}">
-            <div class="name-stacked"><div class="title">{{ pick.name }}</div></div>
-            <button type="button" class="unbutton control-button item-control" data-action="pickSpell"
-                    data-row="{{ index }}" data-tooltip
-                    aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.PickSpell' }}">
-                <i class="fa-solid fa-magnifying-glass" inert></i>
-            </button>
-            {{else}}
-            {{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.PickSpell" }}
-            {{/if}}
-        </div>
-        {{else}}
+        {{#unless (eq kind "spellScroll")}}
         {{#if hasMultipleProfiles}}
         <div class="form-group">
             <label>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.EnchantProfile" }}</label>
@@ -32,24 +16,58 @@
             </select>
         </div>
         {{/if}}
-        {{#if baseItemOptions}}
-        <div class="form-group">
-            <label>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.BaseItem" }}</label>
-            <select name="baseItem-{{ index }}">
-                {{#each baseItemOptions}}
-                <option value="{{ value }}">{{ label }}</option>
-                {{/each}}
-            </select>
-        </div>
-        {{else}}
-        <div class="form-group"><label>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.BaseItem" }}</label></div>
-        <div class="pill-lg {{#unless pick}}empty{{/unless}}" data-action="pickBaseItem" data-row="{{ index }}">
+        {{/unless}}
+    </fieldset>
+    {{#if (eq kind "spellScroll")}}
+    <fieldset>
+        <legend>{{ localize "TYPES.Item.spell" }}</legend>
+        <div class="pill-lg {{#unless pick}}roboto-upper empty{{/unless}}" data-action="pickSpell" data-row="{{ index }}">
             {{#if pick}}
             <img class="gold-icon" src="{{ pick.img }}" alt="{{ pick.name }}">
-            <div class="name-stacked"><div class="title">{{ pick.name }}</div></div>
+            <div class="name-stacked">
+                <div class="title">{{ pick.name }}</div>
+            </div>
+            <button type="button" class="unbutton control-button item-control" data-action="pickSpell"
+                data-row="{{ index }}" data-tooltip
+                aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.PickSpell' }}">
+                <i class="fa-solid fa-magnifying-glass" inert></i>
+            </button>
+            {{else}}
+            {{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.PickSpell" }}
+            {{/if}}
+        </div>
+        {{#if pick}}
+        <div class="form-group">
+            <label>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Icon" }}</label>
+            <div class="form-fields">
+                {{ formInput ../imgField value=imgOverride placeholder=pick.img name=(concat "img-" index) }}
+                <img class="icon-picker-preview" src="{{#if imgOverride}}{{ imgOverride }}{{else}}{{ pick.img }}{{/if}}"
+                    alt="">
+            </div>
+        </div>
+        {{ formField ../identifierField value=identifierOverride placeholder=identifierPreview
+        name=(concat "identifier-" index) label="DND5E.Identifier" localize=true }}
+        {{/if}}
+    </fieldset>
+    {{else}}
+    <fieldset>
+        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.BaseItem" }}</legend>
+        {{#if baseItemOptions}}
+        <select name="baseItem-{{ index }}">
+            {{#each baseItemOptions}}
+            <option value="{{ value }}">{{ label }}</option>
+            {{/each}}
+        </select>
+        {{else}}
+        <div class="pill-lg {{#unless pick}}roboto-upper empty{{/unless}}" data-action="pickBaseItem" data-row="{{ index }}">
+            {{#if pick}}
+            <img class="gold-icon" src="{{ pick.img }}" alt="{{ pick.name }}">
+            <div class="name-stacked">
+                <div class="title">{{ pick.name }}</div>
+            </div>
             <button type="button" class="unbutton control-button item-control" data-action="pickBaseItem"
-                    data-row="{{ index }}" data-tooltip
-                    aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.PickBaseItem' }}">
+                data-row="{{ index }}" data-tooltip
+                aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.PickBaseItem' }}">
                 <i class="fa-solid fa-magnifying-glass" inert></i>
             </button>
             {{else}}
@@ -57,16 +75,19 @@
             {{/if}}
         </div>
         {{/if}}
-        {{/if}}
         {{#if pick}}
-        <div class="icon-picker-group">
-            {{ formGroup ../imgField value=imgOverride placeholder=pick.img name=(concat "img-" index)
-                         label="SIMPLE_SHOP_CRAFT_5E.ShopEditor.Icon" localize=true classes="full-width" }}
-            <img class="icon-picker-preview" src="{{#if imgOverride}}{{ imgOverride }}{{else}}{{ pick.img }}{{/if}}" alt="">
+        <div class="form-group">
+            <label>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Icon" }}</label>
+            <div class="form-fields">
+                {{ formInput ../imgField value=imgOverride placeholder=pick.img name=(concat "img-" index) }}
+                <img class="icon-picker-preview" src="{{#if imgOverride}}{{ imgOverride }}{{else}}{{ pick.img }}{{/if}}"
+                    alt="">
+            </div>
         </div>
         {{ formField ../identifierField value=identifierOverride placeholder=identifierPreview
-                     name=(concat "identifier-" index) label="DND5E.Identifier" localize=true }}
+        name=(concat "identifier-" index) label="DND5E.Identifier" localize=true }}
         {{/if}}
     </fieldset>
+    {{/if}}
     {{/each}}
 </section>

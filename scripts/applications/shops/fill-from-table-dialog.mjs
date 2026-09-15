@@ -1,12 +1,12 @@
 import { ShopItemEntry } from "../../data/shop-data.mjs";
 import { resolveItemPrice, toCopper } from "../../utils.mjs";
 
+const { Dialog5e } = game.dnd5e.applications.api;
+const { DocumentUUIDField, StringField } = foundry.data.fields;
+
 /**
  * @import ShopSheet from "./shop-sheet.mjs";
  */
-
-const { Dialog5e } = game.dnd5e.applications.api;
-const { DocumentUUIDField, StringField } = foundry.data.fields;
 
 /**
  * Dialog to draw items from a RollTable and add them to a shop's stock.
@@ -40,7 +40,7 @@ export default class FillFromTableDialog extends Dialog5e {
   /** @override */
   static PARTS = {
     ...super.PARTS,
-    content: { template: "modules/simple-shop-craft-5e/templates/partials/config-dialog-content.hbs" }
+    content: { template: "modules/simple-shop-craft-5e/templates/shared/config-dialog-content.hbs" }
   };
 
   /* -------------------------------------------- */

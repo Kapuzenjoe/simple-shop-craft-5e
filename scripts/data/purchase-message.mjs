@@ -1,7 +1,6 @@
 import { MODULE_ID } from "../config.mjs";
 
 import { EnchantedItemBlueprint } from "./enchanted-item-blueprint.mjs";
-import { LodgingBlueprint } from "./lodging-blueprint.mjs";
 import { Shop } from "./shop-data.mjs";
 import { SpellScrollBlueprint } from "./spell-scroll-blueprint.mjs";
 
@@ -52,7 +51,6 @@ export class PurchaseMessageData extends foundry.abstract.DataModel {
         uuid: new DocumentUUIDField({ type: "Item", blank: true }),
         generated: new EmbeddedDataField(EnchantedItemBlueprint, { nullable: true, initial: null }),
         spellScroll: new EmbeddedDataField(SpellScrollBlueprint, { nullable: true, initial: null }),
-        lodging: new EmbeddedDataField(LodgingBlueprint, { nullable: true, initial: null }),
         isService: new BooleanField({ initial: false }),
         name: new StringField(), img: new FilePathField({ categories: ["IMAGE"] }),
         quantity: new NumberField(), priceCP: new NumberField(), bundleSize: new NumberField({ initial: 1 }),
@@ -72,22 +70,23 @@ export class PurchaseMessageData extends foundry.abstract.DataModel {
 
   /**
    * Create a chat message requesting GM confirmation for a pending buy/sell transaction.
-   * @param {ShopSheet} shopSheet  The shop editor the transaction originates from.
-   * @param {Actor5e} actor        The acting actor.
-   * @param {object[]} buyLines    Buy cart lines, as prepared by {@link ShopSheet#cartLines}.
-   * @param {object[]} sellLines   Sell cart lines, as prepared by {@link ShopSheet#sellLines}.
-   * @param {object[]} totalParts  Combined (buy - sell) price breakdown parts.
-   * @param {number} netCP         Combined total in copper; negative = actor owes, positive = actor is owed.
+   * @param {object} options
+   * @param {ShopSheet} options.shopSheet  The shop editor the transaction originates from.
+   * @param {Actor5e} options.actor        The acting actor.
+   * @param {object[]} options.buyLines    Buy cart lines, as prepared by {@link ShopSheet#cartLines}.
+   * @param {object[]} options.sellLines   Sell cart lines, as prepared by {@link ShopSheet#sellLines}.
+   * @param {object[]} options.totalParts  Combined (buy - sell) price breakdown parts.
+   * @param {number} options.netCP         Combined total in copper; negative = actor owes, positive = actor is owed.
    * @returns {Promise<ChatMessage>}
    */
-  static async create(shopSheet, actor, buyLines, sellLines, totalParts, netCP) {
+  static async create({ shopSheet, actor, buyLines, sellLines, totalParts, netCP }) {
     const purchase = new PurchaseMessageData({
       shopId: shopSheet.shopId, shopName: shopSheet.shop.name, shopImg: shopSheet.shop.img,
       actorUuid: actor.uuid, actorName: actor.name,
       buyLines: buyLines.map(row => ({
         _id: row.entry._id, identifier: row.entry.identifier, uuid: row.entry.uuid,
         generated: row.entry.generated ?? null, spellScroll: row.entry.spellScroll ?? null,
-        lodging: row.entry.lodging ?? null, isService: row.entry.isService ?? false,
+        isService: row.entry.isService ?? false,
         name: row.item.name, img: row.item.img, quantity: row.cartQuantity, priceCP: row.priceCP,
         bundleSize: row.bundleSize ?? 1, subtotal: row.subtotal
       })),

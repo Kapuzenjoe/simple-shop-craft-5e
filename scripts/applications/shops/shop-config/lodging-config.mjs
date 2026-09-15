@@ -87,7 +87,7 @@ export default class LodgingConfig extends BaseShopConfig {
   /* -------------------------------------------- */
 
   /**
-   * Close instead of rendering once the edited entry no longer exists.
+   * @override
    * @see dnd5e — EffectChangeConfig#_canRender()
    */
   _canRender(options) {
@@ -110,7 +110,8 @@ export default class LodgingConfig extends BaseShopConfig {
     context.fields = [
       {
         field: LodgingBlueprint.schema.fields.tier, name: "tier", value: this.#tier,
-        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.LodgingTier"), options: tierOptions()
+        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.LodgingTier"),
+        options: Object.entries(LODGING_TIERS).map(([value, { label }]) => ({ value, label: _loc(label) }))
       },
       {
         field: LodgingBlueprint.schema.fields.name, name: "name", value: entry.lodging.name,
@@ -166,14 +167,4 @@ export default class LodgingConfig extends BaseShopConfig {
     });
     await this.onUpdate({ items });
   }
-}
-
-/* -------------------------------------------- */
-
-/**
- * Selectable lodging tiers.
- * @returns {{ value: string, label: string }[]}
- */
-function tierOptions() {
-  return Object.entries(LODGING_TIERS).map(([value, { label }]) => ({ value, label: _loc(label) }));
 }

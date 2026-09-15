@@ -1,12 +1,12 @@
 import { ShopItemEntry } from "../../data/shop-data.mjs";
 import { subtypeOptions } from "../../utils.mjs";
 
+const { Dialog5e } = game.dnd5e.applications.api;
+
 /**
  * @import { ShopItemEntryData } from "../../_types.mjs";
  * @import ShopSheet from "./shop-sheet.mjs";
  */
-
-const { Dialog5e } = game.dnd5e.applications.api;
 
 /**
  * Sentinel value meaning "no restriction on this axis" in a multi-select field.
@@ -54,6 +54,8 @@ export default class GenerateItemDialog extends Dialog5e {
     content: { template: "modules/simple-shop-craft-5e/templates/shops/generate-item-dialog/content.hbs" }
   };
 
+  /* -------------------------------------------- */
+  /*  Properties                                  */
   /* -------------------------------------------- */
 
   /**
@@ -154,6 +156,8 @@ export default class GenerateItemDialog extends Dialog5e {
   }
 
   /* -------------------------------------------- */
+  /*  Rendering                                   */
+  /* -------------------------------------------- */
 
   /** @inheritDoc */
   async _prepareContentContext(context, options) {
@@ -252,6 +256,8 @@ export default class GenerateItemDialog extends Dialog5e {
     return context;
   }
 
+  /* -------------------------------------------- */
+  /*  Event Listeners and Handlers                */
   /* -------------------------------------------- */
 
   /**

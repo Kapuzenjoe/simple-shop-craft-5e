@@ -52,9 +52,9 @@ export default class RecipeSheet extends Application5e {
     content: {
       template: "modules/simple-shop-craft-5e/templates/craft/recipe-sheet/content.hbs",
       templates: [
-        "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs",
-        "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs",
-        "modules/simple-shop-craft-5e/templates/partials/item-table.hbs"
+        "modules/simple-shop-craft-5e/templates/shared/item-avatar-name.hbs",
+        "modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs",
+        "modules/simple-shop-craft-5e/templates/shared/item-table.hbs"
       ]
     }
   };
@@ -178,7 +178,7 @@ export default class RecipeSheet extends Application5e {
         { id: "price", label: "DND5E.Price" },
         { id: "quantity", label: "DND5E.Quantity" }, { id: "controls" }, { id: "controls" }
       ],
-      rowTemplate: "modules/simple-shop-craft-5e/templates/partials/material-row.hbs"
+      rowTemplate: "modules/simple-shop-craft-5e/templates/shared/material-row.hbs"
     });
 
     context.targetItemUuidField = [

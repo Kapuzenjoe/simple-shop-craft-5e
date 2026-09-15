@@ -13,7 +13,7 @@
         </div>
         <div class="item-name item-tooltip rollable" data-action="openItemSheet" data-uuid="{{ item.uuid }}"
              role="button" aria-label="{{ item.name }}">
-            {{> "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs"
+            {{> "modules/simple-shop-craft-5e/templates/shared/item-avatar-name.hbs"
                 img=item.img name=item.name }}
             {{#if suppressed}}
             <i class="fa-solid fa-triangle-exclamation warning" data-tooltip="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.SuppressedCap' }}"></i>
@@ -26,9 +26,9 @@
             <span class="unit">%</span>
         </div>
         <div class="item-detail item-price">
-            {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=priceDisplay}}
+            {{> "modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs" parts=priceDisplay}}
         </div>
-        {{> "modules/simple-shop-craft-5e/templates/partials/item-weight-cell.hbs" weight=weight }}
+        {{> "modules/simple-shop-craft-5e/templates/shared/item-weight-cell.hbs" weight=weight }}
         <div class="item-detail item-quantity">
             <span>{{ owned }}</span>
         </div>

@@ -15,7 +15,7 @@
         <div class="item-name item-tooltip rollable" data-action="openItemSheet" data-key="{{ key }}"
              {{#unless entry.generated}}data-uuid="{{ item.uuid }}"{{/unless}}
              role="button" aria-label="{{ itemName }}">
-            {{> "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs"
+            {{> "modules/simple-shop-craft-5e/templates/shared/item-avatar-name.hbs"
                 img=itemImg name=itemName bundleSize=bundleSize }}
             {{#if entry.hireling.actorUuid}}
             <i class="fa-solid fa-link linked-actor-icon" data-action="openLinkedActor" data-key="{{ key }}"
@@ -50,11 +50,11 @@
                 <i class="fas fa-cog" inert></i>
             </button>
             {{else}}
-            {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=priceDisplay}}
+            {{> "modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs" parts=priceDisplay}}
             {{/if}}
         </div>
         {{#unless entry.isService}}
-        {{> "modules/simple-shop-craft-5e/templates/partials/item-weight-cell.hbs" weight=weight }}
+        {{> "modules/simple-shop-craft-5e/templates/shared/item-weight-cell.hbs" weight=weight }}
         {{/unless}}
         <div class="item-detail item-quantity">
             {{#if (and @root.editable @root.isEditMode)}}

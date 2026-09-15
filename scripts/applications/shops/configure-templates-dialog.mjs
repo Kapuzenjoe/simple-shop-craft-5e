@@ -50,6 +50,8 @@ export default class ConfigureTemplatesDialog extends Dialog5e {
   };
 
   /* -------------------------------------------- */
+  /*  Properties                                  */
+  /* -------------------------------------------- */
 
   /**
    * Whether the resulting entries are for the Services tab.
@@ -74,39 +76,7 @@ export default class ConfigureTemplatesDialog extends Dialog5e {
   #rows;
 
   /* -------------------------------------------- */
-
-  /** @inheritDoc */
-  async _onFirstRender(context, options) {
-    await super._onFirstRender(context, options);
-    for ( const row of this.#rows ) {
-      if ( row.kind === "enchant" ) await this.#resolveRowCandidates(row);
-    }
-    this.render({ parts: ["content", "footer"] });
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Resolve and cache the base-item candidates for a row's currently selected profile.
-   * @param {object} row
-   * @returns {Promise<void>}
-   */
-  async #resolveRowCandidates(row) {
-    const { activity } = row.profiles[row.profileIndex];
-    row.candidates = await EnchantedItemBlueprint.resolveBaseItemCandidates(activity);
-    row.baseItem = row.candidates.explicit?.[0] ?? null;
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Whether every row has a complete pick.
-   * @returns {boolean}
-   */
-  #isComplete() {
-    return this.#rows.every(row => (row.kind === "spellScroll") ? !!row.spell : !!row.baseItem);
-  }
-
+  /*  Rendering                                   */
   /* -------------------------------------------- */
 
   /** @inheritDoc */
@@ -148,6 +118,19 @@ export default class ConfigureTemplatesDialog extends Dialog5e {
   }
 
   /* -------------------------------------------- */
+  /*  Life-Cycle Handlers                         */
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  async _onFirstRender(context, options) {
+    await super._onFirstRender(context, options);
+    for ( const row of this.#rows ) {
+      if ( row.kind === "enchant" ) await this.#resolveRowCandidates(row);
+    }
+    this.render({ parts: ["content", "footer"] });
+  }
+
+  /* -------------------------------------------- */
 
   /** @inheritDoc */
   _onChangeForm(formConfig, event) {
@@ -166,6 +149,8 @@ export default class ConfigureTemplatesDialog extends Dialog5e {
     }
   }
 
+  /* -------------------------------------------- */
+  /*  Event Listeners and Handlers                */
   /* -------------------------------------------- */
 
   /**
@@ -194,6 +179,7 @@ export default class ConfigureTemplatesDialog extends Dialog5e {
    */
   static async #pickBaseItem(event, target) {
     const row = this.#rows[target.dataset.row];
+    if ( !row.candidates ) return;
     const { activity } = row.profiles[row.profileIndex];
     const { types, filters } = row.candidates;
     const uuid = await game.dnd5e.applications.CompendiumBrowser.selectOne({
@@ -238,5 +224,30 @@ export default class ConfigureTemplatesDialog extends Dialog5e {
     });
     await this.onSubmit(entries);
     await this.close();
+  }
+
+  /* -------------------------------------------- */
+  /*  Helpers                                     */
+  /* -------------------------------------------- */
+
+  /**
+   * Resolve and cache the base-item candidates for a row's currently selected profile.
+   * @param {object} row
+   * @returns {Promise<void>}
+   */
+  async #resolveRowCandidates(row) {
+    const { activity } = row.profiles[row.profileIndex];
+    row.candidates = await EnchantedItemBlueprint.resolveBaseItemCandidates(activity);
+    row.baseItem = row.candidates.explicit?.[0] ?? null;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Whether every row has a complete pick.
+   * @returns {boolean}
+   */
+  #isComplete() {
+    return this.#rows.every(row => (row.kind === "spellScroll") ? !!row.spell : !!row.baseItem);
   }
 }

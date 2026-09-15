@@ -3,10 +3,6 @@ import { formatDuration } from "../../utils.mjs";
 const { Dialog5e } = globalThis.dnd5e.applications.api;
 
 /**
- * @import { ActivityUseConfiguration } from "../../_types.mjs";
- */
-
-/**
  * Dialog replacing dnd5e's own activity usage dialog for the "Progress Craft" activity, letting the
  * player choose how many hours of progress this use contributes.
  * @param {object} options

@@ -1,8 +1,8 @@
+const { Dialog5e } = game.dnd5e.applications.api;
+
 /**
  * @import ShopSheet from "./shop-sheet.mjs";
  */
-
-const { Dialog5e } = game.dnd5e.applications.api;
 
 /**
  * Dialog to pick a Charisma skill and the NPC's attitude, then roll it against the shop NPC's DC for
@@ -34,7 +34,7 @@ export default class HaggleDialog extends Dialog5e {
   /** @override */
   static PARTS = {
     ...super.PARTS,
-    content: { template: "modules/simple-shop-craft-5e/templates/partials/config-dialog-content.hbs" }
+    content: { template: "modules/simple-shop-craft-5e/templates/shared/config-dialog-content.hbs" }
   };
 
   /* -------------------------------------------- */

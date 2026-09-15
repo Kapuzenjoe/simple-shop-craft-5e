@@ -277,7 +277,6 @@
  *                                                          match exists.
  * @property {EnchantedItemBlueprintData|null} generated    Enchant-generation blueprint, `null` for normal items.
  * @property {SpellScrollBlueprintData|null} spellScroll    Spell-scroll blueprint, `null` for normal items.
- * @property {LodgingBlueprintData|null} lodging            Lodging blueprint, `null` for normal items.
  * @property {boolean} [isService]                          Whether this is a Services-tab entry — money-only,
  *                                                          no item transfer on purchase.
  * @property {string} name                                  Display name of the purchased item.

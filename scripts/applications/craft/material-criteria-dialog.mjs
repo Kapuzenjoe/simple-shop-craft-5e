@@ -33,7 +33,7 @@ export default class MaterialCriteriaDialog extends Dialog5e {
   /** @override */
   static PARTS = {
     ...super.PARTS,
-    content: { template: "modules/simple-shop-craft-5e/templates/partials/config-dialog-content.hbs" }
+    content: { template: "modules/simple-shop-craft-5e/templates/shared/config-dialog-content.hbs" }
   };
 
   /* -------------------------------------------- */

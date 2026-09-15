@@ -1,10 +1,12 @@
 <section class="tab active config-content">
     <fieldset>
-        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.EditHireling" }}</legend>
-        <div class="icon-picker-group">
-            {{ formGroup imgField value=img placeholder=previewImg name="img"
-                         label="SIMPLE_SHOP_CRAFT_5E.ShopEditor.ServiceIcon" localize=true classes="full-width" }}
-            <img class="icon-picker-preview" src="{{ previewImg }}" alt="">
+        <legend>{{ localize legend }}</legend>
+        <div class="form-group">
+            <label>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.ServiceIcon" }}</label>
+            <div class="form-fields">
+                {{ formInput imgField value=img placeholder=previewImg name="img" }}
+                <img class="icon-picker-preview" src="{{ previewImg }}" alt="">
+            </div>
         </div>
         {{> "dnd5e.fieldlist" fields}}
     </fieldset>

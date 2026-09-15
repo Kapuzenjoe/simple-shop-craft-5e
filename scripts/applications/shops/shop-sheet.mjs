@@ -26,11 +26,11 @@ import PriceConfig from "./shop-config/price-config.mjs";
 import SettlementCapConfig from "./shop-config/settlement-cap-config.mjs";
 import VendorConfig from "./shop-config/vendor-config.mjs";
 
+const { Application5e } = game.dnd5e.applications.api;
+
 /**
  * @import { ShopItemEntryData } from "../../_types.mjs";
  */
-
-const { Application5e } = game.dnd5e.applications.api;
 
 /**
  * Column definitions for the Buy tab's item table.
@@ -128,7 +128,7 @@ export default class ShopSheet extends Application5e {
       deleteShop: ShopSheet.#deleteShop,
       duplicateShop: ShopSheet.#duplicateShop,
       editDiscount: ShopSheet.#editDiscount,
-      editImage: ShopSheet.#editImage,
+      editImage: ShopSheet._onEditImage,
       editMaxStock: ShopSheet.#editMaxStock,
       editModifiers: ShopSheet.#editModifiers,
       editOwner: ShopSheet.#editOwner,
@@ -165,41 +165,41 @@ export default class ShopSheet extends Application5e {
   static PARTS = {
     header: {
       template: "modules/simple-shop-craft-5e/templates/shops/shop-sheet/header.hbs",
-      templates: ["modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs"]
+      templates: ["modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs"]
     },
     tabs: {
       template: "systems/dnd5e/templates/shared/horizontal-tabs.hbs",
       templates: ["templates/generic/tab-navigation.hbs"]
     },
     buy: {
-      template: "modules/simple-shop-craft-5e/templates/partials/tab-item-table.hbs",
+      template: "modules/simple-shop-craft-5e/templates/shared/tab-item-table.hbs",
       templates: [
-        "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs",
-        "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs",
-        "modules/simple-shop-craft-5e/templates/partials/item-weight-cell.hbs",
-        "modules/simple-shop-craft-5e/templates/partials/item-table.hbs",
+        "modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs",
+        "modules/simple-shop-craft-5e/templates/shared/item-avatar-name.hbs",
+        "modules/simple-shop-craft-5e/templates/shared/item-weight-cell.hbs",
+        "modules/simple-shop-craft-5e/templates/shared/item-table.hbs",
         "modules/simple-shop-craft-5e/templates/shops/shop-sheet/buy-row.hbs"
       ],
       scrollable: [""]
     },
     sell: {
-      template: "modules/simple-shop-craft-5e/templates/partials/tab-item-table.hbs",
+      template: "modules/simple-shop-craft-5e/templates/shared/tab-item-table.hbs",
       templates: [
-        "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs",
-        "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs",
-        "modules/simple-shop-craft-5e/templates/partials/item-weight-cell.hbs",
-        "modules/simple-shop-craft-5e/templates/partials/item-table.hbs",
+        "modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs",
+        "modules/simple-shop-craft-5e/templates/shared/item-avatar-name.hbs",
+        "modules/simple-shop-craft-5e/templates/shared/item-weight-cell.hbs",
+        "modules/simple-shop-craft-5e/templates/shared/item-table.hbs",
         "modules/simple-shop-craft-5e/templates/shops/shop-sheet/sell-row.hbs"
       ],
       scrollable: [""]
     },
     services: {
-      template: "modules/simple-shop-craft-5e/templates/partials/tab-item-table.hbs",
+      template: "modules/simple-shop-craft-5e/templates/shared/tab-item-table.hbs",
       templates: [
-        "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs",
-        "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs",
-        "modules/simple-shop-craft-5e/templates/partials/item-weight-cell.hbs",
-        "modules/simple-shop-craft-5e/templates/partials/item-table.hbs",
+        "modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs",
+        "modules/simple-shop-craft-5e/templates/shared/item-avatar-name.hbs",
+        "modules/simple-shop-craft-5e/templates/shared/item-weight-cell.hbs",
+        "modules/simple-shop-craft-5e/templates/shared/item-table.hbs",
         "modules/simple-shop-craft-5e/templates/shops/shop-sheet/buy-row.hbs"
       ],
       scrollable: [""]
@@ -524,7 +524,7 @@ export default class ShopSheet extends Application5e {
    * Prepare rendering context for the footer part.
    * @param {ApplicationRenderContext} context  Context being prepared.
    * @param {HandlebarsRenderOptions} options   Options which configure application rendering behavior.
-   * @returns {ApplicationRenderContext}
+   * @returns {Promise<ApplicationRenderContext>}
    * @protected
    */
   async _prepareFooterContext(context, options) {
@@ -541,7 +541,7 @@ export default class ShopSheet extends Application5e {
    * Prepare rendering context for the description tab.
    * @param {ApplicationRenderContext} context  Context being prepared.
    * @param {HandlebarsRenderOptions} options   Options which configure application rendering behavior.
-   * @returns {ApplicationRenderContext}
+   * @returns {Promise<ApplicationRenderContext>}
    * @protected
    */
   async _prepareDescriptionContext(context, options) {
@@ -581,7 +581,7 @@ export default class ShopSheet extends Application5e {
    * Prepare rendering context for the buy tab.
    * @param {ApplicationRenderContext} context  Context being prepared.
    * @param {HandlebarsRenderOptions} options   Options which configure application rendering behavior.
-   * @returns {ApplicationRenderContext}
+   * @returns {Promise<ApplicationRenderContext>}
    * @protected
    */
   async _prepareBuyContext(context, options) {
@@ -599,7 +599,7 @@ export default class ShopSheet extends Application5e {
    * Prepare rendering context for the services tab.
    * @param {ApplicationRenderContext} context  Context being prepared.
    * @param {HandlebarsRenderOptions} options   Options which configure application rendering behavior.
-   * @returns {ApplicationRenderContext}
+   * @returns {Promise<ApplicationRenderContext>}
    * @protected
    */
   async _prepareServicesContext(context, options) {
@@ -617,7 +617,7 @@ export default class ShopSheet extends Application5e {
    * Prepare rendering context for the sell tab.
    * @param {ApplicationRenderContext} context  Context being prepared.
    * @param {HandlebarsRenderOptions} options   Options which configure application rendering behavior.
-   * @returns {ApplicationRenderContext}
+   * @returns {Promise<ApplicationRenderContext>}
    * @protected
    */
   async _prepareSellContext(context, options) {
@@ -646,13 +646,13 @@ export default class ShopSheet extends Application5e {
   _getItemContextOptions(key, entry) {
     return [
       {
-        label: "DND5E.ItemEdit",
+        label: "DND5E.ContextMenuActionEdit",
         icon: '<i class="fa-solid fa-pen-to-square fa-fw"></i>',
         onClick: () => this.#openLodgingConfig(key),
         visible: !!entry.lodging
       },
       {
-        label: "DND5E.ItemEdit",
+        label: "DND5E.ContextMenuActionEdit",
         icon: '<i class="fa-solid fa-pen-to-square fa-fw"></i>',
         onClick: () => this.#openHirelingConfig(key),
         visible: !!entry.hireling
@@ -666,7 +666,7 @@ export default class ShopSheet extends Application5e {
         visible: !entry.lodging && !entry.hireling
       },
       {
-        label: "DND5E.ItemDelete",
+        label: "DND5E.ContextMenuActionDelete",
         icon: '<i class="fas fa-trash fa-fw"></i>',
         onClick: () => this.#removeEntry(key)
       }
@@ -731,7 +731,10 @@ export default class ShopSheet extends Application5e {
 
   /* -------------------------------------------- */
 
-  /** @inheritDoc */
+  /**
+   * @inheritDoc
+   * @see dnd5e — PrimarySheet5e#changeTab()
+   */
   changeTab(tab, group, options) {
     super.changeTab(tab, group, options);
     if ( group !== "primary" ) return;
@@ -840,7 +843,9 @@ export default class ShopSheet extends Application5e {
           search: this.#serviceSearch, setSearch: v => this.#serviceSearch = v
         }
       }[partId];
-      const content = applyListControls(htmlElement, { sortModes: SORT_MODES, ...tabState, onSort: () => this.render() });
+      const content = applyListControls(
+        htmlElement, { sortModes: SORT_MODES, ...tabState, onSort: () => this.render() }
+      );
       if ( content ) applyItemSort(tabState.sort, content);
     }
   }
@@ -1119,13 +1124,10 @@ export default class ShopSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
-   * Handle opening the file picker to change this shop's image.
+   * @override
    * @see dnd5e — BaseApplication5e#_onEditImage()
-   * @this {ShopSheet}
-   * @param {Event} event         Triggering click event.
-   * @param {HTMLElement} target  The `<img data-edit="img">` element that was clicked.
    */
-  static async #editImage(event, target) {
+  static async _onEditImage(event, target) {
     const fp = new foundry.applications.apps.FilePicker.implementation({
       current: this.shop.img,
       type: "image",
@@ -1346,8 +1348,14 @@ export default class ShopSheet extends Application5e {
    */
   static async #openLinkedActor(event, target) {
     const entry = this.shop.items.find(i => ShopItemEntry.key(i) === target.dataset.key);
-    const actor = entry?.hireling?.actorUuid ? await fromUuid(entry.hireling.actorUuid) : null;
-    actor?.sheet?.render(true);
+    const actorUuid = entry?.hireling?.actorUuid;
+    if ( !actorUuid ) return;
+    const actor = await fromUuid(actorUuid);
+    if ( !actor ) {
+      ui.notifications.warn("WARNING.ObjectDoesNotExist", { format: { name: _loc("DOCUMENT.Actor"), identifier: actorUuid } });
+      return;
+    }
+    actor.sheet?.render(true);
   }
 
   /* -------------------------------------------- */
@@ -1716,7 +1724,7 @@ function isFixedValue(item, fixedValueLootTypes) {
 /**
  * Resolve a row's effective discount percent and the attribution sources behind it: item override, else
  * fixed-value (0%), else shop default + player modifier. Rendering the sources into a tooltip is left to
- * the caller (a View concern).
+ * the caller.
  * @param {object} options
  * @param {number|null} options.itemOverride    The item entry's own discount override, if any (buy-side only).
  * @param {boolean} options.isFixedValue        Whether the item is a fixed-value loot subtype (always 0%).

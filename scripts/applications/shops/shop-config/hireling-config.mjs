@@ -97,7 +97,7 @@ export default class HirelingConfig extends BaseShopConfig {
   /* -------------------------------------------- */
 
   /**
-   * Close instead of rendering once the edited entry no longer exists.
+   * @override
    * @see dnd5e — EffectChangeConfig#_canRender()
    */
   _canRender(options) {
@@ -122,7 +122,8 @@ export default class HirelingConfig extends BaseShopConfig {
     context.fields = [
       {
         field: HirelingBlueprint.schema.fields.type, name: "type", value: this.#type,
-        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.HirelingType"), options: typeOptions()
+        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.HirelingType"),
+        options: Object.entries(HIRELING_TYPES).map(([value, { label }]) => ({ value, label: _loc(label) }))
       },
       {
         field: HirelingBlueprint.schema.fields.name, name: "name", value: entry.hireling.name,
@@ -187,14 +188,4 @@ export default class HirelingConfig extends BaseShopConfig {
     });
     await this.onUpdate({ items });
   }
-}
-
-/* -------------------------------------------- */
-
-/**
- * Selectable hireling types.
- * @returns {{ value: string, label: string }[]}
- */
-function typeOptions() {
-  return Object.entries(HIRELING_TYPES).map(([value, { label }]) => ({ value, label: _loc(label) }));
 }

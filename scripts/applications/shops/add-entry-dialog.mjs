@@ -135,7 +135,9 @@ export default class AddEntryDialog extends Dialog5e {
    */
   async #refreshUuidWarning() {
     if ( this.isService ) return;
-    const item = this.#uuid ? await fromUuid(this.#uuid) : null;
+    const uuid = this.#uuid;
+    const item = uuid ? await fromUuid(uuid) : null;
+    if ( uuid !== this.#uuid ) return;
     this.#uuidWarning = !!item && isDefaultIdentifier(item);
     this.render({ parts: ["content"] });
   }

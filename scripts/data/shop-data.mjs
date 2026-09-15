@@ -609,8 +609,7 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
 
     const resolved = await ShopItemEntry.resolveMany(
       purchase.buyLines.map(line => ({
-        identifier: line.identifier, uuid: line.uuid, generated: line.generated, spellScroll: line.spellScroll,
-        lodging: line.lodging
+        identifier: line.identifier, uuid: line.uuid, generated: line.generated, spellScroll: line.spellScroll
       }))
     );
     const itemsToCreate = [];

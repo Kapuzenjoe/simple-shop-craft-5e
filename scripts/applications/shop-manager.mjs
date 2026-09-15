@@ -67,11 +67,11 @@ export default class ShopManager extends Application5e {
     tabs: { template: "templates/generic/tab-navigation.hbs" },
     shops: {
       template: "modules/simple-shop-craft-5e/templates/shop-manager/shops.hbs",
-      templates: ["modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs"]
+      templates: ["modules/simple-shop-craft-5e/templates/shared/item-avatar-name.hbs"]
     },
     recipes: {
       template: "modules/simple-shop-craft-5e/templates/shop-manager/recipes.hbs",
-      templates: ["modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs"]
+      templates: ["modules/simple-shop-craft-5e/templates/shared/item-avatar-name.hbs"]
     }
   };
 
@@ -315,6 +315,7 @@ export default class ShopManager extends Application5e {
   /**
    * Handle importing one or more recipes, each from its own exported JSON file.
    * @this {ShopManager}
+   * @see Core — ClientDocument#importFromJSONDialog()
    * @returns {Promise<void>}
    */
   static async #importRecipes() {
@@ -479,7 +480,7 @@ export default class ShopManager extends Application5e {
   _getRecipeContextOptions(recipe) {
     return [
       {
-        label: "DND5E.ItemEdit",
+        label: "DND5E.ContextMenuActionEdit",
         icon: '<i class="fa-solid fa-pen-to-square fa-fw"></i>',
         onClick: () => this.#editRecipe(recipe._id)
       },
@@ -500,6 +501,7 @@ export default class ShopManager extends Application5e {
 
   /**
    * Handle exporting a recipe to a JSON file.
+   * @see Core — ClientDocument#exportToJSON()
    * @param {Recipe} recipe
    * @returns {void}
    */
