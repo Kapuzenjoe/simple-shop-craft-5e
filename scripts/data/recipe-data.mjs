@@ -1,4 +1,4 @@
-import { SETTING_KEYS, UNLOCK_MODES } from "../config.mjs";
+import { SETTING_KEYS, SPELL_SCROLL_SOURCES, UNLOCK_MODES } from "../config.mjs";
 import { toCopper } from "../utils.mjs";
 
 import { migrateUnlockMode } from "./migration.mjs";
@@ -80,7 +80,13 @@ export class Recipe extends SettingCollectionMixin(foundry.abstract.DataModel, S
       durationOverride: new SchemaField({
         value: new NumberField({ initial: null, nullable: true, integer: true, min: 0 }),
         units: new StringField({ initial: "day", choices: ["minute", "hour", "day"] })
-      })
+      }),
+      spellScroll: new SchemaField({
+        level: new NumberField({ initial: 0, integer: true, min: 0, max: 9, required: true }),
+        spellSource: new StringField({
+          initial: "prepared", choices: Object.keys(SPELL_SCROLL_SOURCES), required: true
+        })
+      }, { nullable: true, initial: null })
     };
   }
 
@@ -91,6 +97,21 @@ export class Recipe extends SettingCollectionMixin(foundry.abstract.DataModel, S
     super._migrateData(source);
     migrateUnlockMode(source);
     return source;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * This recipe's display name: its own name if set, otherwise the target item's name — with the spell
+   * level appended for a spell-scroll recipe, or a generic placeholder if nothing resolves.
+   * @param {Item5e|null} targetItem  The resolved target item, if any.
+   * @returns {string}
+   */
+  displayName(targetItem) {
+    const itemName = this.spellScroll
+      ? `${_loc("SIMPLE_SHOP_CRAFT_5E.RecipeEditor.SpellScroll")}, ${_loc(CONFIG.DND5E.spellLevels[this.spellScroll.level])}`
+      : targetItem?.name;
+    return this.name || itemName || _loc("SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder");
   }
 
   /* -------------------------------------------- */

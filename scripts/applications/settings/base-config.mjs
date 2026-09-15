@@ -75,6 +75,7 @@ export default class BaseSettingsConfig extends HandlebarsApplicationMixin(Appli
   /**
    * Persist every changed setting from the submitted form, prompting a reload if any changed setting
    * requires one.
+   * @see Core — SettingsConfig#onSubmit()
    * @param {SubmitEvent} event
    * @param {HTMLFormElement} form
    * @param {FormDataExtended} formData

@@ -4,11 +4,11 @@ import { resolveIdentifierIndex } from "../../utils.mjs";
 
 import ShopSheet from "./shop-sheet.mjs";
 
+const { Dialog5e } = game.dnd5e.applications.api;
+
 /**
  * @import ShopManager from "../shop-manager.mjs";
  */
-
-const { Dialog5e } = game.dnd5e.applications.api;
 
 /**
  * Dialog to create a new shop: name/starter-pack prompt, then opens the full edit view.
@@ -38,7 +38,7 @@ export default class ShopCreateDialog extends Dialog5e {
   /** @override */
   static PARTS = {
     ...super.PARTS,
-    content: { template: "modules/simple-shop-craft-5e/templates/partials/config-dialog-content.hbs" }
+    content: { template: "modules/simple-shop-craft-5e/templates/shared/config-dialog-content.hbs" }
   };
 
   /* -------------------------------------------- */

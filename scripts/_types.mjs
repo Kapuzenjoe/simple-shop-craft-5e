@@ -34,6 +34,9 @@
  * @property {string} generated.effectId          Id of the specific enchantment effect applied.
  * @property {object|null} spellScroll   Recipe for a generated spell scroll, `null` for normal entries.
  * @property {string} spellScroll.spellUuid       UUID of the spell the scroll casts.
+ * @property {boolean} isService         Whether this entry is a service (Services tab) instead of a normal item.
+ * @property {LodgingBlueprintData|null} lodging  Lodging blueprint, `null` for non-lodging entries.
+ * @property {HirelingBlueprintData|null} hireling  Hireling blueprint, `null` for non-hireling entries.
  */
 
 /* -------------------------------------------- */
@@ -136,6 +139,10 @@
  * @property {object} durationOverride
  * @property {number|null} durationOverride.value  Manual override amount. `null` uses the rules-based value.
  * @property {string} durationOverride.units       Unit for the override (`minute`, `hour`, or `day`).
+ * @property {object|null} spellScroll             Spell-scroll mode config, or `null` for a normal recipe.
+ * @property {number} spellScroll.level             Spell level this recipe produces a scroll for (0 = cantrip).
+ * @property {string} spellScroll.spellSource       Which of the actor's spells are eligible: `"prepared"`,
+ *                                                  `"owned"`, or `"compendium"`.
  */
 
 /* -------------------------------------------- */
@@ -147,6 +154,7 @@
  * @property {string} [targetItem.identifier]  Stable `system.identifier` of the item this craft produces.
  * @property {string} [targetItem.uuid]        Direct UUID reference, used when no `system.identifier` match exists.
  * @property {number} targetQuantity           Units to produce when this craft completes.
+ * @property {string} spellUuid                Chosen spell UUID for a spell-scroll craft, or blank.
  * @property {string} activityId               Id of the "Progress Craft" activity on the tracked item.
  * @property {number} totalHours               Total progress hours needed to finish the craft.
  * @property {number|null} hoursPerUse         Progress hours added per activation. `null` uses the module default.
@@ -165,6 +173,8 @@
  * @property {string} baseItemUuid      UUID of the base item the enchantment is applied to.
  * @property {string} enchantItemUuid   UUID of the item granting the enchantment.
  * @property {string} effectId          Id of the specific enchantment effect applied.
+ * @property {string} img               Icon override, falls back to the base item's own icon.
+ * @property {string} identifier        Identifier override, falls back to the resolved enchant identifier.
  */
 
 /* -------------------------------------------- */
@@ -172,6 +182,30 @@
 /**
  * @typedef SpellScrollBlueprintData
  * @property {string} spellUuid  UUID of the spell the scroll casts.
+ * @property {string} img         Icon override, falls back to the generated scroll's own icon.
+ * @property {string} identifier  Identifier override, falls back to the resolved scroll identifier.
+ */
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef LodgingBlueprintData
+ * @property {string} tier         Lodging tier key (`LODGING_TIERS`).
+ * @property {string} name         Display name override, falls back to the tier's own name.
+ * @property {string} description  Description text.
+ * @property {string} img          Icon path.
+ */
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef HirelingBlueprintData
+ * @property {string} type          Hireling type key (`HIRELING_TYPES`).
+ * @property {string} name          Display name override, falls back to the type's own name.
+ * @property {string} description   Description text.
+ * @property {string} img           Icon path override; falls back to the linked actor's image, then a
+ *                                  generic placeholder.
+ * @property {string} actorUuid     Optional UUID of a linked Actor.
  */
 
 /* -------------------------------------------- */
@@ -196,6 +230,7 @@
  * @property {number} targetQuantity              Units to produce when this craft completes.
  * @property {string} targetName                  Display name of the produced item.
  * @property {string} targetImg                   Image path of the produced item.
+ * @property {string} spellUuid                   Chosen spell UUID for a spell-scroll craft, or blank.
  * @property {string} actorUuid                   UUID of the crafting actor.
  * @property {string} actorName                   Display name of the crafting actor.
  * @property {string|null} toolKey                Tool proficiency key used, or `null` if none required.
@@ -236,11 +271,14 @@
 
 /**
  * @typedef PurchaseBuyLine
+ * @property {string} [_id]                                 Stable id, used when neither identifier nor uuid is set.
  * @property {string} [identifier]                         Stable `system.identifier` of the referenced item.
  * @property {string} [uuid]                                Direct UUID reference, used when no `system.identifier`
  *                                                          match exists.
  * @property {EnchantedItemBlueprintData|null} generated    Enchant-generation blueprint, `null` for normal items.
  * @property {SpellScrollBlueprintData|null} spellScroll    Spell-scroll blueprint, `null` for normal items.
+ * @property {boolean} [isService]                          Whether this is a Services-tab entry — money-only,
+ *                                                          no item transfer on purchase.
  * @property {string} name                                  Display name of the purchased item.
  * @property {string} img                                   Image path of the purchased item.
  * @property {number} quantity                              Quantity purchased.

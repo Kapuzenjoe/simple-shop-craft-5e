@@ -1,11 +1,11 @@
 import { PurchaseMessageData } from "../../data/purchase-message.mjs";
 import { breakdownCopper } from "../../utils.mjs";
 
+const { Dialog5e } = game.dnd5e.applications.api;
+
 /**
  * @import ShopSheet from "./shop-sheet.mjs";
  */
-
-const { Dialog5e } = game.dnd5e.applications.api;
 
 /**
  * Window showing the current shopping cart for a shop, with a confirm action.
@@ -81,9 +81,12 @@ export default class ShopCart extends Dialog5e {
   async _prepareContentContext(context, options) {
     context = await super._prepareContentContext(context, options);
     const state = this.#computeState();
-    context.buyRows = state.lines.map(row => ({
+    const buyRows = state.lines.map(row => ({
+      isService: row.entry.isService,
       img: row.item.img, name: row.item.name, quantity: row.cartQuantity, subtotal: row.subtotal
     }));
+    context.buyRows = buyRows.filter(row => !row.isService);
+    context.serviceRows = buyRows.filter(row => row.isService);
     context.sellRows = state.sellLines.map(row => ({
       img: row.item.img, name: row.item.name, quantity: row.sellQuantity, subtotal: row.subtotal
     }));
@@ -117,9 +120,10 @@ export default class ShopCart extends Dialog5e {
    */
   static async #onSubmit(event, form, formData) {
     const state = this.#computeState();
-    await PurchaseMessageData.create(
-      this.shopSheet, state.actor, state.lines, state.sellLines, state.total.parts, state.netCP
-    );
+    await PurchaseMessageData.create({
+      shopSheet: this.shopSheet, actor: state.actor, buyLines: state.lines, sellLines: state.sellLines,
+      totalParts: state.total.parts, netCP: state.netCP
+    });
     ui.notifications.info("SIMPLE_SHOP_CRAFT_5E.ShopCart.PurchaseRequested", { localize: true });
     this.shopSheet.cart.clear();
     this.shopSheet.sellCart.clear();

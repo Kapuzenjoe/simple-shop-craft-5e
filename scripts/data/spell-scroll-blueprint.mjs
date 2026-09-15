@@ -1,4 +1,6 @@
-const { DocumentUUIDField } = foundry.data.fields;
+import { createSpellScroll } from "../utils.mjs";
+
+const { DocumentUUIDField, FilePathField, StringField } = foundry.data.fields;
 
 /**
  * @import { SpellScrollBlueprintData } from "../_types.mjs";
@@ -15,7 +17,9 @@ export class SpellScrollBlueprint extends foundry.abstract.DataModel {
   /** @override */
   static defineSchema() {
     return {
-      spellUuid: new DocumentUUIDField({ type: "Item", blank: true })
+      spellUuid: new DocumentUUIDField({ type: "Item", blank: true }),
+      img: new FilePathField({ categories: ["IMAGE"], blank: true }),
+      identifier: new StringField({ blank: true })
     };
   }
 
@@ -27,11 +31,11 @@ export class SpellScrollBlueprint extends foundry.abstract.DataModel {
    * @returns {Promise<Item5e|null>}
    */
   async resolve() {
-    const scroll = await Item.implementation.createScrollFromCompendiumSpell(this.spellUuid, { dialog: false });
-    if ( !scroll ) return null;
-    const level = scroll.system.activities?.find(a => a.type === "cast")?.spell?.level ?? 0;
     const spell = await fromUuid(this.spellUuid);
-    scroll.updateSource({ "system.identifier": `spell-scroll-${level}-${spell?.system.identifier ?? spell?.id}` });
+    if ( !spell ) return null;
+    const scroll = await createSpellScroll(spell);
+    if ( this.img ) scroll.updateSource({ img: this.img });
+    if ( this.identifier ) scroll.updateSource({ "system.identifier": this.identifier });
     return scroll;
   }
 }

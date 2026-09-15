@@ -5,7 +5,7 @@ import { Shop } from "./shop-data.mjs";
 import { SpellScrollBlueprint } from "./spell-scroll-blueprint.mjs";
 
 const {
-  ArrayField, DocumentUUIDField, EmbeddedDataField, FilePathField, NumberField, SchemaField, StringField
+  ArrayField, BooleanField, DocumentUUIDField, EmbeddedDataField, FilePathField, NumberField, SchemaField, StringField
 } = foundry.data.fields;
 
 /**
@@ -46,10 +46,12 @@ export class PurchaseMessageData extends foundry.abstract.DataModel {
       actorUuid: new DocumentUUIDField({ type: "Actor" }),
       actorName: new StringField(),
       buyLines: new ArrayField(new SchemaField({
+        _id: new StringField({ blank: true }),
         identifier: new StringField({ blank: true }),
         uuid: new DocumentUUIDField({ type: "Item", blank: true }),
         generated: new EmbeddedDataField(EnchantedItemBlueprint, { nullable: true, initial: null }),
         spellScroll: new EmbeddedDataField(SpellScrollBlueprint, { nullable: true, initial: null }),
+        isService: new BooleanField({ initial: false }),
         name: new StringField(), img: new FilePathField({ categories: ["IMAGE"] }),
         quantity: new NumberField(), priceCP: new NumberField(), bundleSize: new NumberField({ initial: 1 }),
         subtotal: currencyPartsField()
@@ -68,21 +70,23 @@ export class PurchaseMessageData extends foundry.abstract.DataModel {
 
   /**
    * Create a chat message requesting GM confirmation for a pending buy/sell transaction.
-   * @param {ShopSheet} shopSheet  The shop editor the transaction originates from.
-   * @param {Actor5e} actor        The acting actor.
-   * @param {object[]} buyLines    Buy cart lines, as prepared by {@link ShopSheet#cartLines}.
-   * @param {object[]} sellLines   Sell cart lines, as prepared by {@link ShopSheet#sellLines}.
-   * @param {object[]} totalParts  Combined (buy - sell) price breakdown parts.
-   * @param {number} netCP         Combined total in copper; negative = actor owes, positive = actor is owed.
+   * @param {object} options
+   * @param {ShopSheet} options.shopSheet  The shop editor the transaction originates from.
+   * @param {Actor5e} options.actor        The acting actor.
+   * @param {object[]} options.buyLines    Buy cart lines, as prepared by {@link ShopSheet#cartLines}.
+   * @param {object[]} options.sellLines   Sell cart lines, as prepared by {@link ShopSheet#sellLines}.
+   * @param {object[]} options.totalParts  Combined (buy - sell) price breakdown parts.
+   * @param {number} options.netCP         Combined total in copper; negative = actor owes, positive = actor is owed.
    * @returns {Promise<ChatMessage>}
    */
-  static async create(shopSheet, actor, buyLines, sellLines, totalParts, netCP) {
+  static async create({ shopSheet, actor, buyLines, sellLines, totalParts, netCP }) {
     const purchase = new PurchaseMessageData({
       shopId: shopSheet.shopId, shopName: shopSheet.shop.name, shopImg: shopSheet.shop.img,
       actorUuid: actor.uuid, actorName: actor.name,
       buyLines: buyLines.map(row => ({
-        identifier: row.entry.identifier, uuid: row.entry.uuid,
+        _id: row.entry._id, identifier: row.entry.identifier, uuid: row.entry.uuid,
         generated: row.entry.generated ?? null, spellScroll: row.entry.spellScroll ?? null,
+        isService: row.entry.isService ?? false,
         name: row.item.name, img: row.item.img, quantity: row.cartQuantity, priceCP: row.priceCP,
         bundleSize: row.bundleSize ?? 1, subtotal: row.subtotal
       })),
@@ -130,7 +134,8 @@ export class PurchaseMessageData extends foundry.abstract.DataModel {
    */
   async renderContent() {
     return foundry.applications.handlebars.renderTemplate(TEMPLATE, {
-      ...this.toObject(), pending: this.status === "pending", statusLabel: _loc(STATUS_LABELS[this.status])
+      ...this.toObject(), pending: this.status === "pending", statusLabel: _loc(STATUS_LABELS[this.status]),
+      buyLines: this.buyLines.filter(l => !l.isService), serviceLines: this.buyLines.filter(l => l.isService)
     });
   }
 

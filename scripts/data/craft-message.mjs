@@ -50,6 +50,7 @@ export class CraftMessageData extends foundry.abstract.DataModel {
       actorUuid: new DocumentUUIDField({ type: "Actor" }),
       actorName: new StringField(),
       toolKey: new StringField({ nullable: true, initial: null }),
+      spellUuid: new DocumentUUIDField({ type: "Item", blank: true }),
       materialLines: new ArrayField(new SchemaField({
         itemId: new StringField(), name: new StringField(), img: new FilePathField({ categories: ["IMAGE"] }),
         quantity: new NumberField()
@@ -87,6 +88,7 @@ export class CraftMessageData extends foundry.abstract.DataModel {
    * @param {{ item: Item5e, quantity: number }[]} options.materialLines  Owned items contributed as materials.
    * @param {number} options.goldCP                     Copper amount filled in from the actor's own currency.
    * @param {string|null} options.toolKey               Tool proficiency key used, if any.
+   * @param {string|null} options.spellUuid              Chosen spell UUID, for a spell-scroll recipe.
    * @param {number} options.totalHours                 Total progress hours needed to finish the craft.
    * @param {number} options.hoursPerUse                Progress hours added by each "Progress Craft" activation.
    * @param {{ value: number, units: string }} options.weight              Target item's weight.
@@ -94,7 +96,7 @@ export class CraftMessageData extends foundry.abstract.DataModel {
    * @returns {Promise<ChatMessage>}
    */
   static async create({
-    actor, recipe, targetItem, materialLines, goldCP, toolKey, totalHours, hoursPerUse, weight, halfPrice
+    actor, recipe, targetItem, materialLines, goldCP, toolKey, spellUuid, totalHours, hoursPerUse, weight, halfPrice
   }) {
     const craft = new CraftMessageData({
       recipeId: recipe._id,
@@ -102,6 +104,7 @@ export class CraftMessageData extends foundry.abstract.DataModel {
       targetQuantity: recipe.targetQuantity,
       targetName: targetItem.name, targetImg: targetItem.img,
       actorUuid: actor.uuid, actorName: actor.name, toolKey: toolKey || null,
+      spellUuid: spellUuid || "",
       materialLines: materialLines.map(line => ({
         itemId: line.item.id, name: line.item.name, img: line.item.img, quantity: line.quantity
       })),

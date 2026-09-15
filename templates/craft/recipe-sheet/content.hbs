@@ -6,7 +6,7 @@
         <li class="item">
             <div class="item-row">
                 <div class="item-name">
-                    {{> "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs"
+                    {{> "modules/simple-shop-craft-5e/templates/shared/item-avatar-name.hbs"
                         img=recipe.img name=targetItem.name }}
                 </div>
                 <div class="item-detail item-controls always-visible">
@@ -26,6 +26,13 @@
     {{> "dnd5e.fieldlist" targetItemUuidField}}
     {{/if}}
 </fieldset>
+
+{{#if spellScrollFields}}
+<fieldset>
+    <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.SpellScroll" }}</legend>
+    {{> "dnd5e.fieldlist" spellScrollFields}}
+</fieldset>
+{{/if}}
 
 {{#if targetItem}}
 <fieldset>
@@ -47,18 +54,18 @@
     </legend>
     {{> "dnd5e.fieldlist" materialFields}}
     <section class="currency">
-        {{> "modules/simple-shop-craft-5e/templates/partials/currency-inputs.hbs" rows=materialPriceRows}}
+        {{> "modules/simple-shop-craft-5e/templates/shared/currency-inputs.hbs" rows=materialPriceRows}}
     </section>
     <p class="hint{{#unless requiredValueMet}} warning{{/unless}}">
         {{#if recipe.ignoreCraftValue}}
         {{ localize "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.CraftValueIgnored" }}
         {{else}}
         {{ localize "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.RequiredMaterialsValue" }}:
-        {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=requiredValueParts}}
-        / {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=thresholdParts}}
+        {{> "modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs" parts=requiredValueParts}}
+        / {{> "modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs" parts=thresholdParts}}
         {{/if}}
     </p>
-    {{> "modules/simple-shop-craft-5e/templates/partials/item-table.hbs" materialsTable}}
+    {{> "modules/simple-shop-craft-5e/templates/shared/item-table.hbs" materialsTable}}
     <div class="drop-area" data-drop-area>
         <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.DropMaterialHint" }}</p>
     </div>

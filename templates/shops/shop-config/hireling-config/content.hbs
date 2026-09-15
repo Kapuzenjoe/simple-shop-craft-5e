@@ -1,0 +1,17 @@
+<section class="tab active config-content">
+    <fieldset>
+        <legend>{{ localize legend }}</legend>
+        <div class="form-group">
+            <label>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.ServiceIcon" }}</label>
+            <div class="form-fields">
+                {{ formInput imgField value=img placeholder=previewImg name="img" }}
+                <img class="icon-picker-preview" src="{{ previewImg }}" alt="">
+            </div>
+        </div>
+        {{> "dnd5e.fieldlist" fields}}
+    </fieldset>
+    <fieldset>
+        <legend>{{ localize "DND5E.Description" }}</legend>
+        <prose-mirror name="description" value="{{ description }}"></prose-mirror>
+    </fieldset>
+</section>

@@ -26,7 +26,33 @@
                             <span class="title">{{ this.name }}</span>
                             <span class="subtitle">&times;{{ this.quantity }}</span>
                         </div>
-                        {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=this.subtotal }}
+                        {{> "modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs" parts=this.subtotal }}
+                    </li>
+                    {{/each}}
+                </ul>
+            </div>
+        </div>
+    </div>
+    {{/if}}
+
+    {{#if serviceLines.length}}
+    <div class="card-tray service-tray collapsible">
+        <label class="roboto-upper">
+            <i class="fa-solid fa-bell-concierge" inert></i>
+            <span>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Services" }} ({{ serviceLines.length }})</span>
+            <i class="fa-solid fa-caret-down" inert></i>
+        </label>
+        <div class="collapsible-content">
+            <div class="wrapper">
+                <ul class="value-list unlist">
+                    {{#each serviceLines}}
+                    <li class="value-row">
+                        <img class="gold-icon" src="{{ this.img }}" alt="{{ this.name }}">
+                        <div class="name-stacked">
+                            <span class="title">{{ this.name }}</span>
+                            <span class="subtitle">&times;{{ this.quantity }}</span>
+                        </div>
+                        {{> "modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs" parts=this.subtotal }}
                     </li>
                     {{/each}}
                 </ul>
@@ -52,7 +78,7 @@
                             <span class="title">{{ this.name }}</span>
                             <span class="subtitle">&times;{{ this.quantity }}</span>
                         </div>
-                        {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=this.subtotal }}
+                        {{> "modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs" parts=this.subtotal }}
                     </li>
                     {{/each}}
                 </ul>
@@ -67,7 +93,7 @@
                 <div class="name-stacked">
                     <span class="title">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopCart.Total" }}</span>
                 </div>
-                {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=total }}
+                {{> "modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs" parts=total }}
             </li>
         </ul>
     </div>

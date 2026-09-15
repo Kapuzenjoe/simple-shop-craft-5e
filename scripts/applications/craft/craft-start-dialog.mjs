@@ -1,9 +1,9 @@
 import { CraftMessageData } from "../../data/craft-message.mjs";
 import { Recipe } from "../../data/recipe-data.mjs";
 import {
-  applyDropArea, applyLoadingTooltip, breakdownCopper, buildItemTableSections, effectiveCraftCost, maxHoursPerWorkday,
-  needsDefaultPrice, openItemSheet, resolveBundleSizes, resolveEntries, resolveItemPrice, resolveTotalHours,
-  selectableActors, subtypeOptions, toCopper
+  applyDropArea, applyLoadingTooltip, breakdownCopper, buildItemTableSections, maxHoursPerWorkday,
+  needsDefaultPrice, openItemSheet, recipeCraftCost, resolveBundleSizes, resolveEntries, resolveItemPrice,
+  resolveTotalHours, selectableActors, subtypeOptions, toCopper
 } from "../../utils.mjs";
 
 const { Dialog5e } = game.dnd5e.applications.api;
@@ -28,8 +28,10 @@ export default class CraftStartDialog extends Dialog5e {
     window: { resizable: true },
     position: { width: 420, height: "auto" },
     actions: {
+      chooseSpell: CraftStartDialog.#chooseSpell,
       openItemSheet: CraftStartDialog.#openItemSheet,
       removeMaterial: CraftStartDialog.#removeMaterial,
+      removeSpell: CraftStartDialog.#removeSpell,
       startCraft: CraftStartDialog.#startCraft,
       stepMaterialQuantity: CraftStartDialog.#stepMaterialQuantity
     }
@@ -43,12 +45,14 @@ export default class CraftStartDialog extends Dialog5e {
     content: {
       template: "modules/simple-shop-craft-5e/templates/craft/craft-start-dialog/content.hbs",
       templates: [
-        "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs",
-        "modules/simple-shop-craft-5e/templates/partials/item-table.hbs"
+        "modules/simple-shop-craft-5e/templates/shared/item-avatar-name.hbs",
+        "modules/simple-shop-craft-5e/templates/shared/item-table.hbs"
       ]
     }
   };
 
+  /* -------------------------------------------- */
+  /*  Properties                                  */
   /* -------------------------------------------- */
 
   /**
@@ -116,6 +120,14 @@ export default class CraftStartDialog extends Dialog5e {
   /* -------------------------------------------- */
 
   /**
+   * UUID of the chosen spell for a spell-scroll recipe.
+   * @type {string|null}
+   */
+  #chosenSpellUuid = null;
+
+  /* -------------------------------------------- */
+
+  /**
    * The currently selected crafting actor.
    * @type {Actor5e|null}
    */
@@ -137,44 +149,18 @@ export default class CraftStartDialog extends Dialog5e {
 
   /** @override */
   get title() {
-    return this.recipe?.name || this.#targetItemName || _loc("SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder");
+    return this.#targetItemName || _loc("SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder");
   }
 
   /* -------------------------------------------- */
-
-  /** @inheritDoc */
-  async _onRender(context, options) {
-    await super._onRender(context, options);
-    if ( this.hasFrame ) this.window.title.innerText = this.title;
-
-    this.element.addEventListener("change", event => {
-      if ( event.target.name === "selectedActor" ) {
-        this.selectedActorUuid = event.target.value;
-        this.#freeformIds.clear();
-        this.#toolKey = null;
-        this.#workshopClaimed = false;
-        this.#fillWithGold = false;
-        this.#materialQuantities.clear();
-      }
-      else if ( event.target.name === "toolKey" ) this.#toolKey = event.target.value;
-      else if ( event.target.name === "workshopClaimed" ) this.#workshopClaimed = event.target.checked;
-      else if ( event.target.name === "fillWithGold" ) this.#fillWithGold = event.target.checked;
-      else return;
-      this.render({ parts: ["content", "footer"] });
-    });
-
-    applyDropArea(this.element.querySelector("[data-drop-area]"), event => this.#onDropItem(event));
-
-    this.element.querySelectorAll(".item-tooltip[data-uuid]").forEach(applyLoadingTooltip);
-  }
-
+  /*  Rendering                                   */
   /* -------------------------------------------- */
 
   /** @inheritDoc */
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
     context.state = await this.#computeState();
-    this.#targetItemName = context.state.targetItem?.name ?? null;
+    this.#targetItemName = context.state.recipe.displayName(context.state.targetItem);
     return context;
   }
 
@@ -191,9 +177,26 @@ export default class CraftStartDialog extends Dialog5e {
     ].map(o => ({ ...o, selected: o.value === this.selectedActorUuid }));
     context.recipe = state.recipe;
     context.targetItem = state.targetItem;
-    context.displayName = state.recipe.name || state.targetItem?.name
-      || _loc("SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder");
+    context.displayName = this.#targetItemName;
     context.noActor = !state.actor;
+
+    context.spellField = null;
+    context.noEligibleSpell = false;
+    context.chosenSpell = null;
+    if ( state.recipe.spellScroll ) {
+      if ( state.recipe.spellScroll.spellSource === "compendium" ) {
+        context.chosenSpell = state.chosenSpell;
+      } else {
+        context.noEligibleSpell = !state.spellOptions.length;
+        if ( state.spellOptions.length ) {
+          context.spellField = [{
+            field: new foundry.data.fields.StringField(), name: "spellUuid", value: state.chosenSpell?.uuid ?? "",
+            options: state.spellOptions.map(i => ({ value: i.uuid, label: i.name }))
+          }];
+        }
+      }
+    }
+
     context.materialsTable = buildMaterialsTable(state);
     context.allowFreeform = state.recipe.allowFreeformMaterials;
     context.suppliedParts = breakdownCopper(state.suppliedCP);
@@ -256,6 +259,168 @@ export default class CraftStartDialog extends Dialog5e {
   }
 
   /* -------------------------------------------- */
+  /*  Life-Cycle Handlers                         */
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  async _onRender(context, options) {
+    await super._onRender(context, options);
+    if ( this.hasFrame ) this.window.title.innerText = this.title;
+
+    this.element.addEventListener("change", event => {
+      if ( event.target.name === "selectedActor" ) {
+        this.selectedActorUuid = event.target.value;
+        this.#freeformIds.clear();
+        this.#toolKey = null;
+        this.#workshopClaimed = false;
+        this.#fillWithGold = false;
+        this.#materialQuantities.clear();
+        this.#chosenSpellUuid = null;
+      }
+      else if ( event.target.name === "toolKey" ) this.#toolKey = event.target.value;
+      else if ( event.target.name === "workshopClaimed" ) this.#workshopClaimed = event.target.checked;
+      else if ( event.target.name === "fillWithGold" ) this.#fillWithGold = event.target.checked;
+      else if ( event.target.name === "spellUuid" ) this.#chosenSpellUuid = event.target.value || null;
+      else return;
+      this.render({ parts: ["content", "footer"] });
+    });
+
+    applyDropArea(this.element.querySelector("[data-drop-area]"), event => this.#onDropItem(event));
+
+    this.element.querySelectorAll(".item-tooltip[data-uuid]").forEach(applyLoadingTooltip);
+  }
+
+  /* -------------------------------------------- */
+  /*  Event Listeners and Handlers                */
+  /* -------------------------------------------- */
+
+  /**
+   * Handle a drop of an owned item onto the freeform-materials drop area.
+   * @param {DragEvent} event
+   * @returns {Promise<void>}
+   */
+  async #onDropItem(event) {
+    event.preventDefault();
+    event.currentTarget.classList.remove("is-dragover");
+    const data = foundry.applications.ux.TextEditor.implementation.getDragEventData(event);
+    if ( data?.type !== "Item" ) return;
+    const item = await Item.implementation.fromDropData(data);
+    if ( !item || (item.parent !== this.actor) ) {
+      ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.CraftStart.MustOwnMaterial", { localize: true });
+      return;
+    }
+    this.#freeformIds.add(item.id);
+    this.render({ parts: ["content", "footer"] });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle removing a freeform material.
+   * @this {CraftStartDialog}
+   * @param {Event} event         Triggering click event.
+   * @param {HTMLElement} target  Button that was clicked.
+   */
+  static #removeMaterial(event, target) {
+    this.#freeformIds.delete(target.dataset.itemId);
+    this.render({ parts: ["content", "footer"] });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle adjusting how many units of a criteria-slot candidate are contributed.
+   * @this {CraftStartDialog}
+   * @param {Event} event         Triggering click event.
+   * @param {HTMLElement} target  Button that was clicked.
+   */
+  static #stepMaterialQuantity(event, target) {
+    const key = `${target.dataset.index}:${target.dataset.itemId}`;
+    const step = Number(target.dataset.step);
+    const max = Number(target.dataset.max ?? Infinity);
+    const physicalMax = Number(target.dataset.physicalMax ?? max);
+    const current = Math.min(this.#materialQuantities.get(key) ?? 0, max);
+    this.#materialQuantities.set(key, Math.min(physicalMax, Math.max(0, current + step)));
+    this.render({ parts: ["content", "footer"] });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle opening a criteria candidate's item sheet.
+   * @this {CraftStartDialog}
+   * @param {Event} event         Triggering click event.
+   * @param {HTMLElement} target  Button that was clicked.
+   * @returns {Promise<void>}
+   */
+  static async #openItemSheet(event, target) {
+    const item = await fromUuid(target.dataset.uuid);
+    if ( item ) openItemSheet(item);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle picking the spell for a compendium-source spell-scroll recipe, locked to its configured level.
+   * @this {CraftStartDialog}
+   * @returns {Promise<void>}
+   */
+  static async #chooseSpell() {
+    if ( !this.recipe?.spellScroll ) {
+      this.render({ parts: ["content", "footer"] });
+      return;
+    }
+    const uuid = await game.dnd5e.applications.CompendiumBrowser.selectOne({
+      tab: "spells",
+      filters: { locked: { level: { min: this.recipe.spellScroll.level, max: this.recipe.spellScroll.level } } }
+    });
+    if ( !uuid ) return;
+    this.#chosenSpellUuid = uuid;
+    this.render({ parts: ["content", "footer"] });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle clearing the chosen compendium spell.
+   * @this {CraftStartDialog}
+   */
+  static #removeSpell() {
+    this.#chosenSpellUuid = null;
+    this.render({ parts: ["content", "footer"] });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle requesting the craft start: sends a GM-confirmation chat card.
+   * @this {CraftStartDialog}
+   * @returns {Promise<void>}
+   */
+  static async #startCraft() {
+    const state = await this.#computeState();
+    if ( !state.canStart ) return;
+
+    const materialLines = [
+      ...state.fixedLines.flatMap(l => l.criteria
+        ? l.candidates.filter(c => c.selected > 0)
+          .map(c => ({ item: state.actor.items.get(c.id), quantity: c.selected }))
+        : distributeAcrossStacks(l.ownedStacks, l.suppliedUnits)),
+      ...state.freeformItems.map(item => ({ item, quantity: 1 }))
+    ];
+    await CraftMessageData.create({
+      actor: state.actor, recipe: state.recipe, targetItem: state.chosenSpell ?? state.targetItem,
+      materialLines, spellUuid: state.chosenSpell?.uuid ?? null,
+      goldCP: state.goldCP, toolKey: state.chosenToolKey, totalHours: state.totalHours,
+      hoursPerUse: state.hoursPerUse, weight: state.weight, halfPrice: state.halfPrice
+    });
+    ui.notifications.info("SIMPLE_SHOP_CRAFT_5E.CraftStart.Requested", { localize: true });
+    this.close();
+  }
+
+  /* -------------------------------------------- */
+  /*  Helpers                                     */
+  /* -------------------------------------------- */
 
   /**
    * Compute the current selection state: resolved target/materials, running value vs. threshold, gold
@@ -268,18 +433,31 @@ export default class CraftStartDialog extends Dialog5e {
 
     const [targetResolved] = await resolveEntries([recipe.targetItem]);
     const targetItem = targetResolved.item;
-    let craftCost = null;
+    const craftCost = await recipeCraftCost(recipe, targetItem);
     let weight = null;
     let halfPrice = null;
-    if ( targetItem?.uuid ) {
+    if ( !recipe.spellScroll && targetItem?.uuid ) {
       const fullTargetItem = await fromUuid(targetItem.uuid);
-      if ( fullTargetItem?.system?.getCraftCost ) craftCost = await effectiveCraftCost(fullTargetItem);
       if ( fullTargetItem ) {
         weight = { ...fullTargetItem.system.weight };
         halfPrice = {
           value: Math.floor(fullTargetItem.system.price.value / 2),
           denomination: fullTargetItem.system.price.denomination
         };
+      }
+    }
+
+    let spellOptions = null;
+    let chosenSpell = null;
+    if ( recipe.spellScroll ) {
+      if ( recipe.spellScroll.spellSource === "compendium" ) {
+        chosenSpell = this.#chosenSpellUuid ? await fromUuid(this.#chosenSpellUuid) : null;
+      } else {
+        spellOptions = actor ? actor.items.filter(i => (i.type === "spell")
+          && (i.system.level === recipe.spellScroll.level)
+          && ((recipe.spellScroll.spellSource !== "prepared") || i.system.preparation?.prepared)) : [];
+        chosenSpell = spellOptions.find(i => i.uuid === this.#chosenSpellUuid) ?? spellOptions[0] ?? null;
+        this.#chosenSpellUuid = chosenSpell?.uuid ?? null;
       }
     }
 
@@ -389,7 +567,8 @@ export default class CraftStartDialog extends Dialog5e {
     const skillProficient = !!actor && skillKeys.some(k => (actor.system.skills[k]?.value ?? 0) > 0);
     const skillEligible = !skillKeys.length || skillProficient;
 
-    const canStart = !!actor && !!targetItem && toolEligible && skillEligible && requiredMet
+    const spellChosen = !recipe.spellScroll || !!chosenSpell;
+    const canStart = !!actor && !!targetItem && spellChosen && toolEligible && skillEligible && requiredMet
       && (materialsMet || (this.#fillWithGold && !goldInsufficient));
 
     const totalHours = resolveTotalHours(recipe, craftCost, targetItem);
@@ -400,102 +579,8 @@ export default class CraftStartDialog extends Dialog5e {
       suppliedCP, thresholdCP, shortfallCP, materialsMet, goldCP, goldInsufficient,
       toolKeys, chosenToolKey, proficient, toolOwned, toolEligible, skillProficient,
       skillRequired: skillKeys.length > 0, canStart, totalHours,
-      hoursPerUse, weight, halfPrice, requiredMet, requiredAvailable
+      hoursPerUse, weight, halfPrice, requiredMet, requiredAvailable, spellOptions, chosenSpell
     };
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Handle a drop of an owned item onto the freeform-materials drop area.
-   * @param {DragEvent} event
-   * @returns {Promise<void>}
-   */
-  async #onDropItem(event) {
-    event.preventDefault();
-    event.currentTarget.classList.remove("is-dragover");
-    const data = foundry.applications.ux.TextEditor.implementation.getDragEventData(event);
-    if ( data?.type !== "Item" ) return;
-    const item = await Item.implementation.fromDropData(data);
-    if ( !item || (item.parent !== this.actor) ) {
-      ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.CraftStart.MustOwnMaterial", { localize: true });
-      return;
-    }
-    this.#freeformIds.add(item.id);
-    this.render({ parts: ["content", "footer"] });
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Handle removing a freeform material.
-   * @this {CraftStartDialog}
-   * @param {Event} event         Triggering click event.
-   * @param {HTMLElement} target  Button that was clicked.
-   */
-  static #removeMaterial(event, target) {
-    this.#freeformIds.delete(target.dataset.itemId);
-    this.render({ parts: ["content", "footer"] });
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Handle adjusting how many units of a criteria-slot candidate are contributed.
-   * @this {CraftStartDialog}
-   * @param {Event} event         Triggering click event.
-   * @param {HTMLElement} target  Button that was clicked.
-   */
-  static #stepMaterialQuantity(event, target) {
-    const key = `${target.dataset.index}:${target.dataset.itemId}`;
-    const step = Number(target.dataset.step);
-    const max = Number(target.dataset.max ?? Infinity);
-    const physicalMax = Number(target.dataset.physicalMax ?? max);
-    const current = Math.min(this.#materialQuantities.get(key) ?? 0, max);
-    this.#materialQuantities.set(key, Math.min(physicalMax, Math.max(0, current + step)));
-    this.render({ parts: ["content", "footer"] });
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Handle opening a criteria candidate's item sheet.
-   * @this {CraftStartDialog}
-   * @param {Event} event         Triggering click event.
-   * @param {HTMLElement} target  Button that was clicked.
-   * @returns {Promise<void>}
-   */
-  static async #openItemSheet(event, target) {
-    const item = await fromUuid(target.dataset.uuid);
-    if ( item ) openItemSheet(item);
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Handle requesting the craft start: sends a GM-confirmation chat card.
-   * @this {CraftStartDialog}
-   * @returns {Promise<void>}
-   */
-  static async #startCraft() {
-    const state = await this.#computeState();
-    if ( !state.canStart ) return;
-
-    const materialLines = [
-      ...state.fixedLines.flatMap(l => l.criteria
-        ? l.candidates.filter(c => c.selected > 0)
-          .map(c => ({ item: state.actor.items.get(c.id), quantity: c.selected }))
-        : distributeAcrossStacks(l.ownedStacks, l.suppliedUnits)),
-      ...state.freeformItems.map(item => ({ item, quantity: 1 }))
-    ];
-    await CraftMessageData.create({
-      actor: state.actor, recipe: state.recipe, targetItem: state.targetItem,
-      materialLines,
-      goldCP: state.goldCP, toolKey: state.chosenToolKey, totalHours: state.totalHours,
-      hoursPerUse: state.hoursPerUse, weight: state.weight, halfPrice: state.halfPrice
-    });
-    ui.notifications.info("SIMPLE_SHOP_CRAFT_5E.CraftStart.Requested", { localize: true });
-    this.close();
   }
 }
 
@@ -548,7 +633,7 @@ function buildMaterialsTable(state) {
       { id: "price", label: "DND5E.Price" },
       { id: "quantity", label: "DND5E.Quantity" }, { id: "controls" }
     ],
-    rowTemplate: "modules/simple-shop-craft-5e/templates/partials/material-row.hbs"
+    rowTemplate: "modules/simple-shop-craft-5e/templates/shared/material-row.hbs"
   });
 }
 

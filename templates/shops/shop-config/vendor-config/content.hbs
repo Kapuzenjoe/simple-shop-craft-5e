@@ -1,10 +1,14 @@
 <section class="tab active config-content">
     <fieldset>
+        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.ShopName" }}</legend>
+        {{> "dnd5e.fieldlist" nameFields}}
+    </fieldset>
+    <fieldset>
         <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GoldPool" }}</legend>
         {{> "dnd5e.fieldlist" moneyFields}}
         {{#if currencyRows}}
         <section class="currency">
-            {{> "modules/simple-shop-craft-5e/templates/partials/currency-inputs.hbs" rows=currencyRows}}
+            {{> "modules/simple-shop-craft-5e/templates/shared/currency-inputs.hbs" rows=currencyRows}}
         </section>
         {{/if}}
     </fieldset>

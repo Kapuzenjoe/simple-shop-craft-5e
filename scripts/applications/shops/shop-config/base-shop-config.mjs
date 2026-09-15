@@ -22,7 +22,7 @@ export default class BaseShopConfig extends Application5e {
   /** @override */
   static PARTS = {
     content: {
-      template: "modules/simple-shop-craft-5e/templates/partials/config-dialog-content.hbs"
+      template: "modules/simple-shop-craft-5e/templates/shared/config-dialog-content.hbs"
     }
   };
 

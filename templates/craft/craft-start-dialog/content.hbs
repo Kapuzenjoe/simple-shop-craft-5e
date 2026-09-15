@@ -28,6 +28,32 @@
     </ol>
 </fieldset>
 
+{{#if recipe.spellScroll}}
+<fieldset class="card-tray">
+    <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.Spell" }}</legend>
+    {{#if spellField}}
+    {{> "dnd5e.fieldlist" spellField}}
+    {{else if noEligibleSpell}}
+    <p class="hint warning">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.NoEligibleSpell" }}</p>
+    {{else if chosenSpell}}
+    <ol class="value-list unlist">
+        <li class="value-row">
+            <img class="gold-icon" src="{{ chosenSpell.img }}" alt="{{ chosenSpell.name }}">
+            <div class="name-stacked"><span class="title">{{ chosenSpell.name }}</span></div>
+            <button type="button" class="unbutton control-button" data-action="removeSpell" data-tooltip
+                    aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.CraftStart.RemoveSpell' }}">
+                <i class="fa-solid fa-xmark" inert></i>
+            </button>
+        </li>
+    </ol>
+    {{else}}
+    <button type="button" data-action="chooseSpell">
+        {{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.ChooseSpell" }}
+    </button>
+    {{/if}}
+</fieldset>
+{{/if}}
+
 {{#if chosenToolKey}}
 <fieldset>
     <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.Tool" }}</legend>
@@ -55,7 +81,7 @@
 
 <fieldset class="card-tray">
     <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.CraftingMaterials" }}</legend>
-    {{> "modules/simple-shop-craft-5e/templates/partials/item-table.hbs" materialsTable}}
+    {{> "modules/simple-shop-craft-5e/templates/shared/item-table.hbs" materialsTable}}
 
     {{#if allowFreeform}}
     <div class="drop-area" data-drop-area>
@@ -77,11 +103,11 @@
 
     <p class="hint">
         {{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.Supplied" }}:
-        {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=suppliedParts }}
+        {{> "modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs" parts=suppliedParts }}
     </p>
     <p class="hint{{#unless materialsMet}} warning{{/unless}}">
         {{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.Threshold" }}:
-        {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=thresholdParts }}
+        {{> "modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs" parts=thresholdParts }}
     </p>
 
     {{#if goldField}}
@@ -89,7 +115,7 @@
     {{#if fillWithGold}}
     <p class="hint">
         {{ localize "SIMPLE_SHOP_CRAFT_5E.GoldFilled" }}:
-        {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=goldParts }}
+        {{> "modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs" parts=goldParts }}
     </p>
     {{#if goldInsufficient}}
     <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopCart.InsufficientFunds" }}</p>

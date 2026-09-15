@@ -1,7 +1,7 @@
 <li class="item" data-index="{{ index }}"{{#if hasContextMenu}} data-id="{{ index }}"{{/if}}>
     <div class="item-row">
         <div class="item-name item-tooltip" {{#if uuid}}data-uuid="{{ uuid }}"{{/if}}>
-            {{> "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs"
+            {{> "modules/simple-shop-craft-5e/templates/shared/item-avatar-name.hbs"
                 img=img name=name subtitle=subtitle bundleSize=bundleSize }}
             {{#if warning}}
             <i class="fa-solid fa-triangle-exclamation warning" data-tooltip="{{ warningTooltip }}"></i>
@@ -9,7 +9,7 @@
         </div>
         {{#if price}}
         <div class="item-detail item-price">
-            {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=price}}
+            {{> "modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs" parts=price}}
         </div>
         {{/if}}
         <div class="item-detail item-quantity">
@@ -71,7 +71,7 @@
                 <div class="name name-stacked"><span class="title">{{ this.name }}</span></div>
             </div>
             <div class="item-detail item-price">
-                {{> "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs" parts=this.price}}
+                {{> "modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs" parts=this.price}}
             </div>
             <div class="item-detail item-quantity">
                 <a class="adjustment-button always-interactive" data-action="stepMaterialQuantity"

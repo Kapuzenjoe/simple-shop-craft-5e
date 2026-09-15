@@ -1,29 +1,36 @@
-import { MODULE_ID } from "../../config.mjs";
+import {
+  HIRELING_ITEM_TYPE, HIRELING_TYPES, LODGING_ITEM_TYPE, LODGING_TIERS, MODULE_ID
+} from "../../config.mjs";
+import { EnchantedItemBlueprint } from "../../data/enchanted-item-blueprint.mjs";
 import { newEntryStock, Shop, ShopItemEntry } from "../../data/shop-data.mjs";
 import {
-  applyItemSort, applyListControls, applyLoadingTooltip, breakdownCopper, buildItemTableSections, finalizeGroups,
-  isCalendarModeActive, needsDefaultPrice, openItemSheet, resolveItemPrice, selectableActors, toCopper
+  applyItemSort, applyListControls, applyLoadingTooltip, applyRichTooltip, breakdownCopper, buildItemTableSections,
+  confirmDeleteShop, finalizeGroups, isCalendarModeActive, isSpellScrollItem, itemRef, needsDefaultPrice,
+  openItemSheet, resolveItemPrice, selectableActors, spotlightShop, toCopper
 } from "../../utils.mjs";
 
+import AddEntryDialog from "./add-entry-dialog.mjs";
+import ConfigureTemplatesDialog from "./configure-templates-dialog.mjs";
 import FillFromTableDialog from "./fill-from-table-dialog.mjs";
 import GenerateItemDialog from "./generate-item-dialog.mjs";
 import HaggleDialog from "./haggle-dialog.mjs";
 import ShopCart from "./shop-cart.mjs";
 import DiscountConfig from "./shop-config/discount-config.mjs";
+import HirelingConfig from "./shop-config/hireling-config.mjs";
+import LodgingConfig from "./shop-config/lodging-config.mjs";
 import MaxStockConfig from "./shop-config/max-stock-config.mjs";
 import ModifiersConfig from "./shop-config/modifiers-config.mjs";
 import OwnerConfig from "./shop-config/owner-config.mjs";
 import PlayersConfig from "./shop-config/players-config.mjs";
 import PriceConfig from "./shop-config/price-config.mjs";
-import RenameConfig from "./shop-config/rename-config.mjs";
 import SettlementCapConfig from "./shop-config/settlement-cap-config.mjs";
 import VendorConfig from "./shop-config/vendor-config.mjs";
+
+const { Application5e } = game.dnd5e.applications.api;
 
 /**
  * @import { ShopItemEntryData } from "../../_types.mjs";
  */
-
-const { Application5e } = game.dnd5e.applications.api;
 
 /**
  * Column definitions for the Buy tab's item table.
@@ -37,6 +44,12 @@ const BUY_COLUMNS = [
   { id: "quantity", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Stock" },
   { id: "controls" }
 ];
+
+/**
+ * Column definitions for the Services tab's item table — same as Buy, without Weight.
+ * @type {{ id: string, label?: string }[]}
+ */
+const SERVICES_COLUMNS = BUY_COLUMNS.filter(column => column.id !== "weight");
 
 /**
  * Column definitions for the Sell tab's item table.
@@ -83,13 +96,17 @@ export default class ShopSheet extends Application5e {
       title: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Title",
       resizable: true,
       controls: [
-        { action: "renameShop", icon: "fa-solid fa-pen", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.RenameShop",
+        { action: "editVendorSettings", icon: "fa-solid fa-cog", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.VendorSettings",
           visible: ShopSheet.#isEditable },
         { action: "toggleActive", icon: "fa-solid fa-toggle-on", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Deactivate",
           visible: ShopSheet.#canDeactivate },
         { action: "toggleActive", icon: "fa-solid fa-toggle-off", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Activate",
           visible: ShopSheet.#canActivate },
         { action: "spotlight", icon: "fa-solid fa-bullhorn", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Spotlight",
+          visible: ShopSheet.#isEditable },
+        { action: "duplicateShop", icon: "fa-solid fa-copy", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Duplicate",
+          visible: ShopSheet.#isEditable },
+        { action: "deleteShop", icon: "fa-solid fa-trash", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Delete",
           visible: ShopSheet.#isEditable }
       ]
     },
@@ -104,11 +121,14 @@ export default class ShopSheet extends Application5e {
     },
     actions: {
       addItems: ShopSheet.#addItems,
+      addService: ShopSheet.#addService,
       adjustCartQuantity: ShopSheet.#adjustCartQuantity,
       adjustSellQuantity: ShopSheet.#adjustSellQuantity,
       changeMode: ShopSheet.#changeMode,
+      deleteShop: ShopSheet.#deleteShop,
+      duplicateShop: ShopSheet.#duplicateShop,
       editDiscount: ShopSheet.#editDiscount,
-      editImage: ShopSheet.#editImage,
+      editImage: ShopSheet._onEditImage,
       editMaxStock: ShopSheet.#editMaxStock,
       editModifiers: ShopSheet.#editModifiers,
       editOwner: ShopSheet.#editOwner,
@@ -121,8 +141,7 @@ export default class ShopSheet extends Application5e {
       haggle: ShopSheet.#haggle,
       openCart: ShopSheet.#openCart,
       openItemSheet: ShopSheet.#openItemSheet,
-      removeItem: ShopSheet.#removeItem,
-      renameShop: ShopSheet.#renameShop,
+      openLinkedActor: ShopSheet.#openLinkedActor,
       resetShop: ShopSheet.#resetShop,
       spotlight: ShopSheet.#spotlight,
       toggleActive: ShopSheet.#toggleActive
@@ -146,31 +165,42 @@ export default class ShopSheet extends Application5e {
   static PARTS = {
     header: {
       template: "modules/simple-shop-craft-5e/templates/shops/shop-sheet/header.hbs",
-      templates: ["modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs"]
+      templates: ["modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs"]
     },
     tabs: {
       template: "systems/dnd5e/templates/shared/horizontal-tabs.hbs",
       templates: ["templates/generic/tab-navigation.hbs"]
     },
     buy: {
-      template: "modules/simple-shop-craft-5e/templates/partials/tab-item-table.hbs",
+      template: "modules/simple-shop-craft-5e/templates/shared/tab-item-table.hbs",
       templates: [
-        "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs",
-        "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs",
-        "modules/simple-shop-craft-5e/templates/partials/item-weight-cell.hbs",
-        "modules/simple-shop-craft-5e/templates/partials/item-table.hbs",
+        "modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs",
+        "modules/simple-shop-craft-5e/templates/shared/item-avatar-name.hbs",
+        "modules/simple-shop-craft-5e/templates/shared/item-weight-cell.hbs",
+        "modules/simple-shop-craft-5e/templates/shared/item-table.hbs",
         "modules/simple-shop-craft-5e/templates/shops/shop-sheet/buy-row.hbs"
       ],
       scrollable: [""]
     },
     sell: {
-      template: "modules/simple-shop-craft-5e/templates/partials/tab-item-table.hbs",
+      template: "modules/simple-shop-craft-5e/templates/shared/tab-item-table.hbs",
       templates: [
-        "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs",
-        "modules/simple-shop-craft-5e/templates/partials/item-avatar-name.hbs",
-        "modules/simple-shop-craft-5e/templates/partials/item-weight-cell.hbs",
-        "modules/simple-shop-craft-5e/templates/partials/item-table.hbs",
+        "modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs",
+        "modules/simple-shop-craft-5e/templates/shared/item-avatar-name.hbs",
+        "modules/simple-shop-craft-5e/templates/shared/item-weight-cell.hbs",
+        "modules/simple-shop-craft-5e/templates/shared/item-table.hbs",
         "modules/simple-shop-craft-5e/templates/shops/shop-sheet/sell-row.hbs"
+      ],
+      scrollable: [""]
+    },
+    services: {
+      template: "modules/simple-shop-craft-5e/templates/shared/tab-item-table.hbs",
+      templates: [
+        "modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs",
+        "modules/simple-shop-craft-5e/templates/shared/item-avatar-name.hbs",
+        "modules/simple-shop-craft-5e/templates/shared/item-weight-cell.hbs",
+        "modules/simple-shop-craft-5e/templates/shared/item-table.hbs",
+        "modules/simple-shop-craft-5e/templates/shops/shop-sheet/buy-row.hbs"
       ],
       scrollable: [""]
     },
@@ -191,6 +221,7 @@ export default class ShopSheet extends Application5e {
       tabs: [
         { id: "buy", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Buy", icon: "fas fa-cart-shopping" },
         { id: "sell", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Sell", icon: "fas fa-hand-holding-dollar" },
+        { id: "services", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Services", icon: "fas fa-bell-concierge" },
         { id: "description", label: "DND5E.Description", icon: "fas fa-book-open" }
       ],
       initial: "buy"
@@ -267,6 +298,14 @@ export default class ShopSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
+   * Service item groups from the last render.
+   * @type {{ type: string, label: string, items: object[] }[]}
+   */
+  #lastServiceGroups = [];
+
+  /* -------------------------------------------- */
+
+  /**
    * Current Buy-tab search query, kept live across re-renders.
    * @type {string}
    */
@@ -315,11 +354,36 @@ export default class ShopSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
+   * Current Services-tab search query, kept live across re-renders.
+   * @type {string}
+   */
+  #serviceSearch = "";
+
+  /* -------------------------------------------- */
+
+  /**
+   * Current Services-tab type filter, kept live across re-renders. Empty string means no filter.
+   * @type {string}
+   */
+  #serviceTypeFilter = "";
+
+  /* -------------------------------------------- */
+
+  /**
+   * Current Services-tab sort, kept live across re-renders. "type" is the default server-rendered order.
+   * @type {"type"|"name"}
+   */
+  #serviceSort = "name";
+
+  /* -------------------------------------------- */
+
+  /**
    * Rows currently selected in the shopping cart, resolved from the last render.
    * @type {object[]}
    */
   get cartLines() {
-    return (this.#lastGroups ?? []).flatMap(group => group.items).filter(row => row.cartQuantity > 0);
+    return [...(this.#lastGroups ?? []), ...(this.#lastServiceGroups ?? [])]
+      .flatMap(group => group.items).filter(row => row.cartQuantity > 0);
   }
 
   /* -------------------------------------------- */
@@ -406,13 +470,23 @@ export default class ShopSheet extends Application5e {
       && !!context.actor?.items.some(i => (i.type === "feat") && (i.system.identifier === "crafter"));
 
     const resolved = await ShopItemEntry.resolveMany(context.shop.items);
+    const buyResolved = resolved.filter(({ entry }) => !entry.isService);
+    const serviceResolved = resolved.filter(({ entry }) => entry.isService);
     context.groups = await groupByType({
-      rows: resolved, settlementCap: context.shop.settlementCap, buyModifier: context.shop.buyModifier,
+      rows: buyResolved, settlementCap: context.shop.settlementCap, buyModifier: context.shop.buyModifier,
       cart: this.cart, fixedValueLootTypes: context.shop.fixedValueLootTypes, playerBuyModifier: playerOverride.buy,
       actorName: context.actor?.name, renderDiscountTooltip, stockDefaults: context.shop.stockDefaults,
       hasCrafterFeat
     });
     this.#lastGroups = context.groups;
+
+    context.serviceGroups = await groupByType({
+      rows: serviceResolved, settlementCap: context.shop.settlementCap, buyModifier: context.shop.buyModifier,
+      cart: this.cart, fixedValueLootTypes: context.shop.fixedValueLootTypes, playerBuyModifier: playerOverride.buy,
+      actorName: context.actor?.name, renderDiscountTooltip, stockDefaults: context.shop.stockDefaults,
+      hasCrafterFeat
+    });
+    this.#lastServiceGroups = context.serviceGroups;
 
     context.sellGroups = context.shop.goldPool.sellDisabled ? [] : await groupSellItems({
       items: context.actor?.items ?? [], sellModifier: context.shop.sellModifier, sellCart: this.sellCart,
@@ -439,6 +513,7 @@ export default class ShopSheet extends Application5e {
       case "description": context = await this._prepareDescriptionContext(context, options); break;
       case "buy": context = await this._prepareBuyContext(context, options); break;
       case "sell": context = await this._prepareSellContext(context, options); break;
+      case "services": context = await this._prepareServicesContext(context, options); break;
     }
     return context;
   }
@@ -449,7 +524,7 @@ export default class ShopSheet extends Application5e {
    * Prepare rendering context for the footer part.
    * @param {ApplicationRenderContext} context  Context being prepared.
    * @param {HandlebarsRenderOptions} options   Options which configure application rendering behavior.
-   * @returns {ApplicationRenderContext}
+   * @returns {Promise<ApplicationRenderContext>}
    * @protected
    */
   async _prepareFooterContext(context, options) {
@@ -466,7 +541,7 @@ export default class ShopSheet extends Application5e {
    * Prepare rendering context for the description tab.
    * @param {ApplicationRenderContext} context  Context being prepared.
    * @param {HandlebarsRenderOptions} options   Options which configure application rendering behavior.
-   * @returns {ApplicationRenderContext}
+   * @returns {Promise<ApplicationRenderContext>}
    * @protected
    */
   async _prepareDescriptionContext(context, options) {
@@ -506,7 +581,7 @@ export default class ShopSheet extends Application5e {
    * Prepare rendering context for the buy tab.
    * @param {ApplicationRenderContext} context  Context being prepared.
    * @param {HandlebarsRenderOptions} options   Options which configure application rendering behavior.
-   * @returns {ApplicationRenderContext}
+   * @returns {Promise<ApplicationRenderContext>}
    * @protected
    */
   async _prepareBuyContext(context, options) {
@@ -521,10 +596,28 @@ export default class ShopSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
+   * Prepare rendering context for the services tab.
+   * @param {ApplicationRenderContext} context  Context being prepared.
+   * @param {HandlebarsRenderOptions} options   Options which configure application rendering behavior.
+   * @returns {Promise<ApplicationRenderContext>}
+   * @protected
+   */
+  async _prepareServicesContext(context, options) {
+    context.tabId = "services";
+    context.table = buildItemTableSections({
+      groups: context.serviceGroups, emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.None", columns: SERVICES_COLUMNS,
+      rowTemplate: "modules/simple-shop-craft-5e/templates/shops/shop-sheet/buy-row.hbs"
+    });
+    return context;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
    * Prepare rendering context for the sell tab.
    * @param {ApplicationRenderContext} context  Context being prepared.
    * @param {HandlebarsRenderOptions} options   Options which configure application rendering behavior.
-   * @returns {ApplicationRenderContext}
+   * @returns {Promise<ApplicationRenderContext>}
    * @protected
    */
   async _prepareSellContext(context, options) {
@@ -542,42 +635,111 @@ export default class ShopSheet extends Application5e {
   }
 
   /* -------------------------------------------- */
+
+  /**
+   * Prepare an array of context menu options which are available for a Buy/Services row.
+   * @param {string} key
+   * @param {ShopItemEntry} entry
+   * @returns {ContextMenuEntry[]}
+   * @protected
+   */
+  _getItemContextOptions(key, entry) {
+    return [
+      {
+        label: "DND5E.ContextMenuActionEdit",
+        icon: '<i class="fa-solid fa-pen-to-square fa-fw"></i>',
+        onClick: () => this.#openLodgingConfig(key),
+        visible: !!entry.lodging
+      },
+      {
+        label: "DND5E.ContextMenuActionEdit",
+        icon: '<i class="fa-solid fa-pen-to-square fa-fw"></i>',
+        onClick: () => this.#openHirelingConfig(key),
+        visible: !!entry.hireling
+      },
+      {
+        label: entry.isService
+          ? "SIMPLE_SHOP_CRAFT_5E.ShopEditor.UnmarkService"
+          : "SIMPLE_SHOP_CRAFT_5E.ShopEditor.MarkService",
+        icon: '<i class="fa-solid fa-bell-concierge fa-fw"></i>',
+        onClick: () => this.#setItemService(key, !entry.isService),
+        visible: !entry.lodging && !entry.hireling
+      },
+      {
+        label: "DND5E.ContextMenuActionDelete",
+        icon: '<i class="fas fa-trash fa-fw"></i>',
+        onClick: () => this.#removeEntry(key)
+      }
+    ];
+  }
+
+  /* -------------------------------------------- */
   /*  Life-Cycle Handlers                         */
   /* -------------------------------------------- */
 
   /** @inheritDoc */
   async _onFirstRender(context, options) {
     await super._onFirstRender(context, options);
+    if ( this.tabGroups.primary ) this.element.classList.add(`tab-${this.tabGroups.primary}`);
 
+    const buyActions = this.#createFloatingActions("buy", [
+      { action: "addItems", tooltip: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.AddItems", icon: "fas fa-plus" },
+      { action: "generateItem", tooltip: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItem",
+        icon: "fas fa-wand-magic-sparkles" },
+      { action: "fillFromTable", tooltip: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.FillFromTable", icon: "fas fa-table-list" }
+    ]);
+    const serviceActions = this.#createFloatingActions("services", [
+      { action: "addService", tooltip: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.AddService", icon: "fas fa-plus" }
+    ]);
+    this.element.querySelector(".window-content").append(buyActions, serviceActions);
+
+    new game.dnd5e.applications.ContextMenu5e(this.element, "li.item[data-key]", [], {
+      onOpen: element => {
+        const key = element.dataset.key;
+        const entry = this.shop.items.find(i => ShopItemEntry.key(i) === key);
+        ui.context.menuItems = (this.isEditable && entry)
+          ? this._getItemContextOptions(key, entry) : [];
+      },
+      jQuery: false
+    });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Build a floating action-button cluster, shown only while its tab is active and the sheet is editable.
+   * @param {string} tabScope
+   * @param {{ action: string, tooltip: string, icon: string }[]} buttons
+   * @returns {HTMLDivElement}
+   */
+  #createFloatingActions(tabScope, buttons) {
     const actions = document.createElement("div");
     actions.classList.add("window-content-actions");
+    actions.dataset.tabScope = tabScope;
+    actions.append(...buttons.map(({ action, tooltip, icon }) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.dataset.tooltip = tooltip;
+      button.ariaLabel = _loc(tooltip);
+      button.classList.add("gold-button", "always-interactive");
+      button.dataset.action = action;
+      button.innerHTML = `<i class="${icon}" inert></i>`;
+      return button;
+    }));
+    return actions;
+  }
 
-    const button = document.createElement("button");
-    button.type = "button";
-    button.dataset.tooltip = "SIMPLE_SHOP_CRAFT_5E.ShopEditor.AddItems";
-    button.ariaLabel = _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.AddItems");
-    button.classList.add("gold-button", "always-interactive");
-    button.dataset.action = "addItems";
-    button.innerHTML = '<i class="fas fa-plus" inert></i>';
+  /* -------------------------------------------- */
 
-    const generateButton = document.createElement("button");
-    generateButton.type = "button";
-    generateButton.dataset.tooltip = "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItem";
-    generateButton.ariaLabel = _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItem");
-    generateButton.classList.add("gold-button", "always-interactive");
-    generateButton.dataset.action = "generateItem";
-    generateButton.innerHTML = '<i class="fas fa-wand-magic-sparkles" inert></i>';
-
-    const fillButton = document.createElement("button");
-    fillButton.type = "button";
-    fillButton.dataset.tooltip = "SIMPLE_SHOP_CRAFT_5E.ShopEditor.FillFromTable";
-    fillButton.ariaLabel = _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.FillFromTable");
-    fillButton.classList.add("gold-button", "always-interactive");
-    fillButton.dataset.action = "fillFromTable";
-    fillButton.innerHTML = '<i class="fas fa-table-list" inert></i>';
-
-    actions.append(button, generateButton, fillButton);
-    this.element.querySelector(".window-content").append(actions);
+  /**
+   * @inheritDoc
+   * @see dnd5e — PrimarySheet5e#changeTab()
+   */
+  changeTab(tab, group, options) {
+    super.changeTab(tab, group, options);
+    if ( group !== "primary" ) return;
+    this.element.className = this.element.className.replace(/tab-\w+/g, "");
+    this.element.classList.add(`tab-${tab}`);
   }
 
   /* -------------------------------------------- */
@@ -589,8 +751,8 @@ export default class ShopSheet extends Application5e {
     this._renderModeToggle();
     if ( this._mode === this.constructor.MODES.PLAY ) this._disableFields();
 
-    const actions = this.element.querySelector(".window-content-actions");
-    if ( actions ) actions.hidden = !context.editable || !this.isEditMode || !context.tabs?.buy?.active;
+    const canShowActions = context.editable && this.isEditMode;
+    this.element.querySelectorAll(".window-content-actions").forEach(actions => actions.hidden = !canShowActions);
   }
 
   /* -------------------------------------------- */
@@ -612,68 +774,86 @@ export default class ShopSheet extends Application5e {
       });
     }
 
-    if ( (partId === "buy") || (partId === "sell") ) {
-      htmlElement.querySelectorAll(".item-tooltip[data-uuid]").forEach(el => {
-        if ( (partId === "buy") && needsDefaultPrice(this.#findRowItem(el.dataset.key)) ) return;
-        applyLoadingTooltip(el);
-      });
-    }
+    htmlElement.querySelectorAll(".item-tooltip[data-uuid]").forEach(el => applyLoadingTooltip(el));
 
-    if ( partId === "buy" ) {
-      htmlElement.querySelectorAll(".item-tooltip[data-key]").forEach(el => {
-        const item = this.#findRowItem(el.dataset.key);
-        if ( !item ) return;
-        const defaultPrice = needsDefaultPrice(item) ? resolveItemPrice(item) : null;
-        if ( !defaultPrice && el.dataset.uuid ) return;
-        const resolved = (typeof item.clone === "function") ? Promise.resolve(item) : fromUuid(item.uuid);
-        resolved
-          .then(fullItem => defaultPrice ? fullItem?.clone({ system: { price: defaultPrice } }) : fullItem)
-          .then(tooltipItem => tooltipItem?.richTooltip())
-          .then(result => {
-            if ( !result ) return;
-            el.dataset.tooltipHtml = result.content;
-            el.dataset.tooltipClass = result.classes.join(" ");
-            el.dataset.tooltipDirection ??= "LEFT";
-          });
-      });
-    }
+    htmlElement.querySelectorAll(".item-tooltip[data-key]").forEach(el => {
+      const item = this.#findRowItem(el.dataset.key);
+      if ( !item ) return;
+      if ( item.type === LODGING_ITEM_TYPE ) {
+        applyRichTooltip(el, {
+          name: item.name, img: item.img, price: item.system.price,
+          description: item.system.description.value, subtitle: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.Lodging")
+        });
+        return;
+      }
+      if ( item.type === HIRELING_ITEM_TYPE ) {
+        applyRichTooltip(el, {
+          name: item.name, img: item.img, price: item.system.price,
+          description: item.system.description.value, subtitle: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.Hireling")
+        });
+        return;
+      }
+      if ( typeof item.richTooltip !== "function" ) return;
+      const defaultPrice = needsDefaultPrice(item) ? resolveItemPrice(item) : null;
+      if ( !defaultPrice && el.dataset.uuid ) return;
+      const resolved = (typeof item.clone === "function") ? Promise.resolve(item) : fromUuid(item.uuid);
+      resolved
+        .then(fullItem => defaultPrice ? fullItem?.clone({ system: { price: defaultPrice } }) : fullItem)
+        .then(tooltipItem => tooltipItem?.richTooltip())
+        .then(result => {
+          if ( !result ) return;
+          el.dataset.tooltipHtml = result.content;
+          el.dataset.tooltipClass = result.classes.join(" ");
+          el.dataset.tooltipDirection ??= "LEFT";
+        });
+    });
 
-    if ( partId === "buy" ) {
-      const buyTab = htmlElement.matches('.tab[data-tab="buy"]') ? htmlElement : htmlElement.querySelector('.tab[data-tab="buy"]');
-      if ( editable && buyTab ) {
-        buyTab.addEventListener("dragover", event => event.preventDefault());
-        buyTab.addEventListener("drop", async event => {
+    if ( (partId === "buy") || (partId === "services") ) {
+      const dropTab = htmlElement.matches(`.tab[data-tab="${partId}"]`)
+        ? htmlElement : htmlElement.querySelector(`.tab[data-tab="${partId}"]`);
+      if ( editable && dropTab ) {
+        dropTab.addEventListener("dragover", event => event.preventDefault());
+        dropTab.addEventListener("drop", async event => {
           const data = foundry.applications.ux.TextEditor.implementation.getDragEventData(event);
           if ( data.type !== "Item" ) return;
           const item = await fromUuid(data.uuid);
           if ( !item || !CONFIG.Item.dataModels[item.type]?.inventorySection ) return;
           await this.#mergeItemEntries([
-            { uuid: data.uuid, ...newEntryStock(item, this.shop.stockDefaults) }
+            { ...itemRef(item), isService: partId === "services", ...newEntryStock(item, this.shop.stockDefaults) }
           ]);
         });
       }
     }
 
-    if ( (partId === "buy") || (partId === "sell") ) {
-      const isBuy = partId === "buy";
-      const content = applyListControls(htmlElement, {
-        sortModes: SORT_MODES,
-        sort: isBuy ? this.#buySort : this.#sellSort,
-        setSort: v => { if ( isBuy ) this.#buySort = v; else this.#sellSort = v; },
-        typeFilter: isBuy ? this.#buyTypeFilter : this.#sellTypeFilter,
-        setTypeFilter: v => { if ( isBuy ) this.#buyTypeFilter = v; else this.#sellTypeFilter = v; },
-        search: isBuy ? this.#buySearch : this.#sellSearch,
-        setSearch: v => { if ( isBuy ) this.#buySearch = v; else this.#sellSearch = v; },
-        onSort: () => this.render()
-      });
-      if ( content ) applyItemSort(isBuy ? this.#buySort : this.#sellSort, content);
+    if ( (partId === "buy") || (partId === "sell") || (partId === "services") ) {
+      const tabState = {
+        buy: {
+          sort: this.#buySort, setSort: v => this.#buySort = v,
+          typeFilter: this.#buyTypeFilter, setTypeFilter: v => this.#buyTypeFilter = v,
+          search: this.#buySearch, setSearch: v => this.#buySearch = v
+        },
+        sell: {
+          sort: this.#sellSort, setSort: v => this.#sellSort = v,
+          typeFilter: this.#sellTypeFilter, setTypeFilter: v => this.#sellTypeFilter = v,
+          search: this.#sellSearch, setSearch: v => this.#sellSearch = v
+        },
+        services: {
+          sort: this.#serviceSort, setSort: v => this.#serviceSort = v,
+          typeFilter: this.#serviceTypeFilter, setTypeFilter: v => this.#serviceTypeFilter = v,
+          search: this.#serviceSearch, setSearch: v => this.#serviceSearch = v
+        }
+      }[partId];
+      const content = applyListControls(
+        htmlElement, { sortModes: SORT_MODES, ...tabState, onSort: () => this.render() }
+      );
+      if ( content ) applyItemSort(tabState.sort, content);
     }
   }
 
   /* -------------------------------------------- */
 
   /**
-   * Whether shop-editing header controls (rename, spotlight) should be visible.
+   * Whether shop-editing header controls (vendor settings, spotlight) should be visible.
    * @this {ShopSheet}
    * @returns {boolean}
    */
@@ -706,10 +886,65 @@ export default class ShopSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
-   * Handle adding items to this shop via the compendium browser.
+   * Handle opening the "Add Items" dialog.
    * @this {ShopSheet}
    */
   static async #addItems() {
+    new AddEntryDialog({
+      window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.AddItems" }, isService: false,
+      methods: [
+        { value: "compendium", icon: "fa-solid fa-book-atlas", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.FromCompendium") },
+        { value: "uuid", icon: "fa-solid fa-link", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.ByUuid") }
+      ],
+      onSubmit: (method, uuid) => this.#handleAddEntryMethod(method, uuid, false)
+    }).render({ force: true });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle opening the "Add Service" dialog.
+   * @this {ShopSheet}
+   */
+  static async #addService() {
+    new AddEntryDialog({
+      window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.AddService" }, isService: true,
+      methods: [
+        { value: "compendium", icon: "fa-solid fa-book-atlas", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.FromCompendium") },
+        { value: "uuid", icon: "fa-solid fa-link", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.ByUuid") },
+        { value: "lodging", icon: "fa-solid fa-bed", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.AddLodging") },
+        { value: "hireling", icon: "fa-solid fa-user-plus", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.AddHireling") }
+      ],
+      onSubmit: (method, uuid) => this.#handleAddEntryMethod(method, uuid, true)
+    }).render({ force: true });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Route the chosen "Add Items"/"Add Service" method to its flow.
+   * @param {string} method
+   * @param {string} uuid  Picked item UUID, only set for method "uuid".
+   * @param {boolean} isService
+   * @returns {Promise<void>}
+   */
+  async #handleAddEntryMethod(method, uuid, isService) {
+    switch ( method ) {
+      case "compendium": return this.#pickAndAddItems({ isService });
+      case "uuid": return this.#addByUuid(uuid, isService);
+      case "lodging": return this.#addLodging();
+      case "hireling": return this.#addHireling();
+    }
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Prompt the compendium browser and add the picked items to this shop.
+   * @param {object} options
+   * @param {boolean} options.isService
+   */
+  async #pickAndAddItems({ isService }) {
     const selection = await game.dnd5e.applications.CompendiumBrowser.select({
       tab: "physical",
       selection: { min: 1 }
@@ -717,12 +952,104 @@ export default class ShopSheet extends Application5e {
     if ( !selection?.size ) return;
 
     const items = await Promise.all(Array.from(selection).map(uuid => fromUuid(uuid)));
-    const entries = items
-      .filter(item => item?.system?.identifier)
-      .map(item => ({ identifier: item.system.identifier, ...newEntryStock(item, this.shop.stockDefaults) }));
-    if ( !entries.length ) return;
+    const entries = [];
+    const templates = [];
+    for ( const item of items ) {
+      if ( !item ) continue;
+      if ( isSpellScrollItem(item) ) {
+        templates.push({ kind: "spellScroll", item });
+      } else if ( EnchantedItemBlueprint.getEnchantmentProfiles(item)
+        .some(p => EnchantedItemBlueprint.resolveProfileRarity(item, p.effect) !== "artifact") ) {
+        templates.push({ kind: "enchant", item });
+      } else if ( item.system?.identifier ) {
+        entries.push({ ...itemRef(item), isService, ...newEntryStock(item, this.shop.stockDefaults) });
+      }
+    }
+    if ( entries.length ) await this.#mergeItemEntries(entries);
+    if ( templates.length ) {
+      new ConfigureTemplatesDialog({
+        templates, isService, onSubmit: newEntries => this.#mergeItemEntries(newEntries)
+      }).render({ force: true });
+    }
+  }
 
-    await this.#mergeItemEntries(entries);
+  /* -------------------------------------------- */
+
+  /**
+   * Add an item to this shop by UUID.
+   * @param {string} uuid
+   * @param {boolean} isService
+   * @returns {Promise<void>}
+   */
+  async #addByUuid(uuid, isService) {
+    if ( !uuid ) return;
+
+    const item = await fromUuid(uuid);
+    if ( !item || !CONFIG.Item.dataModels[item.type]?.inventorySection ) {
+      ui.notifications.warn("WARNING.ObjectDoesNotExist", { format: { name: _loc("DOCUMENT.Item"), identifier: uuid } });
+      return;
+    }
+    await this.#mergeItemEntries([
+      { ...itemRef(item), isService, ...newEntryStock(item, this.shop.stockDefaults) }
+    ]);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Create a new lodging entry with default values, then open its editor.
+   * @returns {Promise<void>}
+   */
+  async #addLodging() {
+    const tier = Object.keys(LODGING_TIERS)[0];
+    const entry = {
+      _id: foundry.utils.randomID(), isService: true, restockMode: "unlimited",
+      lodging: { tier, name: "", description: "", img: "icons/svg/house.svg" },
+      price: { value: null, denomination: LODGING_TIERS[tier].price.denomination }
+    };
+    await this.#mergeItemEntries([entry]);
+    this.#openLodgingConfig(ShopItemEntry.key(entry));
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Open the autosaving editor for a lodging entry.
+   * @param {string} key
+   */
+  #openLodgingConfig(key) {
+    new LodgingConfig({
+      shopSheet: this, entryKey: key, onUpdate: updateData => this.#updateShop(updateData)
+    }).render({ force: true });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Create a new hireling entry with default values, then open its editor.
+   * @returns {Promise<void>}
+   */
+  async #addHireling() {
+    const type = Object.keys(HIRELING_TYPES)[0];
+    const entry = {
+      _id: foundry.utils.randomID(), isService: true, restockMode: "unlimited",
+      hireling: { type, name: "", description: "", img: "", actorUuid: "" },
+      price: { value: null, denomination: HIRELING_TYPES[type].price.denomination }
+    };
+    await this.#mergeItemEntries([entry]);
+    this.#openHirelingConfig(ShopItemEntry.key(entry));
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Open the autosaving editor for a hireling entry.
+   * @param {string} key
+   */
+  #openHirelingConfig(key) {
+    new HirelingConfig({
+      shopSheet: this, entryKey: key, onUpdate: updateData => this.#updateShop(updateData)
+    }).render({ force: true });
   }
 
   /* -------------------------------------------- */
@@ -797,13 +1124,10 @@ export default class ShopSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
-   * Handle opening the file picker to change this shop's image.
+   * @override
    * @see dnd5e — BaseApplication5e#_onEditImage()
-   * @this {ShopSheet}
-   * @param {Event} event         Triggering click event.
-   * @param {HTMLElement} target  The `<img data-edit="img">` element that was clicked.
    */
-  static async #editImage(event, target) {
+  static async _onEditImage(event, target) {
     const fp = new foundry.applications.apps.FilePicker.implementation({
       current: this.shop.img,
       type: "image",
@@ -901,7 +1225,7 @@ export default class ShopSheet extends Application5e {
    * @this {ShopSheet}
    */
   static async #editVendorSettings() {
-    await new VendorConfig({ shopSheet: this, onUpdate: updateData => this.#updateShop(updateData) })
+    await new VendorConfig({ shop: this.shop, onUpdate: updateData => this.#updateShop(updateData) })
       .render({ force: true });
   }
 
@@ -1017,13 +1341,30 @@ export default class ShopSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
-   * Handle removing an item from this shop.
+   * Handle opening the sheet of a hireling's linked actor.
    * @this {ShopSheet}
    * @param {Event} event         Triggering click event.
-   * @param {HTMLElement} target  Button that was clicked.
+   * @param {HTMLElement} target  Element that was clicked.
    */
-  static async #removeItem(event, target) {
-    const key = target.dataset.key;
+  static async #openLinkedActor(event, target) {
+    const entry = this.shop.items.find(i => ShopItemEntry.key(i) === target.dataset.key);
+    const actorUuid = entry?.hireling?.actorUuid;
+    if ( !actorUuid ) return;
+    const actor = await fromUuid(actorUuid);
+    if ( !actor ) {
+      ui.notifications.warn("WARNING.ObjectDoesNotExist", { format: { name: _loc("DOCUMENT.Actor"), identifier: actorUuid } });
+      return;
+    }
+    actor.sheet?.render(true);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Remove an item entry from this shop.
+   * @param {string} key
+   */
+  async #removeEntry(key) {
     const items = this.shop.items.filter(i => ShopItemEntry.key(i) !== key).map(i => i.toObject());
     await this.#updateShop({ items });
   }
@@ -1031,12 +1372,18 @@ export default class ShopSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
-   * Handle opening a dialog to rename this shop.
-   * @this {ShopSheet}
+   * Set an item entry's Service flag, moving it between the Buy and Services tabs.
+   * @param {string} key
+   * @param {boolean} isService
    */
-  static async #renameShop() {
-    await new RenameConfig({ shopSheet: this, onUpdate: updateData => this.#updateShop(updateData) })
-      .render({ force: true });
+  async #setItemService(key, isService) {
+    const items = this.shop.items.map(i => ShopItemEntry.key(i) === key
+      ? { ...i.toObject(), isService } : i.toObject());
+    await this.#updateShop({ items });
+    ui.notifications.info(
+      isService ? "SIMPLE_SHOP_CRAFT_5E.ShopEditor.MarkedAsService" : "SIMPLE_SHOP_CRAFT_5E.ShopEditor.UnmarkedAsService",
+      { localize: true }
+    );
   }
 
   /* -------------------------------------------- */
@@ -1057,13 +1404,7 @@ export default class ShopSheet extends Application5e {
    * @this {ShopSheet}
    */
   static async #spotlight() {
-    const targets = game.users.filter(u => u.active && (u.id !== game.user.id));
-    if ( !targets.length ) {
-      ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SpotlightNoTargets", { localize: true });
-      return;
-    }
-    await User.queryMany(targets, `${MODULE_ID}.spotlight`, { shopId: this.shopId });
-    ui.notifications.info("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SpotlightSuccess", { localize: true });
+    await spotlightShop(this.shopId);
   }
 
   /* -------------------------------------------- */
@@ -1074,6 +1415,31 @@ export default class ShopSheet extends Application5e {
    */
   static async #toggleActive() {
     await this.#updateShop({ active: !this.shop.active });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle duplicating this shop and opening the copy's editor.
+   * @this {ShopSheet}
+   */
+  static async #duplicateShop() {
+    const clone = await Shop.duplicate(this.shop);
+    new ShopSheet({ shopId: clone._id }).render({ force: true });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle deleting this shop, after confirmation. Closes this sheet first, since its shop no longer
+   * exists afterward.
+   * @this {ShopSheet}
+   */
+  static async #deleteShop() {
+    const confirmed = await confirmDeleteShop();
+    if ( !confirmed ) return;
+    await this.close();
+    await Shop.delete(this.shopId);
   }
 
   /* -------------------------------------------- */
@@ -1100,7 +1466,9 @@ export default class ShopSheet extends Application5e {
    * @returns {object|null}
    */
   #findRow(key) {
-    return this.#lastGroups.flatMap(group => group.items).find(row => row.key === key) ?? null;
+    return this.#lastGroups.flatMap(group => group.items).find(row => row.key === key)
+      ?? this.#lastServiceGroups.flatMap(group => group.items).find(row => row.key === key)
+      ?? null;
   }
 
   /* -------------------------------------------- */
@@ -1119,13 +1487,27 @@ export default class ShopSheet extends Application5e {
 
   /**
    * Merge new item entries into the shop's item list, replacing any existing entry with the same
-   * {@link ShopItemEntry.key}.
+   * {@link ShopItemEntry.key}. An entry whose key already exists with a different `isService` value
+   * (same catalog item present in both Buy and Services) is skipped with a warning instead of overwriting it.
    * @param {ShopItemEntryData[]} newEntries
+   * @returns {Promise<void>}
    */
   async #mergeItemEntries(newEntries) {
     const entries = new Map(this.shop.items.map(i => [ShopItemEntry.key(i), i.toObject()]));
-    for ( const entry of newEntries ) entries.set(ShopItemEntry.key(entry), entry);
-    await this.#updateShop({ items: Array.from(entries.values()) });
+    let blocked = false;
+    let changed = false;
+    for ( const entry of newEntries ) {
+      const key = ShopItemEntry.key(entry);
+      const existing = entries.get(key);
+      if ( existing && (!!existing.isService !== !!entry.isService) ) {
+        blocked = true;
+        continue;
+      }
+      entries.set(key, entry);
+      changed = true;
+    }
+    if ( blocked ) ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.AlreadyExistsOtherTab", { localize: true });
+    if ( changed ) await this.#updateShop({ items: Array.from(entries.values()) });
   }
 
   /* -------------------------------------------- */
@@ -1161,7 +1543,7 @@ export default class ShopSheet extends Application5e {
   async #updateShop(updateData) {
     if ( !game.user.isGM ) return;
     await Shop.update(this.shopId, updateData);
-    this.render();
+    this.render({ window: { title: this.title } });
     if ( this.#cartApp?.rendered ) this.#cartApp.render();
   }
 }
@@ -1262,7 +1644,10 @@ async function groupByType({
     if ( !groups.has(type) ) groups.set(type, []);
     groups.get(type).push(row);
   }
-  return finalizeGroups(groups);
+  return finalizeGroups(groups, {
+    labelFor: type => (type === LODGING_ITEM_TYPE) ? _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.Lodging")
+      : (type === HIRELING_ITEM_TYPE) ? _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.Hireling") : null
+  });
 }
 
 /* -------------------------------------------- */
@@ -1339,7 +1724,7 @@ function isFixedValue(item, fixedValueLootTypes) {
 /**
  * Resolve a row's effective discount percent and the attribution sources behind it: item override, else
  * fixed-value (0%), else shop default + player modifier. Rendering the sources into a tooltip is left to
- * the caller (a View concern).
+ * the caller.
  * @param {object} options
  * @param {number|null} options.itemOverride    The item entry's own discount override, if any (buy-side only).
  * @param {boolean} options.isFixedValue        Whether the item is a fixed-value loot subtype (always 0%).

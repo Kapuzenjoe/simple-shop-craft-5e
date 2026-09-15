@@ -1,5 +1,5 @@
 import { ShopItemEntry } from "../../../data/shop-data.mjs";
-import { getCurrencyOptions } from "../../../utils.mjs";
+import { currencyValueField } from "../../../utils.mjs";
 
 import BaseShopConfig from "./base-shop-config.mjs";
 
@@ -72,26 +72,24 @@ export default class PriceConfig extends BaseShopConfig {
     const context = await super._prepareContext(options);
     const entry = this.#entry;
     const item = (await ShopItemEntry.resolveMany([entry]))[0]?.item;
-    const priceFields = ShopItemEntry.schema.fields.price.fields;
     const bundleSizeField = ShopItemEntry.schema.fields.bundleSize;
     context.fields = [
-      {
-        field: priceFields.value, name: "value", value: entry.price?.value,
+      currencyValueField({
         label: _loc("DND5E.Price"), hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.PriceOverrideHint"),
-        placeholder: item?.system?.price?.value
-      },
-      {
-        field: priceFields.denomination, name: "denomination",
-        value: entry.price?.denomination ?? item?.system?.price?.denomination ?? CONFIG.DND5E.defaultCurrency,
-        label: _loc("DND5E.Currency"), options: getCurrencyOptions()
-      },
-      {
+        field: ShopItemEntry.schema.fields.price, valueName: "value", value: entry.price?.value,
+        placeholder: item?.system?.price?.value,
+        denominationName: "denomination",
+        denomination: entry.price?.denomination ?? item?.system?.price?.denomination ?? CONFIG.DND5E.defaultCurrency
+      })
+    ];
+    if ( !entry.isService ) {
+      context.fields.push({
         field: bundleSizeField, name: "bundleSize", value: entry.bundleSize,
         label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.BundleSize"),
         hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.BundleSizeHint"),
         placeholder: (item?.system?.quantity > 1) ? item.system.quantity : 1
-      }
-    ];
+      });
+    }
     return context;
   }
 

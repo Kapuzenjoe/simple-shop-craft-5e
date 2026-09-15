@@ -112,6 +112,43 @@ export async function effectiveCraftCost(item) {
 }
 
 /* -------------------------------------------- */
+
+/**
+ * Resolve a recipe's crafting cost: `CONFIG.DND5E.crafting.scrolls[level]` for a spell-scroll recipe,
+ * otherwise `effectiveCraftCost()` on the resolved target item.
+ * @param {Recipe} recipe
+ * @param {Item5e|null} targetItem  The recipe's resolved target item, if any.
+ * @returns {Promise<{ days: number, gold: number }|null>}
+ */
+export async function recipeCraftCost(recipe, targetItem) {
+  if ( recipe.spellScroll ) return CONFIG.DND5E.crafting.scrolls[recipe.spellScroll.level] ?? null;
+  if ( !targetItem?.uuid ) return null;
+  try {
+    const fullItem = await fromUuid(targetItem.uuid);
+    return fullItem?.system?.getCraftCost ? effectiveCraftCost(fullItem) : null;
+  } catch ( err ) {
+    console.warn(`${MODULE_ID} | Failed to resolve craft cost for ${targetItem.uuid}:`, err);
+    return null;
+  }
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Synthesize a non-persisted scroll Item for a spell, with a unique per-level, per-spell `system.identifier`
+ * in place of the generic template's shared one.
+ * @param {Item5e} spell
+ * @returns {Promise<Item5e|null>}
+ */
+export async function createSpellScroll(spell) {
+  const scroll = await Item.implementation.createScrollFromSpell(spell, {}, { dialog: false });
+  if ( !scroll ) return null;
+  const level = scroll.system.activities?.find(a => a.type === "cast")?.spell?.level ?? 0;
+  scroll.updateSource({ "system.identifier": `spell-scroll-${level}-${spell.system.identifier ?? spell.id}` });
+  return scroll;
+}
+
+/* -------------------------------------------- */
 /*  Currencies                                  */
 /* -------------------------------------------- */
 
@@ -189,6 +226,36 @@ export function getCurrencyOptions({ abbreviated=false }={}) {
   return Object.entries(CONFIG.DND5E.currencies).map(([value, cfg]) => ({
     value, label: abbreviated ? cfg.abbreviation : cfg.label
   }));
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Build a single-line Value + Currency split-group fieldlist entry.
+ * @param {object} options
+ * @param {string} options.label
+ * @param {string} [options.hint]
+ * @param {SchemaField} options.field
+ * @param {string} options.valueName
+ * @param {number|null} [options.value]
+ * @param {string|number} [options.placeholder="0"]
+ * @param {string} options.denominationName
+ * @param {string} [options.denomination]
+ * @returns {object}
+ */
+export function currencyValueField({
+  label, hint, field, valueName, value, placeholder="0", denominationName, denomination
+}) {
+  return {
+    group: { label, hint },
+    fields: [
+      { field: field.fields.value, name: valueName, value, placeholder },
+      {
+        field: field.fields.denomination, name: denominationName, value: denomination,
+        options: getCurrencyOptions({ abbreviated: true })
+      }
+    ]
+  };
 }
 
 /* -------------------------------------------- */
@@ -326,12 +393,16 @@ export function buildItemTableSections({ groups, emptyLabel, columns, rowTemplat
 /**
  * Turn a Map of type → rows into the sorted, labeled group array used by both Buy and Sell tables.
  * @param {Map<string, object[]>} groups
+ * @param {object} [options]
+ * @param {(type: string) => string|null} [options.labelFor]  Override for a specific type's label, checked
+ *   before the generic `TYPES.Item.<type>Pl` fallback. Return `null`/`undefined` to use the fallback.
  * @returns {{ type: string, label: string, items: object[] }[]}
  */
-export function finalizeGroups(groups) {
+export function finalizeGroups(groups, { labelFor }={}) {
   return Array.from(groups, ([type, items]) => ({
     type,
-    label: (type === "unknown") ? _loc("SIMPLE_SHOP_CRAFT_5E.Unknown") : _loc(`TYPES.Item.${type}Pl`),
+    label: labelFor?.(type)
+      ?? ((type === "unknown") ? _loc("SIMPLE_SHOP_CRAFT_5E.Unknown") : _loc(`TYPES.Item.${type}Pl`)),
     items
   })).sort((a, b) => {
     return (CONFIG.Item.dataModels[a.type]?.inventorySection?.order ?? Infinity)
@@ -348,10 +419,11 @@ export function finalizeGroups(groups) {
  */
 export async function preloadHandlebarsTemplates() {
   return foundry.applications.handlebars.loadTemplates([
-    "modules/simple-shop-craft-5e/templates/partials/currency-parts.hbs",
-    "modules/simple-shop-craft-5e/templates/partials/currency-inputs.hbs",
-    "modules/simple-shop-craft-5e/templates/partials/item-table.hbs",
-    "modules/simple-shop-craft-5e/templates/partials/material-row.hbs",
+    "modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs",
+    "modules/simple-shop-craft-5e/templates/shared/currency-inputs.hbs",
+    "modules/simple-shop-craft-5e/templates/shared/item-table.hbs",
+    "modules/simple-shop-craft-5e/templates/shared/rich-tooltip.hbs",
+    "modules/simple-shop-craft-5e/templates/shared/material-row.hbs",
     "modules/simple-shop-craft-5e/templates/shop-manager/recipe-row.hbs",
     "modules/simple-shop-craft-5e/templates/shop-manager/shop-row.hbs",
     "modules/simple-shop-craft-5e/templates/shops/shop-sheet/buy-row.hbs",
@@ -362,6 +434,17 @@ export async function preloadHandlebarsTemplates() {
 
 /* -------------------------------------------- */
 /*  Items                                       */
+/* -------------------------------------------- */
+
+/**
+ * Whether an item is dnd5e's generic Spell Scroll item — picking it activates spell-scroll handling.
+ * @param {Item5e} item
+ * @returns {boolean}
+ */
+export function isSpellScrollItem(item) {
+  return (item.system.identifier === "spell-scroll") || /spell scroll/i.test(item.name ?? "");
+}
+
 /* -------------------------------------------- */
 
 /**
@@ -407,6 +490,18 @@ export function itemRefKey(entry) {
 /* -------------------------------------------- */
 
 /**
+ * Build an identifier/uuid reference for a resolved item, preferring its `system.identifier` when it isn't
+ * just the unedited default.
+ * @param {Item5e} item
+ * @returns {{ identifier: string }|{ uuid: string }}
+ */
+export function itemRef(item) {
+  return isDefaultIdentifier(item) ? { uuid: item.uuid } : { identifier: item.system.identifier };
+}
+
+/* -------------------------------------------- */
+
+/**
  * Whether an item's own price is unset, meaning a rarity-based fallback price is being shown for it
  * instead.
  * @param {Item5e|null} item
@@ -425,8 +520,41 @@ export function needsDefaultPrice(item) {
  */
 export function openItemSheet(item) {
   const sheet = item.sheet;
-  if ( !item.collection?.has(item.id) ) Object.defineProperty(sheet, "isEditable", { get: () => false });
+  if ( !sheet ) return;
+  if ( !item.collection?.has(item.id) ) {
+    Object.defineProperty(sheet, "isEditable", { get: () => false, configurable: true });
+  }
   sheet.render(true);
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Prompt the user to confirm deleting a shop.
+ * @returns {Promise<boolean>}
+ */
+export async function confirmDeleteShop() {
+  return foundry.applications.api.DialogV2.confirm({
+    window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Delete" },
+    content: `<p>${_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.DeleteConfirm")}</p>`
+  });
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Broadcast a shop to every connected client, opening it in their Shop Editor.
+ * @param {string} shopId
+ * @returns {Promise<void>}
+ */
+export async function spotlightShop(shopId) {
+  const targets = game.users.filter(u => u.active && (u.id !== game.user.id));
+  if ( !targets.length ) {
+    ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SpotlightNoTargets", { localize: true });
+    return;
+  }
+  await User.queryMany(targets, `${MODULE_ID}.spotlight`, { shopId });
+  ui.notifications.info("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SpotlightSuccess", { localize: true });
 }
 
 /* -------------------------------------------- */
@@ -748,6 +876,28 @@ export function applyLoadingTooltip(el) {
   el.dataset.tooltipClass = game.dnd5e.utils.loadingTooltip
     ? "dnd5e2 dnd5e-tooltip item-tooltip"
     : "dnd5e2 dnd5e-tooltip item-tooltip themed theme-light";
+  el.dataset.tooltipDirection ??= "LEFT";
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Wire a synthesized tooltip onto an element, rendered from the same layout as dnd5e's own item tooltips.
+ * @param {HTMLElement} el
+ * @param {object} data
+ * @param {string} data.name
+ * @param {string} data.img
+ * @param {string} data.subtitle
+ * @param {{ value: number, denomination: string }|null} [data.price]
+ * @param {string} [data.description]
+ * @param {string[]} [data.properties]
+ * @returns {Promise<void>}
+ */
+export async function applyRichTooltip(el, data) {
+  el.dataset.tooltipHtml = await foundry.applications.handlebars.renderTemplate(
+    "modules/simple-shop-craft-5e/templates/shared/rich-tooltip.hbs", data
+  );
+  el.dataset.tooltipClass = "dnd5e2 dnd5e-tooltip item-tooltip document-tooltip";
   el.dataset.tooltipDirection ??= "LEFT";
 }
 

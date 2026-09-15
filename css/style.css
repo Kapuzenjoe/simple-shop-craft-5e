@@ -40,6 +40,14 @@
   .item-controls {
     width: 70px;
   }
+
+  .tab[data-tab="shops"], .tab[data-tab="recipes"] {
+    padding-bottom: 60px;
+  }
+
+  .window-content-actions {
+    display: flex;
+  }
 }
 
 #tooltip.property-attribution.simple-shop-craft-5e table td.attribution-value {
@@ -61,8 +69,13 @@
   .window-content-actions {
     position: absolute;
     inset: auto 16px 16px auto;
-    display: flex;
+    display: none;
     gap: 8px;
+  }
+
+  &.tab-buy .window-content-actions[data-tab-scope="buy"]:not([hidden]),
+  &.tab-services .window-content-actions[data-tab-scope="services"]:not([hidden]) {
+    display: flex;
   }
 
   .tab:not(.active) {
@@ -92,6 +105,49 @@
     .name-stacked {
       flex: 1;
     }
+  }
+
+  .icon-picker-preview {
+    flex: none;
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--dnd5e-color-gold);
+    border-radius: 4px;
+    object-fit: cover;
+  }
+
+  &.configure-templates-dialog .pill-lg {
+    max-width: unset;
+  }
+
+  &.add-entry-dialog {
+    li {
+      border-bottom: var(--dnd5e-border-dotted);
+
+      &:has(input:enabled):hover { background: var(--radio-list-hover); }
+      &:last-child { border: none; }
+    }
+
+    label {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 4px 8px;
+      cursor: var(--cursor-pointer);
+
+      i { width: 32px; font-size: 32px; text-align: center; color: var(--color-text-primary); }
+
+      span {
+        flex: 1;
+        font-family: var(--dnd5e-font-roboto-slab);
+        font-weight: bold;
+        font-size: var(--font-size-14);
+        color: var(--color-text-primary);
+      }
+    }
+
+    .uuid-field-row { padding: 4px 8px 8px; }
+    .uuid-field-row .hint { color: var(--dnd5e-color-note-warn); }
   }
 
   .item-quantity {
@@ -222,7 +278,7 @@
     align-items: center;
   }
 
-  .tab[data-tab="buy"] {
+  .tab[data-tab="buy"], .tab[data-tab="services"] {
     padding-bottom: 60px;
   }
 
@@ -343,5 +399,11 @@
     color: var(--dnd5e-color-failure);
     margin-left: 4px;
     cursor: help;
+  }
+
+  .linked-actor-icon {
+    margin-left: 4px;
+    cursor: var(--cursor-pointer);
+    color: var(--color-text-primary);
   }
 }
