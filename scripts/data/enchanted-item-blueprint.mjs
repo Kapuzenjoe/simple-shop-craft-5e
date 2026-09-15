@@ -62,6 +62,23 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
   /* -------------------------------------------- */
 
   /**
+   * Can this item's type/subtype be an enchant-item template, per the DMG/SRD catalog's own pattern?
+   * @param {Item5e} item
+   * @returns {boolean}
+   */
+  static canBeTemplate(item) {
+    if ( item.type === "weapon" ) return true;
+    if ( item.type === "equipment" ) {
+      const subtype = item.system.type?.value;
+      return (subtype in CONFIG.DND5E.armorTypes) || ["ring", "rod", "wand"].includes(subtype);
+    }
+    if ( item.type === "consumable" ) return ["ammo", "scroll"].includes(item.system.type?.value);
+    return false;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
    * List all enchantment profiles offered by an item's `enchant` Activities — every effect profile across
    * every such Activity, excluding profiles with rider items.
    * @param {Item5e} item

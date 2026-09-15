@@ -297,39 +297,46 @@ export default class GenerateItemDialog extends Dialog5e {
   /**
    * Roll and add the generated entries.
    * @this {GenerateItemDialog}
+   * @param {Event} event         Triggering click event.
+   * @param {HTMLElement} target  Button that was clicked.
    * @returns {Promise<void>}
    */
-  static async #generate() {
-    const typeConfigs = new Map(Array.from(this.#types).map(type => {
-      const subtypes = this.#subtypesByType.get(type);
-      return [type, subtypes?.size ? subtypes : null];
-    }));
-    const spellFilter = this.#showSpellFilter
-      ? {
-        schools: this.#schools.size ? this.#schools : null, ritualOnly: this.#ritualOnly,
-        classes: this.#classes.size ? this.#classes : null, levels: this.#levels.size ? this.#levels : null
+  static async #generate(event, target) {
+    target.disabled = true;
+    try {
+      const typeConfigs = new Map(Array.from(this.#types).map(type => {
+        const subtypes = this.#subtypesByType.get(type);
+        return [type, subtypes?.size ? subtypes : null];
+      }));
+      const spellFilter = this.#showSpellFilter
+        ? {
+          schools: this.#schools.size ? this.#schools : null, ritualOnly: this.#ritualOnly,
+          classes: this.#classes.size ? this.#classes : null, levels: this.#levels.size ? this.#levels : null
+        }
+        : null;
+      const existingKeys = new Set(this.shopSheet.shop.items.map(i => ShopItemEntry.key(i)));
+
+      const rolled = await ShopItemEntry.rollMany({
+        typeConfigs, rarities: this.#rarities.size ? this.#rarities : null, magic: this.#magic,
+        spellFilter, count: this.#count, existingKeys, settlementCap: this.shopSheet.shop.settlementCap,
+        stockDefaults: this.shopSheet.shop.stockDefaults
+      });
+
+      if ( !rolled.length ) {
+        ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemNone", { localize: true });
+        return;
       }
-      : null;
-    const existingKeys = new Set(this.shopSheet.shop.items.map(i => ShopItemEntry.key(i)));
 
-    const rolled = await ShopItemEntry.rollMany({
-      typeConfigs, rarities: this.#rarities.size ? this.#rarities : null, magic: this.#magic,
-      spellFilter, count: this.#count, existingKeys, settlementCap: this.shopSheet.shop.settlementCap,
-      stockDefaults: this.shopSheet.shop.stockDefaults
-    });
-
-    if ( !rolled.length ) {
-      ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemNone", { localize: true });
-      return;
+      await this.onGenerated(rolled.map(r => r.entry));
+      const [key, format] = (rolled.length === 1)
+        ? ["SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemResult", { name: rolled[0].label }]
+        : (rolled.length === this.#count)
+          ? ["SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemResultMultiple", { count: rolled.length }]
+          : ["SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemPartial", { count: rolled.length, total: this.#count }];
+      ui.notifications.info(key, { format });
+    } finally {
+      target.disabled = false;
     }
-
-    await this.onGenerated(rolled.map(r => r.entry));
-    const [key, format] = (rolled.length === 1)
-      ? ["SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemResult", { name: rolled[0].label }]
-      : (rolled.length === this.#count)
-        ? ["SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemResultMultiple", { count: rolled.length }]
-        : ["SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemPartial", { count: rolled.length, total: this.#count }];
-    ui.notifications.info(key, { format });
   }
 }
 

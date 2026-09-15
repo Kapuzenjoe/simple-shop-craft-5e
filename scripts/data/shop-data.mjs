@@ -252,7 +252,8 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
       const hasEnchant = candidateItem.system.activities?.some(a => a.type === "enchant");
       if ( !hasEnchant && !candidateItem.system.price?.value && !(isMagic && itemRarity(candidateItem)) ) continue;
 
-      if ( !hasEnchant || candidateItem.system.type?.baseItem ) {
+      if ( !hasEnchant || !EnchantedItemBlueprint.canBeTemplate(candidateItem)
+        || candidateItem.system.type?.baseItem ) {
         if ( rarities && !rarities.has(itemRarity(candidateItem)) ) continue;
         const wantedSubtypes = typeConfigs.get(candidateItem.type);
         if ( wantedSubtypes && !wantedSubtypes.has(candidateItem.system.type?.value) ) continue;
