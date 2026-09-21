@@ -32,24 +32,6 @@ export function isShopPackSource(uuid) {
 }
 
 /* -------------------------------------------- */
-
-/**
- * Group active Item compendium packs by their owning package type.
- * @returns {Map<string, CompendiumCollection[]>}
- */
-function getPacksByPackageType() {
-  const sources = game.dnd5e.applications.settings.CompendiumBrowserSettingsConfig.collateSources();
-  const packsByPackageType = new Map();
-  for ( const pack of game.packs ) {
-    if ( (pack.documentName !== "Item") || !sources.has(pack.collection) ) continue;
-    const packageType = pack.metadata.packageType;
-    if ( !packsByPackageType.has(packageType) ) packsByPackageType.set(packageType, []);
-    packsByPackageType.get(packageType).push(pack);
-  }
-  return packsByPackageType;
-}
-
-/* -------------------------------------------- */
 /*  Crafting                                    */
 /* -------------------------------------------- */
 
@@ -138,10 +120,14 @@ export async function recipeCraftCost(recipe, targetItem) {
  * Synthesize a non-persisted scroll Item for a spell, with a unique per-level, per-spell `system.identifier`
  * in place of the generic template's shared one.
  * @param {Item5e} spell
+ * @param {{ dc: number, bonus: number }} [values]  Save DC and attack bonus for the created scroll. Omit to
+ *   fall back to `Item5e.createScrollFromSpell()`'s own default.
  * @returns {Promise<Item5e|null>}
  */
-export async function createSpellScroll(spell) {
-  const scroll = await Item.implementation.createScrollFromSpell(spell, {}, { dialog: false });
+export async function createSpellScroll(spell, values) {
+  const config = { dialog: false };
+  if ( values ) config.values = values;
+  const scroll = await Item.implementation.createScrollFromSpell(spell, {}, config);
   if ( !scroll ) return null;
   const level = scroll.system.activities?.find(a => a.type === "cast")?.spell?.level ?? 0;
   scroll.updateSource({ "system.identifier": `spell-scroll-${level}-${spell.system.identifier ?? spell.id}` });
@@ -249,10 +235,10 @@ export function currencyValueField({
   return {
     group: { label, hint },
     fields: [
-      { field: field.fields.value, name: valueName, value, placeholder },
+      { field: field.fields.value, name: valueName, value, placeholder, label },
       {
         field: field.fields.denomination, name: denominationName, value: denomination,
-        options: getCurrencyOptions({ abbreviated: true })
+        label: _loc("DND5E.Currency"), options: getCurrencyOptions({ abbreviated: true })
       }
     ]
   };
@@ -492,7 +478,7 @@ export function itemRefKey(entry) {
 /**
  * Build an identifier/uuid reference for a resolved item, preferring its `system.identifier` when it isn't
  * just the unedited default.
- * @param {Item5e} item
+ * @param {Item5e|object} item  An item or its compendium index entry.
  * @returns {{ identifier: string }|{ uuid: string }}
  */
 export function itemRef(item) {
@@ -615,7 +601,19 @@ export async function resolveIdentifierIndex(identifiers) {
   if ( !identifiers.size ) return byIdentifier;
 
   const rules = game.dnd5e.settings.rulesVersion === "modern" ? "2024" : "2014";
-  const packsByPackageType = getPacksByPackageType();
+  const index = await game.dnd5e.applications.CompendiumBrowser.fetch(Item, {
+    filters: [{ k: "system.identifier", o: "in", v: identifiers }],
+    indexFields: new Set([
+      "system.source", "system.price.value", "system.price.denomination",
+      "system.weight.value", "system.weight.units", "system.quantity", "system.type.value",
+      "system.rarity", "system.rarities",
+      "system.properties"
+    ]),
+    sort: false
+  });
+  const entriesByPackageType = Map.groupBy(index, entry => {
+    return foundry.utils.parseUuid(entry.uuid).collection.metadata.packageType;
+  });
   const remaining = new Set(identifiers);
 
   const considerEntry = entry => {
@@ -639,21 +637,7 @@ export async function resolveIdentifierIndex(identifiers) {
 
   for ( const packageType of PACKAGE_TYPE_ORDER ) {
     if ( !remaining.size ) break;
-    for ( const pack of packsByPackageType.get(packageType) ?? [] ) {
-      let index;
-      try {
-        index = await pack.getIndex({ fields: [
-          "system.identifier", "system.source", "system.price.value", "system.price.denomination",
-          "system.weight.value", "system.weight.units", "system.quantity", "system.type.value",
-          "system.rarity", "system.rarities",
-          "system.properties"
-        ] });
-      } catch ( err ) {
-        console.warn(`${MODULE_ID} | Failed to index pack ${pack.metadata.id}:`, err);
-        continue;
-      }
-      for ( const entry of index ) considerEntry(entry);
-    }
+    for ( const entry of entriesByPackageType.get(packageType) ?? [] ) considerEntry(entry);
     for ( const identifier of byIdentifier.keys() ) remaining.delete(identifier);
   }
   if ( remaining.size ) for ( const item of game.items ) considerEntry(item);

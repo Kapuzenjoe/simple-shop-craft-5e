@@ -1,26 +1,15 @@
 import { ShopItemEntry } from "../../../data/shop-data.mjs";
-
 import BaseShopConfig from "./base-shop-config.mjs";
-
-/**
- * @import ShopSheet from "../shop-sheet.mjs";
- */
 
 /**
  * Dialog to edit an item's price-modifier override.
  * @param {object} options
- * @param {ShopSheet} options.shopSheet
- * @param {string} options.entryKey  Entry key of the item being edited.
  * @param {{ buy: number|null, sell: number|null }} options.playerOverride  Acting actor's discount override, if any.
- * @param {(updateData: object) => Promise<void>} options.onUpdate
  */
 export default class DiscountConfig extends BaseShopConfig {
-  constructor({ shopSheet, entryKey, playerOverride, onUpdate, ...options }={}) {
+  constructor({ playerOverride, ...options }={}) {
     super(options);
-    this.shopSheet = shopSheet;
-    this.entryKey = entryKey;
     this.playerOverride = playerOverride;
-    this.onUpdate = onUpdate;
   }
 
   /* -------------------------------------------- */
@@ -35,22 +24,6 @@ export default class DiscountConfig extends BaseShopConfig {
   /* -------------------------------------------- */
 
   /**
-   * The shop editor this config belongs to.
-   * @type {ShopSheet}
-   */
-  shopSheet;
-
-  /* -------------------------------------------- */
-
-  /**
-   * Entry key of the item being edited.
-   * @type {string}
-   */
-  entryKey;
-
-  /* -------------------------------------------- */
-
-  /**
    * Acting actor's discount override, if any.
    * @type {{ buy: number|null, sell: number|null }}
    */
@@ -58,28 +31,10 @@ export default class DiscountConfig extends BaseShopConfig {
 
   /* -------------------------------------------- */
 
-  /**
-   * Callback receiving the shop update.
-   * @type {(updateData: object) => Promise<void>}
-   */
-  onUpdate;
-
-  /* -------------------------------------------- */
-
-  /**
-   * The item entry being edited.
-   * @type {ShopItemEntry}
-   */
-  get #entry() {
-    return this.shopSheet.shop.items.find(i => ShopItemEntry.key(i) === this.entryKey);
-  }
-
-  /* -------------------------------------------- */
-
   /** @inheritDoc */
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
-    const entry = this.#entry;
+    const entry = this.entry;
     const effectiveDefault = this.shopSheet.shop.buyModifier + (this.playerOverride.buy ?? 0);
     context.fields = [
       {

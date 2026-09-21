@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.0
+- Added a Proficiency Mode to recipes for how Tool and Skill Proficiencies combine: Tool & Skill (default), Tool or Skill, or Every Listed Tool & Skill.
+- Added editable Save DC/Attack Bonus for a crafted spell scroll, defaulting to the crafting character's own spellcasting values.
+- Added Enspelled Staff, Weapon, and Armor to the Item Generator, each bound to a random spell of its rarity's level (#10).
+- Added a pool preview to the Item Generator, showing how many possible results match per rarity, how many the settlement cap leaves out, and the chance per draw for items, enchanted items, and spell scrolls.
+- Added a Weighting setting to the Item Generator for how often enchanted items come up: per Combination, Variant, or Template.
+- Changed the Item Generator to draw enchanted items in proportion to their variants, so items like +1 weapons no longer count as a single item.
+- Fixed the Craft Start dialog's spell picker for a compendium-source spell-scroll recipe showing no results instead of the recipe's eligible spells.
+- Fixed a spell-scroll recipe's "Prepared" spell source never listing any spells on dnd5e 6.0.0+.
+
 ## 0.5.0
 
 - Added a Services tab for shops (#8):

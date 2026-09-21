@@ -1,29 +1,11 @@
 import { ShopItemEntry } from "../../../data/shop-data.mjs";
 import { currencyValueField } from "../../../utils.mjs";
-
 import BaseShopConfig from "./base-shop-config.mjs";
 
 /**
- * @import ShopSheet from "../shop-sheet.mjs";
- */
-
-/**
  * Dialog to edit an item's price.
- * @param {object} options
- * @param {ShopSheet} options.shopSheet
- * @param {string} options.entryKey  Entry key of the item being edited.
- * @param {(updateData: object) => Promise<void>} options.onUpdate
  */
 export default class PriceConfig extends BaseShopConfig {
-  constructor({ shopSheet, entryKey, onUpdate, ...options }={}) {
-    super(options);
-    this.shopSheet = shopSheet;
-    this.entryKey = entryKey;
-    this.onUpdate = onUpdate;
-  }
-
-  /* -------------------------------------------- */
-
   /** @override */
   static DEFAULT_OPTIONS = {
     id: "price-config-{id}",
@@ -33,44 +15,10 @@ export default class PriceConfig extends BaseShopConfig {
 
   /* -------------------------------------------- */
 
-  /**
-   * The shop editor this config belongs to.
-   * @type {ShopSheet}
-   */
-  shopSheet;
-
-  /* -------------------------------------------- */
-
-  /**
-   * Entry key of the item being edited.
-   * @type {string}
-   */
-  entryKey;
-
-  /* -------------------------------------------- */
-
-  /**
-   * Callback receiving the shop update.
-   * @type {(updateData: object) => Promise<void>}
-   */
-  onUpdate;
-
-  /* -------------------------------------------- */
-
-  /**
-   * The item entry being edited.
-   * @type {ShopItemEntry}
-   */
-  get #entry() {
-    return this.shopSheet.shop.items.find(i => ShopItemEntry.key(i) === this.entryKey);
-  }
-
-  /* -------------------------------------------- */
-
   /** @inheritDoc */
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
-    const entry = this.#entry;
+    const entry = this.entry;
     const item = (await ShopItemEntry.resolveMany([entry]))[0]?.item;
     const bundleSizeField = ShopItemEntry.schema.fields.bundleSize;
     context.fields = [

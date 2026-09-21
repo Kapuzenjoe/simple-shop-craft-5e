@@ -150,6 +150,37 @@
     .uuid-field-row .hint { color: var(--dnd5e-color-note-warn); }
   }
 
+  &.generate-item-dialog .window-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto 1fr;
+    align-items: start;
+    column-gap: 1rem;
+
+    [data-application-part="content"] { grid-row: 1 / span 2; }
+    [data-application-part="footer"] { grid-column: 1 / -1; }
+
+    .pool-total {
+      font-size: var(--font-size-16);
+      font-weight: bold;
+    }
+
+    .pool-rarities li,
+    .pool-chances li {
+      display: grid;
+      grid-template-columns: 7rem 1fr 3rem 3rem;
+      align-items: center;
+      gap: 0.5rem;
+
+      .count {
+        font-weight: bold;
+        text-align: end;
+      }
+
+      .capped { color: var(--color-text-secondary); }
+    }
+  }
+
   .item-quantity {
     display: flex;
     align-items: center;

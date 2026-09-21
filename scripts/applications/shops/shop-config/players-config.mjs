@@ -1,21 +1,13 @@
 import BaseShopConfig from "./base-shop-config.mjs";
 
 /**
- * @import ShopSheet from "../shop-sheet.mjs";
- */
-
-/**
  * Dialog to manage a shop's per-player discount overrides and haggling locks.
  * @param {object} options
- * @param {ShopSheet} options.shopSheet
- * @param {(updateData: object) => Promise<void>} options.onUpdate
  * @param {(actorUuid: string, updateData: object) => Promise<void>} options.onUpdatePlayerDiscount
  */
 export default class PlayersConfig extends BaseShopConfig {
-  constructor({ shopSheet, onUpdate, onUpdatePlayerDiscount, ...options }={}) {
+  constructor({ onUpdatePlayerDiscount, ...options }={}) {
     super(options);
-    this.shopSheet = shopSheet;
-    this.onUpdate = onUpdate;
     this.onUpdatePlayerDiscount = onUpdatePlayerDiscount;
     this.#actorUuids = this.shopSheet.shop.playerDiscounts.map(pd => pd.actor);
   }
@@ -40,22 +32,6 @@ export default class PlayersConfig extends BaseShopConfig {
     ...super.PARTS,
     content: { template: "modules/simple-shop-craft-5e/templates/shops/shop-config/players-config/content.hbs" }
   };
-
-  /* -------------------------------------------- */
-
-  /**
-   * The shop editor this config belongs to.
-   * @type {ShopSheet}
-   */
-  shopSheet;
-
-  /* -------------------------------------------- */
-
-  /**
-   * Callback receiving the shop update.
-   * @type {(updateData: object) => Promise<void>}
-   */
-  onUpdate;
 
   /* -------------------------------------------- */
 

@@ -159,6 +159,16 @@ export const UNLOCK_MODES = {
 };
 
 /**
+ * How a recipe's tool and skill proficiencies combine to determine crafting eligibility.
+ * @type {Record<string, { label: string }>}
+ */
+export const PROFICIENCY_MODES = {
+  both: { label: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.ProficiencyModeBoth" },
+  either: { label: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.ProficiencyModeEither" },
+  all: { label: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.ProficiencyModeAll" }
+};
+
+/**
  * Which of an actor's spells are eligible for a spell-scroll recipe.
  * @type {Record<string, { label: string }>}
  */
@@ -188,11 +198,22 @@ export const RARITY_DEFAULT_PRICES = {
 };
 
 /**
- * Spell levels matching each rarity tier's spell scroll price/rarity, per DMG 2024 "Spell Scroll Costs".
+ * Spell levels of the spell scrolls of each rarity, per DMG 2024 magic item "Spell Scroll".
  * @type {Record<string, number[]>}
  */
 export const SPELL_SCROLL_LEVELS = {
   common: [0, 1], uncommon: [2, 3], rare: [4, 5], veryRare: [6, 7, 8], legendary: [9]
+};
+
+/**
+ * Spell schools an Enspelled item's bound spell may belong to, per DMG 2024 "Enspelled Armor/Staff/Weapon",
+ * keyed by the template's `system.identifier`. `null` allows any school.
+ * @type {Record<string, string[]|null>}
+ */
+export const ENSPELLED_ITEMS = {
+  "enspelled-armor": ["abj", "ill"],
+  "enspelled-staff": null,
+  "enspelled-weapon": ["con", "div", "evo", "nec", "trs"]
 };
 
 /**

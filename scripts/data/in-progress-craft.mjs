@@ -3,7 +3,6 @@ import {
   createSpellScroll, deductActorCurrencyChecked, formatDuration, isCalendarModeActive, maxHoursPerWorkday,
   resolveEntries, shouldHandleWorldTimeAdvance
 } from "../utils.mjs";
-
 import ProgressHoursDialog from "../applications/craft/progress-hours-dialog.mjs";
 
 const { DocumentUUIDField, NumberField, SchemaField, StringField } = foundry.data.fields;
@@ -51,6 +50,9 @@ export class InProgressCraft extends foundry.abstract.DataModel {
       }),
       targetQuantity: new NumberField({ required: true, initial: 1, integer: true, min: 1 }),
       spellUuid: new DocumentUUIDField({ type: "Item", blank: true }),
+      scrollValues: new SchemaField({
+        dc: new NumberField({ required: true }), bonus: new NumberField({ required: true })
+      }, { nullable: true, initial: null }),
       activityId: new StringField({ blank: true }),
       totalHours: new NumberField({ required: true, initial: 0 }),
       hoursPerUse: new NumberField({ initial: null, nullable: true }),
@@ -100,8 +102,8 @@ export class InProgressCraft extends foundry.abstract.DataModel {
 
     const inProgress = new InProgressCraft({
       recipeId: craft.recipeId, targetItem: craft.targetItem, targetQuantity: craft.targetQuantity,
-      spellUuid: craft.spellUuid || "", activityId: foundry.utils.randomID(),
-      totalHours: craft.totalHours, hoursPerUse: craft.hoursPerUse, progress: 0
+      spellUuid: craft.spellUuid || "", scrollValues: craft.scrollValues ?? null,
+      activityId: foundry.utils.randomID(), totalHours: craft.totalHours, hoursPerUse: craft.hoursPerUse, progress: 0
     });
     const [item] = await actor.createEmbeddedDocuments("Item", [{
       name: _loc("SIMPLE_SHOP_CRAFT_5E.Craft.InProgressName", { name: craft.targetName }),
@@ -353,7 +355,7 @@ export class InProgressCraft extends foundry.abstract.DataModel {
     let fullItem;
     if ( this.spellUuid ) {
       const spell = await fromUuid(this.spellUuid);
-      fullItem = spell ? await createSpellScroll(spell) : null;
+      fullItem = spell ? await createSpellScroll(spell, this.scrollValues) : null;
     } else {
       const [resolved] = await resolveEntries([this.targetItem]);
       fullItem = resolved.item?.uuid ? await fromUuid(resolved.item.uuid) : null;

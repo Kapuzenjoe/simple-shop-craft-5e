@@ -128,6 +128,22 @@ export default class CraftStartDialog extends Dialog5e {
   /* -------------------------------------------- */
 
   /**
+   * Save DC override for a spell-scroll recipe, or `null` to use the computed default.
+   * @type {number|null}
+   */
+  #scrollDC = null;
+
+  /* -------------------------------------------- */
+
+  /**
+   * Attack bonus override for a spell-scroll recipe, or `null` to use the computed default.
+   * @type {number|null}
+   */
+  #scrollBonus = null;
+
+  /* -------------------------------------------- */
+
+  /**
    * The currently selected crafting actor.
    * @type {Actor5e|null}
    */
@@ -183,6 +199,7 @@ export default class CraftStartDialog extends Dialog5e {
     context.spellField = null;
     context.noEligibleSpell = false;
     context.chosenSpell = null;
+    context.spellValueFields = null;
     if ( state.recipe.spellScroll ) {
       if ( state.recipe.spellScroll.spellSource === "compendium" ) {
         context.chosenSpell = state.chosenSpell;
@@ -195,6 +212,16 @@ export default class CraftStartDialog extends Dialog5e {
           }];
         }
       }
+      context.spellValueFields = [
+        {
+          field: new foundry.data.fields.NumberField(), name: "scrollDC", value: state.scrollValues?.dc,
+          label: _loc("DND5E.Scroll.SaveDC")
+        },
+        {
+          field: new foundry.data.fields.NumberField(), name: "scrollBonus", value: state.scrollValues?.bonus,
+          label: _loc("DND5E.BonusAttack")
+        }
+      ];
     }
 
     context.materialsTable = buildMaterialsTable(state);
@@ -228,7 +255,16 @@ export default class CraftStartDialog extends Dialog5e {
       }
     }
 
-    context.workshopField = (state.chosenToolKey && state.recipe.allowWorkshopOverride)
+    context.statusList = (state.toolStatuses.length || state.skillStatuses.length) ? [
+      ...state.toolStatuses.map(({ key, met }) => ({
+        met, label: game.dnd5e.documents.Trait.keyLabel(key, { trait: "tool" })
+      })),
+      ...state.skillStatuses.map(({ key, proficient: met }) => ({
+        met, label: _loc(CONFIG.DND5E.skills[key]?.label ?? key)
+      }))
+    ] : null;
+
+    context.workshopField = ((state.chosenToolKey || state.toolStatuses.length) && state.recipe.allowWorkshopOverride)
       ? [{
         field: new foundry.data.fields.BooleanField(), name: "workshopClaimed", value: this.#workshopClaimed,
         label: _loc("SIMPLE_SHOP_CRAFT_5E.CraftStart.WorkshopAccess")
@@ -276,11 +312,15 @@ export default class CraftStartDialog extends Dialog5e {
         this.#fillWithGold = false;
         this.#materialQuantities.clear();
         this.#chosenSpellUuid = null;
+        this.#scrollDC = null;
+        this.#scrollBonus = null;
       }
       else if ( event.target.name === "toolKey" ) this.#toolKey = event.target.value;
       else if ( event.target.name === "workshopClaimed" ) this.#workshopClaimed = event.target.checked;
       else if ( event.target.name === "fillWithGold" ) this.#fillWithGold = event.target.checked;
       else if ( event.target.name === "spellUuid" ) this.#chosenSpellUuid = event.target.value || null;
+      else if ( event.target.name === "scrollDC" ) this.#scrollDC = Number(event.target.value);
+      else if ( event.target.name === "scrollBonus" ) this.#scrollBonus = Number(event.target.value);
       else return;
       this.render({ parts: ["content", "footer"] });
     });
@@ -372,7 +412,10 @@ export default class CraftStartDialog extends Dialog5e {
     }
     const uuid = await game.dnd5e.applications.CompendiumBrowser.selectOne({
       tab: "spells",
-      filters: { locked: { level: { min: this.recipe.spellScroll.level, max: this.recipe.spellScroll.level } } }
+      filters: { locked: {
+        types: new Set(["spell"]),
+        additional: { level: { min: this.recipe.spellScroll.level, max: this.recipe.spellScroll.level } }
+      } }
     });
     if ( !uuid ) return;
     this.#chosenSpellUuid = uuid;
@@ -410,7 +453,7 @@ export default class CraftStartDialog extends Dialog5e {
     ];
     await CraftMessageData.create({
       actor: state.actor, recipe: state.recipe, targetItem: state.chosenSpell ?? state.targetItem,
-      materialLines, spellUuid: state.chosenSpell?.uuid ?? null,
+      materialLines, spellUuid: state.chosenSpell?.uuid ?? null, scrollValues: state.scrollValues,
       goldCP: state.goldCP, toolKey: state.chosenToolKey, totalHours: state.totalHours,
       hoursPerUse: state.hoursPerUse, weight: state.weight, halfPrice: state.halfPrice
     });
@@ -449,16 +492,23 @@ export default class CraftStartDialog extends Dialog5e {
 
     let spellOptions = null;
     let chosenSpell = null;
+    let scrollValues = null;
     if ( recipe.spellScroll ) {
       if ( recipe.spellScroll.spellSource === "compendium" ) {
         chosenSpell = this.#chosenSpellUuid ? await fromUuid(this.#chosenSpellUuid) : null;
       } else {
         spellOptions = actor ? actor.items.filter(i => (i.type === "spell")
           && (i.system.level === recipe.spellScroll.level)
-          && ((recipe.spellScroll.spellSource !== "prepared") || i.system.preparation?.prepared)) : [];
+          && ((recipe.spellScroll.spellSource !== "prepared")
+            || !CONFIG.DND5E.spellcasting[i.system.method]?.prepares || i.system.prepared || !i.system.level)) : [];
         chosenSpell = spellOptions.find(i => i.uuid === this.#chosenSpellUuid) ?? spellOptions[0] ?? null;
         this.#chosenSpellUuid = chosenSpell?.uuid ?? null;
       }
+      const fallback = CONFIG.DND5E.spellScrollValues[recipe.spellScroll.level] ?? {};
+      scrollValues = {
+        dc: this.#scrollDC ?? (actor ? actor.system.attributes.spell.dc : fallback.dc),
+        bonus: this.#scrollBonus ?? (actor ? actor.system.attributes.spell.attack : fallback.bonus)
+      };
     }
 
     const materialsResolved = await resolveEntries(recipe.materials);
@@ -553,22 +603,42 @@ export default class CraftStartDialog extends Dialog5e {
     }
 
     const toolKeys = Array.from(recipe.toolProficiencies);
-    const chosenToolKey = (toolKeys.length > 1) ? (this.#toolKey ?? toolKeys[0]) : (toolKeys[0] ?? null);
-    let proficient = true;
-    let toolOwned = true;
-    if ( chosenToolKey ) {
-      proficient = !!actor && ((actor.system.tools[chosenToolKey]?.value ?? 0) > 0);
-      toolOwned = !!actor?.items.some(i => (i.type === "tool") && (i.system.type?.baseItem === chosenToolKey));
-    }
-    const toolEligible = !chosenToolKey
-      || (proficient && (toolOwned || (recipe.allowWorkshopOverride && this.#workshopClaimed)));
-
     const skillKeys = Array.from(recipe.skillProficiencies);
-    const skillProficient = !!actor && skillKeys.some(k => (actor.system.skills[k]?.value ?? 0) > 0);
+    const mode = recipe.proficiencyMode;
+
+    const toolStatuses = toolKeys.map(key => {
+      const keyProficient = !!actor && ((actor.system.tools[key]?.value ?? 0) > 0);
+      const owned = !!actor?.items.some(i => (i.type === "tool") && (i.system.type?.baseItem === key));
+      return {
+        key, proficient: keyProficient, owned,
+        met: keyProficient && (owned || (recipe.allowWorkshopOverride && this.#workshopClaimed))
+      };
+    });
+    const skillStatuses = skillKeys.map(key => ({
+      key, proficient: !!actor && ((actor.system.skills[key]?.value ?? 0) > 0)
+    }));
+
+    const chosenToolKey = (mode === "both")
+      ? ((toolKeys.length > 1) ? (this.#toolKey ?? toolKeys[0]) : (toolKeys[0] ?? null))
+      : null;
+    const chosenTool = toolStatuses.find(t => t.key === chosenToolKey) ?? {};
+    const proficient = chosenToolKey ? !!chosenTool.proficient : true;
+    const toolOwned = chosenToolKey ? !!chosenTool.owned : true;
+    const toolEligible = !chosenToolKey || !!chosenTool.met;
+
+    const skillProficient = skillStatuses.some(s => s.proficient);
     const skillEligible = !skillKeys.length || skillProficient;
 
+    let proficiencyEligible = toolEligible && skillEligible;
+    if ( mode === "all" ) {
+      proficiencyEligible = toolStatuses.every(t => t.met) && skillStatuses.every(s => s.proficient);
+    } else if ( mode === "either" ) {
+      proficiencyEligible = (!toolKeys.length && !skillKeys.length)
+        || toolStatuses.some(t => t.met) || skillStatuses.some(s => s.proficient);
+    }
+
     const spellChosen = !recipe.spellScroll || !!chosenSpell;
-    const canStart = !!actor && !!targetItem && spellChosen && toolEligible && skillEligible && requiredMet
+    const canStart = !!actor && !!targetItem && spellChosen && proficiencyEligible && requiredMet
       && (materialsMet || (this.#fillWithGold && !goldInsufficient));
 
     const totalHours = resolveTotalHours(recipe, craftCost, targetItem);
@@ -578,8 +648,9 @@ export default class CraftStartDialog extends Dialog5e {
       recipe, actor, targetItem, craftCost, fixedLines, freeformItems,
       suppliedCP, thresholdCP, shortfallCP, materialsMet, goldCP, goldInsufficient,
       toolKeys, chosenToolKey, proficient, toolOwned, toolEligible, skillProficient,
-      skillRequired: skillKeys.length > 0, canStart, totalHours,
-      hoursPerUse, weight, halfPrice, requiredMet, requiredAvailable, spellOptions, chosenSpell
+      skillRequired: skillKeys.length > 0, toolStatuses, skillStatuses, canStart, totalHours,
+      hoursPerUse, weight, halfPrice, requiredMet, requiredAvailable, spellOptions, chosenSpell,
+      scrollValues
     };
   }
 }

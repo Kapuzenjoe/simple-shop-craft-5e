@@ -1,20 +1,17 @@
 import { STOCK_MAGIC_RULES } from "../../../config.mjs";
 import { Shop } from "../../../data/shop-data.mjs";
 import { currencyRows, goldPoolCurrencies } from "../../../utils.mjs";
-
 import BaseShopConfig from "./base-shop-config.mjs";
 
 /**
  * Dialog to edit a shop's money pool and default stock per item type.
  * @param {object} options
  * @param {Shop} options.shop
- * @param {(updateData: object) => Promise<void>} options.onUpdate
  */
 export default class VendorConfig extends BaseShopConfig {
-  constructor({ shop, onUpdate, ...options }={}) {
+  constructor({ shop, ...options }={}) {
     super(options);
     this.shop = shop;
-    this.onUpdate = onUpdate;
     this.#unlimited = !!this.shop.goldPool.unlimited;
     this.#amounts = { ...this.shop.goldPool.max };
     this.#sellDisabled = !!this.shop.goldPool.sellDisabled;
@@ -46,14 +43,6 @@ export default class VendorConfig extends BaseShopConfig {
    * @type {Shop}
    */
   shop;
-
-  /* -------------------------------------------- */
-
-  /**
-   * Callback receiving the shop update.
-   * @type {(updateData: object) => Promise<void>}
-   */
-  onUpdate;
 
   /* -------------------------------------------- */
 

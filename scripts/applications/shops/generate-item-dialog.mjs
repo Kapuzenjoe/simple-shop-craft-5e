@@ -1,10 +1,11 @@
+import GeneratorProfile from "../../data/generator-profile.mjs";
 import { ShopItemEntry } from "../../data/shop-data.mjs";
 import { subtypeOptions } from "../../utils.mjs";
 
 const { Dialog5e } = game.dnd5e.applications.api;
 
 /**
- * @import { ShopItemEntryData } from "../../_types.mjs";
+ * @import { GeneratorPool, ShopItemEntryData } from "../../_types.mjs";
  * @import ShopSheet from "./shop-sheet.mjs";
  */
 
@@ -16,7 +17,8 @@ const ANY_VALUE = "any";
 
 /**
  * GM-facing dialog to roll random shop item entries: multi-select item types, each with its own
- * subtype restriction, a global rarity/magic filter, an optional spell-scroll filter, and a count.
+ * subtype restriction, a global rarity/magic filter, an optional spell-scroll filter, a weighting, and a count.
+ * A preview beside the filters summarizes the pool the settings draw from.
  */
 export default class GenerateItemDialog extends Dialog5e {
   constructor({ shopSheet, onGenerated, ...options }={}) {
@@ -32,7 +34,7 @@ export default class GenerateItemDialog extends Dialog5e {
     id: "generate-item-dialog-{id}",
     classes: ["simple-shop-craft-5e", "generate-item-dialog", "standard-form"],
     window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItem", resizable: true },
-    position: { width: 420, height: "auto" },
+    position: { width: 720, height: "auto" },
     form: {
       handler: GenerateItemDialog.#onSubmit,
       submitOnChange: true,
@@ -50,8 +52,10 @@ export default class GenerateItemDialog extends Dialog5e {
 
   /** @override */
   static PARTS = {
-    ...super.PARTS,
-    content: { template: "modules/simple-shop-craft-5e/templates/shops/generate-item-dialog/content.hbs" }
+    content: { template: "modules/simple-shop-craft-5e/templates/shops/generate-item-dialog/content.hbs" },
+    preview: { template: "modules/simple-shop-craft-5e/templates/shops/generate-item-dialog/preview.hbs" },
+    settings: { template: "modules/simple-shop-craft-5e/templates/shops/generate-item-dialog/settings.hbs" },
+    footer: super.PARTS.footer
   };
 
   /* -------------------------------------------- */
@@ -75,88 +79,53 @@ export default class GenerateItemDialog extends Dialog5e {
   /* -------------------------------------------- */
 
   /**
-   * Selected item types.
-   * @type {Set<string>}
+   * The generator settings being edited.
+   * @type {GeneratorProfile}
    */
-  #types = new Set();
+  #profile = new GeneratorProfile();
 
   /* -------------------------------------------- */
 
   /**
-   * Selected subtypes per type. An empty (or absent) Set for a type means "Any" — no restriction.
-   * @type {Map<string, Set<string>>}
+   * The pool of the current settings, or `null` while it is being built.
+   * @type {GeneratorPool|null}
    */
-  #subtypesByType = new Map();
+  #pool = null;
 
   /* -------------------------------------------- */
 
   /**
-   * Selected rarities; empty means "Any".
-   * @type {Set<string>}
+   * Build the pool of the current settings and show its preview, unless the settings changed in the meantime.
+   * @type {Function}
    */
-  #rarities = new Set();
-
-  /* -------------------------------------------- */
-
-  /**
-   * Magic/Mundane filter.
-   * @type {"any"|"magic"|"mundane"}
-   */
-  #magic = ANY_VALUE;
-
-  /* -------------------------------------------- */
-
-  /**
-   * Selected spell schools for scroll generation; empty means "Any".
-   * @type {Set<string>}
-   */
-  #schools = new Set();
-
-  /* -------------------------------------------- */
-
-  /**
-   * Whether to restrict scroll generation to rituals only.
-   * @type {boolean}
-   */
-  #ritualOnly = false;
-
-  /* -------------------------------------------- */
-
-  /**
-   * Selected spellcasting classes for scroll generation; empty means "Any".
-   * @type {Set<string>}
-   */
-  #classes = new Set();
-
-  /* -------------------------------------------- */
-
-  /**
-   * Selected spell levels for scroll generation; empty means "Any".
-   * @type {Set<number>}
-   */
-  #levels = new Set();
-
-  /* -------------------------------------------- */
-
-  /**
-   * Number of items to generate in this batch.
-   * @type {number}
-   */
-  #count = 1;
-
-  /* -------------------------------------------- */
-
-  /**
-   * Whether the consumable type is selected with its subtypes narrowed to scrolls, showing the
-   * spell-scroll filter fieldset.
-   * @type {boolean}
-   */
-  get #showSpellFilter() {
-    return this.#types.has("consumable") && (this.#subtypesByType.get("consumable")?.has("scroll") ?? false);
-  }
+  #refreshPool = foundry.utils.debounce(async () => {
+    const profile = this.#profile;
+    const pool = await profile.buildPool(this.shopSheet.shop.settlementCap);
+    if ( profile !== this.#profile ) return;
+    this.#pool = pool;
+    await this.render({ parts: ["preview"] });
+  }, 300);
 
   /* -------------------------------------------- */
   /*  Rendering                                   */
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  async _onFirstRender(context, options) {
+    await super._onFirstRender(context, options);
+    this.#refreshPool();
+  }
+
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  async _preparePartContext(partId, context, options) {
+    context = await super._preparePartContext(partId, context, options);
+    if ( partId === "preview" ) context = await this._preparePreviewContext(context, options);
+    if ( partId === "settings" ) context = await this._prepareSettingsContext(context, options);
+    return context;
+  }
+
   /* -------------------------------------------- */
 
   /** @inheritDoc */
@@ -169,14 +138,15 @@ export default class GenerateItemDialog extends Dialog5e {
 
     context.typeFields = [{
       field: new foundry.data.fields.SetField(new foundry.data.fields.StringField()), name: "types",
-      label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemType"), value: Array.from(this.#types), options: typeOptions
+      label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemType"), value: Object.keys(this.#profile.types),
+      options: typeOptions
     }];
 
-    context.typeFieldsets = Array.from(this.#types)
+    context.typeFieldsets = Object.keys(this.#profile.types)
       .toSorted((a, b) => (CONFIG.Item.dataModels[a]?.inventorySection?.order ?? Infinity)
         - (CONFIG.Item.dataModels[b]?.inventorySection?.order ?? Infinity))
       .map(type => {
-        const selected = this.#subtypesByType.get(type) ?? new Set();
+        const selected = this.#profile.types[type];
         return {
           label: _loc(`TYPES.Item.${type}Pl`),
           fields: [{
@@ -191,12 +161,13 @@ export default class GenerateItemDialog extends Dialog5e {
         };
       });
 
-    context.spellFieldset = this.#showSpellFilter ? {
+    const { spellFilter } = this.#profile;
+    context.spellFieldset = this.#profile.includesScrolls ? {
       fields: [
         {
           field: new foundry.data.fields.SetField(new foundry.data.fields.StringField()), name: "schools",
           label: _loc("DND5E.School"),
-          value: this.#schools.size ? Array.from(this.#schools) : [ANY_VALUE],
+          value: spellFilter.schools.size ? Array.from(spellFilter.schools) : [ANY_VALUE],
           options: [
             { value: ANY_VALUE, label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemAny") },
             ...Object.entries(CONFIG.DND5E.spellSchools).map(([value, { label }]) => ({ value, label: _loc(label) }))
@@ -205,7 +176,7 @@ export default class GenerateItemDialog extends Dialog5e {
         {
           field: new foundry.data.fields.SetField(new foundry.data.fields.StringField()), name: "classes",
           label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemClass"),
-          value: this.#classes.size ? Array.from(this.#classes) : [ANY_VALUE],
+          value: spellFilter.classes.size ? Array.from(spellFilter.classes) : [ANY_VALUE],
           options: [
             { value: ANY_VALUE, label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemAny") },
             ...game.dnd5e.registry.spellLists.options.filter(o => o.type === "class")
@@ -215,7 +186,7 @@ export default class GenerateItemDialog extends Dialog5e {
         {
           field: new foundry.data.fields.SetField(new foundry.data.fields.StringField()), name: "levels",
           label: _loc("DND5E.Level"),
-          value: this.#levels.size ? Array.from(this.#levels) : [ANY_VALUE],
+          value: spellFilter.levels.size ? Array.from(spellFilter.levels) : [ANY_VALUE],
           options: [
             { value: ANY_VALUE, label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemAny") },
             ...Object.entries(CONFIG.DND5E.spellLevels).map(([value, label]) => ({ value, label: _loc(label) }))
@@ -223,7 +194,7 @@ export default class GenerateItemDialog extends Dialog5e {
         },
         {
           field: new foundry.data.fields.BooleanField(), name: "ritualOnly",
-          label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemRitualOnly"), value: this.#ritualOnly
+          label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemRitualOnly"), value: spellFilter.ritualOnly
         }
       ]
     } : null;
@@ -232,7 +203,8 @@ export default class GenerateItemDialog extends Dialog5e {
       {
         field: new foundry.data.fields.SetField(new foundry.data.fields.StringField()), name: "rarities",
         label: _loc("DND5E.Rarity"),
-        value: this.#rarities.size ? Array.from(this.#rarities).map(r => r === "" ? "mundane" : r) : [ANY_VALUE],
+        value: this.#profile.rarities.size
+          ? Array.from(this.#profile.rarities).map(r => r === "" ? "mundane" : r) : [ANY_VALUE],
         options: [
           { value: ANY_VALUE, label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemAny") },
           { value: "mundane", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemMundane") },
@@ -243,7 +215,7 @@ export default class GenerateItemDialog extends Dialog5e {
       },
       {
         field: new foundry.data.fields.StringField(), name: "magic",
-        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemMagic"), value: this.#magic,
+        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemMagic"), value: this.#profile.magic,
         options: [
           { value: ANY_VALUE, label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemAny") },
           { value: "magic", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemMagicOnly") },
@@ -252,7 +224,67 @@ export default class GenerateItemDialog extends Dialog5e {
       }
     ];
 
-    context.count = this.#count;
+    return context;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Prepare rendering context for the settings part.
+   * @param {ApplicationRenderContext} context  Context being prepared.
+   * @param {HandlebarsRenderOptions} options   Options which configure application rendering behavior.
+   * @returns {Promise<ApplicationRenderContext>}
+   * @protected
+   */
+  async _prepareSettingsContext(context, options) {
+    const { weighting } = this.#profile;
+    context.weightingFields = [{
+      field: GeneratorProfile.schema.fields.weighting, name: "weighting",
+      label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemWeighting"), value: weighting,
+      hint: _loc(`SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemWeighting${weighting.capitalize()}Hint`),
+      options: GeneratorProfile.schema.fields.weighting.choices.map(value => ({
+        value, label: _loc(`SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemWeighting${value.capitalize()}`)
+      }))
+    }];
+    context.count = this.#profile.count;
+    return context;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Prepare rendering context for the preview part.
+   * @param {ApplicationRenderContext} context  Context being prepared.
+   * @param {HandlebarsRenderOptions} options   Options which configure application rendering behavior.
+   * @returns {Promise<ApplicationRenderContext>}
+   * @protected
+   */
+  async _preparePreviewContext(context, options) {
+    if ( !this.#pool ) return context;
+    const { included, capped } = this.#pool.summary;
+    const total = Object.values(included).reduce((sum, count) => sum + count, 0);
+    const weights = {};
+    for ( const { kind, weight } of this.#pool.candidates ) weights[kind] = (weights[kind] ?? 0) + weight;
+    const totalWeight = Object.values(weights).reduce((sum, weight) => sum + weight, 0);
+    context.pool = {
+      total,
+      capped: Object.values(capped).reduce((sum, count) => sum + count, 0),
+      rarities: ["", ...Object.keys(CONFIG.DND5E.itemRarity)]
+        .filter(rarity => included[rarity] || capped[rarity])
+        .map(rarity => ({
+          label: rarity ? CONFIG.DND5E.itemRarity[rarity].capitalize()
+            : _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemMundane"),
+          count: included[rarity] ?? 0,
+          capped: capped[rarity] ?? 0,
+          percent: total ? Math.round(((included[rarity] ?? 0) / total) * 100) : 0
+        })),
+      chances: ["item", "template", "spell"]
+        .filter(kind => weights[kind])
+        .map(kind => ({
+          label: _loc(`SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemPoolKind${kind.capitalize()}`),
+          percent: Math.round((weights[kind] / totalWeight) * 100)
+        }))
+    };
     return context;
   }
 
@@ -270,26 +302,24 @@ export default class GenerateItemDialog extends Dialog5e {
    */
   static async #onSubmit(event, form, formData) {
     const data = foundry.utils.expandObject(formData.object);
-
-    this.#types = new Set(data.types ?? []);
-
-    const subtypesByType = new Map();
-    for ( const type of this.#types ) subtypesByType.set(type, parseMultiSelect(data.subtypes ?? {}, type));
-    this.#subtypesByType = subtypesByType;
-
-    this.#rarities = new Set(Array.from(parseMultiSelect(data, "rarities")).map(r => r === "mundane" ? "" : r));
-
-    this.#magic = data.magic || ANY_VALUE;
-
-    this.#schools = parseMultiSelect(data, "schools");
-    this.#ritualOnly = !!data.ritualOnly;
-
-    this.#classes = parseMultiSelect(data, "classes");
-    this.#levels = new Set(Array.from(parseMultiSelect(data, "levels")).map(Number));
-
-    this.#count = Math.clamp(Number(data.count) || 1, 1, 10);
-
-    await this.render({ parts: ["content", "footer"] });
+    this.#profile = new GeneratorProfile({
+      types: Object.fromEntries(
+        (data.types ?? []).map(type => [type, parseMultiSelect(data.subtypes ?? {}, type)])
+      ),
+      rarities: parseMultiSelect(data, "rarities").map(r => r === "mundane" ? "" : r),
+      magic: data.magic || ANY_VALUE,
+      weighting: data.weighting,
+      spellFilter: {
+        schools: parseMultiSelect(data, "schools"),
+        classes: parseMultiSelect(data, "classes"),
+        levels: parseMultiSelect(data, "levels").map(Number),
+        ritualOnly: !!data.ritualOnly
+      },
+      count: Math.clamp(Number(data.count) || 1, 1, 10)
+    });
+    this.#pool = null;
+    this.#refreshPool();
+    await this.render({ parts: ["content", "settings", "preview", "footer"] });
   }
 
   /* -------------------------------------------- */
@@ -304,23 +334,11 @@ export default class GenerateItemDialog extends Dialog5e {
   static async #generate(event, target) {
     target.disabled = true;
     try {
-      const typeConfigs = new Map(Array.from(this.#types).map(type => {
-        const subtypes = this.#subtypesByType.get(type);
-        return [type, subtypes?.size ? subtypes : null];
-      }));
-      const spellFilter = this.#showSpellFilter
-        ? {
-          schools: this.#schools.size ? this.#schools : null, ritualOnly: this.#ritualOnly,
-          classes: this.#classes.size ? this.#classes : null, levels: this.#levels.size ? this.#levels : null
-        }
-        : null;
+      const { count } = this.#profile;
       const existingKeys = new Set(this.shopSheet.shop.items.map(i => ShopItemEntry.key(i)));
 
-      const rolled = await ShopItemEntry.rollMany({
-        typeConfigs, rarities: this.#rarities.size ? this.#rarities : null, magic: this.#magic,
-        spellFilter, count: this.#count, existingKeys, settlementCap: this.shopSheet.shop.settlementCap,
-        stockDefaults: this.shopSheet.shop.stockDefaults
-      });
+      const { settlementCap, stockDefaults } = this.shopSheet.shop;
+      const rolled = await this.#profile.roll({ existingKeys, settlementCap, stockDefaults, pool: this.#pool });
 
       if ( !rolled.length ) {
         ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemNone", { localize: true });
@@ -330,9 +348,9 @@ export default class GenerateItemDialog extends Dialog5e {
       await this.onGenerated(rolled.map(r => r.entry));
       const [key, format] = (rolled.length === 1)
         ? ["SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemResult", { name: rolled[0].label }]
-        : (rolled.length === this.#count)
+        : (rolled.length === count)
           ? ["SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemResultMultiple", { count: rolled.length }]
-          : ["SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemPartial", { count: rolled.length, total: this.#count }];
+          : ["SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemPartial", { count: rolled.length, total: count }];
       ui.notifications.info(key, { format });
     } finally {
       target.disabled = false;
@@ -343,13 +361,11 @@ export default class GenerateItemDialog extends Dialog5e {
 /* -------------------------------------------- */
 
 /**
- * Read a multi-select field's submitted values into a clean Set, with the "Any" sentinel stripped.
+ * Read a multi-select field's submitted values, with the "Any" sentinel stripped.
  * @param {object} data
  * @param {string} key
- * @returns {Set<string>}
+ * @returns {string[]}
  */
 function parseMultiSelect(data, key) {
-  const set = new Set(data[key] ?? []);
-  set.delete(ANY_VALUE);
-  return set;
+  return (data[key] ?? []).filter(value => value !== ANY_VALUE);
 }

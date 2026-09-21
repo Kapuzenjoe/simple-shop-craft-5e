@@ -8,7 +8,6 @@ import {
   confirmDeleteShop, finalizeGroups, isCalendarModeActive, isSpellScrollItem, itemRef, needsDefaultPrice,
   openItemSheet, resolveItemPrice, selectableActors, spotlightShop, toCopper
 } from "../../utils.mjs";
-
 import AddEntryDialog from "./add-entry-dialog.mjs";
 import ConfigureTemplatesDialog from "./configure-templates-dialog.mjs";
 import FillFromTableDialog from "./fill-from-table-dialog.mjs";
@@ -465,7 +464,6 @@ export default class ShopSheet extends Application5e {
     ].map(o => ({ ...o, selected: o.value === this.selectedActorUuid }));
     context.actor = this.selectedActorUuid ? fromUuidSync(this.selectedActorUuid) : null;
     const playerOverride = context.shop.resolvePlayerOverride(this.selectedActorUuid);
-    const renderDiscountTooltip = (sources, total) => ShopSheet.#renderAttribution(sources, total);
     const hasCrafterFeat = (game.dnd5e.settings.rulesVersion === "modern")
       && !!context.actor?.items.some(i => (i.type === "feat") && (i.system.identifier === "crafter"));
 
@@ -475,7 +473,7 @@ export default class ShopSheet extends Application5e {
     context.groups = await groupByType({
       rows: buyResolved, settlementCap: context.shop.settlementCap, buyModifier: context.shop.buyModifier,
       cart: this.cart, fixedValueLootTypes: context.shop.fixedValueLootTypes, playerBuyModifier: playerOverride.buy,
-      actorName: context.actor?.name, renderDiscountTooltip, stockDefaults: context.shop.stockDefaults,
+      actorName: context.actor?.name, stockDefaults: context.shop.stockDefaults,
       hasCrafterFeat
     });
     this.#lastGroups = context.groups;
@@ -483,7 +481,7 @@ export default class ShopSheet extends Application5e {
     context.serviceGroups = await groupByType({
       rows: serviceResolved, settlementCap: context.shop.settlementCap, buyModifier: context.shop.buyModifier,
       cart: this.cart, fixedValueLootTypes: context.shop.fixedValueLootTypes, playerBuyModifier: playerOverride.buy,
-      actorName: context.actor?.name, renderDiscountTooltip, stockDefaults: context.shop.stockDefaults,
+      actorName: context.actor?.name, stockDefaults: context.shop.stockDefaults,
       hasCrafterFeat
     });
     this.#lastServiceGroups = context.serviceGroups;
@@ -491,7 +489,7 @@ export default class ShopSheet extends Application5e {
     context.sellGroups = context.shop.goldPool.sellDisabled ? [] : await groupSellItems({
       items: context.actor?.items ?? [], sellModifier: context.shop.sellModifier, sellCart: this.sellCart,
       fixedValueLootTypes: context.shop.fixedValueLootTypes, playerSellModifier: playerOverride.sell,
-      actorName: context.actor?.name, renderDiscountTooltip, settlementCap: context.shop.settlementCap
+      actorName: context.actor?.name, settlementCap: context.shop.settlementCap
     });
     this.#lastSellGroups = context.sellGroups;
 
@@ -1447,20 +1445,6 @@ export default class ShopSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
-   * Render dnd5e's property-attribution table markup for use as a hover tooltip.
-   * @param {object[]} sources
-   * @param {string} total
-   * @returns {Promise<string>}
-   */
-  static async #renderAttribution(sources, total) {
-    return foundry.applications.handlebars.renderTemplate("systems/dnd5e/templates/apps/property-attribution.hbs", {
-      caption: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.PriceModifier"), sources, total
-    });
-  }
-
-  /* -------------------------------------------- */
-
-  /**
    * Find a row from the most recently rendered Buy groups.
    * @param {string} key
    * @returns {object|null}
@@ -1587,15 +1571,14 @@ function festivalOptions() {
  * @param {number|null} [options.playerBuyModifier]  Acting actor's buy-side override, used when an item has
  *   no override.
  * @param {string} [options.actorName]  Acting actor's name, used to label the player row.
- * @param {(sources: object[], total: string) => Promise<string>} options.renderDiscountTooltip
  * @param {{ byType: Record<string, number|null>, magicRule: string }} options.stockDefaults  The shop's
  *   default stock configuration, used to resolve a row's default max stock for display.
  * @param {boolean} options.hasCrafterFeat  Whether the acting actor owns the PHB 2024 "Crafter" feat.
  * @returns {Promise<{ type: string, label: string, items: object[] }[]>}
  */
 async function groupByType({
-  rows, settlementCap, buyModifier, cart, fixedValueLootTypes, playerBuyModifier, actorName, renderDiscountTooltip,
-  stockDefaults, hasCrafterFeat
+  rows, settlementCap, buyModifier, cart, fixedValueLootTypes, playerBuyModifier, actorName, stockDefaults,
+  hasCrafterFeat
 }) {
   const targetUnit = game.settings.get("dnd5e", "metricWeightUnits") ? "kg" : "lb";
   const capCP = settlementCap?.value != null ? toCopper(settlementCap.value, settlementCap.denomination) : null;
@@ -1619,7 +1602,7 @@ async function groupByType({
     row.priceDisplay = breakdownCopper(priceCP);
     row.priceCP = priceCP;
     row.discountPercent = discountPercent;
-    row.discountTooltip = await renderDiscountTooltip(sources, `${discountPercent}%`);
+    row.discountTooltip = await renderAttribution(sources, `${discountPercent}%`);
     row.cartQuantity = cart.get(row.key) ?? 0;
     const bundleSize = row.entry.bundleSize
       ?? ((row.item?.system?.quantity > 1) ? row.item.system.quantity : 1);
@@ -1661,14 +1644,12 @@ async function groupByType({
  * @param {Set<string>} options.fixedValueLootTypes
  * @param {number|null} [options.playerSellModifier]  Acting actor's sell-side override, if configured.
  * @param {string} [options.actorName]  Acting actor's name, used to label the player row.
- * @param {(sources: object[], total: string) => Promise<string>} options.renderDiscountTooltip
  * @param {{ value: number|null, denomination: string, appliesToSell: boolean }} [options.settlementCap]
  *   Blocks selling an item for more than this value, if `appliesToSell` is set.
  * @returns {Promise<{ type: string, label: string, items: object[] }[]>}
  */
 async function groupSellItems({
-  items, sellModifier, sellCart, fixedValueLootTypes, playerSellModifier, actorName, renderDiscountTooltip,
-  settlementCap
+  items, sellModifier, sellCart, fixedValueLootTypes, playerSellModifier, actorName, settlementCap
 }) {
   const targetUnit = game.settings.get("dnd5e", "metricWeightUnits") ? "kg" : "lb";
   const capCP = (settlementCap?.value != null) && settlementCap.appliesToSell
@@ -1693,7 +1674,7 @@ async function groupSellItems({
       item,
       priceDisplay: breakdownCopper(priceCP),
       discountPercent,
-      discountTooltip: await renderDiscountTooltip(sources, `${discountPercent}%`),
+      discountTooltip: await renderAttribution(sources, `${discountPercent}%`),
       sellQuantity: sellCart.get(item.id) ?? 0,
       owned: item.system.quantity ?? 1,
       priceCP,
@@ -1717,6 +1698,20 @@ async function groupSellItems({
  */
 function isFixedValue(item, fixedValueLootTypes) {
   return (item?.type === "loot") && fixedValueLootTypes.has(item?.system?.type?.value);
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Render dnd5e's property-attribution table markup for use as a hover tooltip.
+ * @param {object[]} sources
+ * @param {string} total
+ * @returns {Promise<string>}
+ */
+async function renderAttribution(sources, total) {
+  return foundry.applications.handlebars.renderTemplate("systems/dnd5e/templates/apps/property-attribution.hbs", {
+    caption: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.PriceModifier"), sources, total
+  });
 }
 
 /* -------------------------------------------- */

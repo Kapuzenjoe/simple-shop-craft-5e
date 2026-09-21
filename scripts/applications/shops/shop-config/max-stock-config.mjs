@@ -1,26 +1,14 @@
 import { RESTOCK_MODES } from "../../../config.mjs";
 import { Shop, ShopItemEntry } from "../../../data/shop-data.mjs";
-
 import BaseShopConfig from "./base-shop-config.mjs";
 
 /**
- * @import ShopSheet from "../shop-sheet.mjs";
- */
-
-/**
  * Dialog to edit an item's stock max (restock target) and current stock together.
- * @param {object} options
- * @param {ShopSheet} options.shopSheet
- * @param {string} options.entryKey  Entry key of the item being edited.
- * @param {(updateData: object) => Promise<void>} options.onUpdate
  */
 export default class MaxStockConfig extends BaseShopConfig {
-  constructor({ shopSheet, entryKey, onUpdate, ...options }={}) {
+  constructor(options={}) {
     super(options);
-    this.shopSheet = shopSheet;
-    this.entryKey = entryKey;
-    this.onUpdate = onUpdate;
-    this.#restockMode = this.#entry.restockMode;
+    this.#restockMode = this.entry.restockMode;
   }
 
   /* -------------------------------------------- */
@@ -36,30 +24,6 @@ export default class MaxStockConfig extends BaseShopConfig {
   /* -------------------------------------------- */
 
   /**
-   * The shop editor this config belongs to.
-   * @type {ShopSheet}
-   */
-  shopSheet;
-
-  /* -------------------------------------------- */
-
-  /**
-   * Entry key of the item being edited.
-   * @type {string}
-   */
-  entryKey;
-
-  /* -------------------------------------------- */
-
-  /**
-   * Callback receiving the shop update.
-   * @type {(updateData: object) => Promise<void>}
-   */
-  onUpdate;
-
-  /* -------------------------------------------- */
-
-  /**
    * Restock behavior for this item, toggled live before submit.
    * @type {string}
    */
@@ -67,20 +31,10 @@ export default class MaxStockConfig extends BaseShopConfig {
 
   /* -------------------------------------------- */
 
-  /**
-   * The item entry being edited.
-   * @type {ShopItemEntry}
-   */
-  get #entry() {
-    return this.shopSheet.shop.items.find(i => ShopItemEntry.key(i) === this.entryKey);
-  }
-
-  /* -------------------------------------------- */
-
   /** @inheritDoc */
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
-    const entry = this.#entry;
+    const entry = this.entry;
     const stockFields = ShopItemEntry.schema.fields.stock.fields;
     const [resolved] = await ShopItemEntry.resolveMany([entry]);
     const typeDefault = resolved.item ? Shop.defaultStockMax(resolved.item, this.shopSheet.shop.stockDefaults) : null;

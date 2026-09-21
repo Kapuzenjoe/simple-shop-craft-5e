@@ -2,15 +2,15 @@ import { MODULE_ID } from "../config.mjs";
 
 /**
  * Data model mixin adding Setting-backed collection CRUD: create, get, getAll, update, delete.
- * @param {typeof foundry.abstract.DataModel} Base
+ * @param {typeof foundry.abstract.DataModel} Base  The base data model class being mixed.
  * @param {string} settingKey  Key under `SETTING_KEYS` this model's collection is stored at.
- * @returns {typeof Base}
+ * @returns {typeof SettingCollection}
  * @mixin
  */
-export function SettingCollectionMixin(Base, settingKey) {
+export default function SettingCollectionMixin(Base, settingKey) {
   const semaphore = new foundry.utils.Semaphore(1);
 
-  return class extends Base {
+  return class SettingCollection extends Base {
 
     /**
      * Get every persisted instance.

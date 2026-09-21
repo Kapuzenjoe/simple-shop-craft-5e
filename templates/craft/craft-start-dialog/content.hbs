@@ -51,6 +51,7 @@
         {{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.ChooseSpell" }}
     </button>
     {{/if}}
+    {{> "dnd5e.fieldlist" spellValueFields}}
 </fieldset>
 {{/if}}
 
@@ -73,6 +74,23 @@
     <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.SkillMissing" }}</p>
     {{/unless}}
     {{/if}}
+    {{#if workshopField}}
+    {{> "dnd5e.fieldlist" workshopField}}
+    {{/if}}
+</fieldset>
+{{/if}}
+
+{{#if statusList}}
+<fieldset>
+    <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.Tool" }}</legend>
+    <ul class="value-list unlist">
+        {{#each statusList}}
+        <li class="value-row">
+            <i class="fa-solid {{#if this.met}}fa-check{{else}}fa-xmark warning{{/if}}" inert></i>
+            {{ this.label }}
+        </li>
+        {{/each}}
+    </ul>
     {{#if workshopField}}
     {{> "dnd5e.fieldlist" workshopField}}
     {{/if}}

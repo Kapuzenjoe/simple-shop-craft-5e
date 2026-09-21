@@ -2,27 +2,15 @@ import { LODGING_TIERS } from "../../../config.mjs";
 import { LodgingBlueprint } from "../../../data/lodging-blueprint.mjs";
 import { ShopItemEntry } from "../../../data/shop-data.mjs";
 import { currencyValueField } from "../../../utils.mjs";
-
 import BaseShopConfig from "./base-shop-config.mjs";
 
 /**
- * @import ShopSheet from "../shop-sheet.mjs";
- */
-
-/**
  * Dialog to edit a lodging entry's tier, name, price, icon, and description. Autosaves on every change.
- * @param {object} options
- * @param {ShopSheet} options.shopSheet
- * @param {string} options.entryKey  Entry key of the lodging entry being edited.
- * @param {(updateData: object) => Promise<void>} options.onUpdate
  */
 export default class LodgingConfig extends BaseShopConfig {
-  constructor({ shopSheet, entryKey, onUpdate, ...options }={}) {
+  constructor(options={}) {
     super(options);
-    this.shopSheet = shopSheet;
-    this.entryKey = entryKey;
-    this.onUpdate = onUpdate;
-    this.#tier = this.#entry.lodging.tier;
+    this.#tier = this.entry.lodging.tier;
   }
 
   /* -------------------------------------------- */
@@ -45,30 +33,6 @@ export default class LodgingConfig extends BaseShopConfig {
   /* -------------------------------------------- */
 
   /**
-   * The shop editor this config belongs to.
-   * @type {ShopSheet}
-   */
-  shopSheet;
-
-  /* -------------------------------------------- */
-
-  /**
-   * Entry key of the lodging entry being edited.
-   * @type {string}
-   */
-  entryKey;
-
-  /* -------------------------------------------- */
-
-  /**
-   * Callback receiving the shop update.
-   * @type {(updateData: object) => Promise<void>}
-   */
-  onUpdate;
-
-  /* -------------------------------------------- */
-
-  /**
    * Currently selected tier, toggled live to drive the Name placeholder and Price default.
    * @type {string}
    */
@@ -76,33 +40,10 @@ export default class LodgingConfig extends BaseShopConfig {
 
   /* -------------------------------------------- */
 
-  /**
-   * The item entry being edited.
-   * @type {ShopItemEntry}
-   */
-  get #entry() {
-    return this.shopSheet.shop.items.find(i => ShopItemEntry.key(i) === this.entryKey);
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * @override
-   * @see dnd5e — EffectChangeConfig#_canRender()
-   */
-  _canRender(options) {
-    if ( this.rendered && !this.#entry ) {
-      this.close();
-      return false;
-    }
-  }
-
-  /* -------------------------------------------- */
-
   /** @inheritDoc */
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
-    const entry = this.#entry;
+    const entry = this.entry;
     context.imgField = LodgingBlueprint.schema.fields.img;
     context.img = entry.lodging.img;
     context.description = entry.lodging.description;

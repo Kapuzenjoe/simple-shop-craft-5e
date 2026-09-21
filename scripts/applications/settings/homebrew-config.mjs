@@ -1,5 +1,4 @@
 import { SETTING_KEYS } from "../../config.mjs";
-
 import BaseSettingsConfig from "./base-config.mjs";
 
 /**

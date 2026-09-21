@@ -1,4 +1,4 @@
-import { excludeFilter, isShopPackSource, itemRarity } from "../utils.mjs";
+import { excludeFilter, isShopPackSource, itemRarity, itemRef, itemRefKey } from "../utils.mjs";
 
 const { DocumentUUIDField, FilePathField, StringField } = foundry.data.fields;
 
@@ -35,6 +35,7 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
       baseItemUuid: new DocumentUUIDField({ type: "Item", blank: true }),
       enchantItemUuid: new DocumentUUIDField({ type: "Item", blank: true }),
       effectId: new StringField({ blank: true }),
+      spellUuid: new DocumentUUIDField({ type: "Item", blank: true }),
       img: new FilePathField({ categories: ["IMAGE"], blank: true }),
       identifier: new StringField({ blank: true })
     };
@@ -52,8 +53,9 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
     const baseItem = await fromUuid(this.baseItemUuid);
     const enchantItem = await fromUuid(this.enchantItemUuid);
     const effect = enchantItem?.effects.get(this.effectId);
-    if ( !baseItem || !effect ) return null;
-    const item = EnchantedItemBlueprint.#synthesize(baseItem, enchantItem, effect);
+    const spell = this.spellUuid ? await fromUuid(this.spellUuid) : null;
+    if ( !baseItem || !effect || (this.spellUuid && !spell) ) return null;
+    const item = EnchantedItemBlueprint.#synthesize(baseItem, enchantItem, effect, spell);
     if ( this.img ) item.updateSource({ img: this.img });
     if ( this.identifier ) item.updateSource({ "system.identifier": this.identifier });
     return item;
@@ -80,13 +82,13 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
 
   /**
    * List all enchantment profiles offered by an item's `enchant` Activities — every effect profile across
-   * every such Activity, excluding profiles with rider items.
+   * every such Activity that isn't itself a rider, excluding profiles with rider items.
    * @param {Item5e} item
    * @returns {{ activity: EnchantActivity, effect: ActiveEffect5e }[]}
    */
   static getEnchantmentProfiles(item) {
     const enchantActivities = item.system.activities?.getByType("enchant") ?? [];
-    return enchantActivities.flatMap(activity => (activity.effects ?? [])
+    return enchantActivities.filter(activity => !activity.isRider).flatMap(activity => (activity.effects ?? [])
       .filter(profile => !profile.riders?.item?.length)
       .map(profile => ({ activity, effect: item.effects.get(profile._id) }))
       .filter(profile => profile.effect));
@@ -111,31 +113,29 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
   /* -------------------------------------------- */
 
   /**
-   * Find a random base item eligible for the given enchant Activity, searched across all active compendium
-   * sources. Activity restrictions are frequently left unset by the source data, so an explicit @UUID list
-   * from the enchant item's description header is preferred when present, then a category filter parsed
-   * from the same header, then the Activity's own restrictions as a last resort.
+   * List the UUIDs of the base items eligible for the given enchant Activity, searched across all active compendium
+   * sources; an item present in several packs counts once. Activity restrictions are frequently left unset by
+   * the source data, so an explicit @UUID list from the enchant item's description header is preferred when
+   * present, then a category filter parsed from the same header, then the Activity's own restrictions as a
+   * last resort.
    * @param {EnchantActivity} activity
    * @param {Set<string>|null} [wantedSubtypes]  Restrict to these `system.type.value` subtypes, when given.
-   * @returns {Promise<Item5e|null>}
+   * @returns {Promise<string[]>}
    */
-  static async findEnchantableBaseItem(activity, wantedSubtypes=null) {
+  static async listEnchantableBaseItems(activity, wantedSubtypes=null) {
     const candidates = await EnchantedItemBlueprint.resolveBaseItemCandidates(activity);
 
     if ( "explicit" in candidates ) {
-      const pool = candidates.explicit.filter(item => !wantedSubtypes || wantedSubtypes.has(item.system.type?.value));
-      while ( pool.length ) {
-        const [candidate] = pool.splice(Math.floor(Math.random() * pool.length), 1);
-        if ( activity.canEnchant(candidate) === true ) return candidate;
-      }
-      return null;
+      return candidates.explicit
+        .filter(item => !wantedSubtypes || wantedSubtypes.has(item.system.type?.value))
+        .map(item => item.uuid);
     }
 
     const { types, categoryFilters, filters } = candidates;
     const itemType = activity.restrictions.type || activity.item.type;
     const rules = game.dnd5e.settings.rulesVersion === "modern" ? "2024" : "2014";
     const results = await game.dnd5e.applications.CompendiumBrowser.fetch(Item, {
-      types, indexFields: new Set(["system.source"]),
+      types, indexFields: new Set(["system.source", "system.identifier"]),
       filters: wantedSubtypes ? [...filters, { k: "system.type.value", o: "in", v: wantedSubtypes }] : filters
     });
 
@@ -145,11 +145,24 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
     const registry = BASE_ITEM_REGISTRIES[itemType];
     const baseItemUuids = (registry && ((itemType !== "equipment") || categoryFilters.length))
       ? new Set(Object.values(registry())) : null;
-    const pool = baseItemUuids ? fromShopPack.filter(index => baseItemUuids.has(index.uuid)) : fromShopPack;
+    const eligible = baseItemUuids ? fromShopPack.filter(index => baseItemUuids.has(index.uuid)) : fromShopPack;
+    return Array.from(new Map(eligible.map(index => [itemRefKey(itemRef(index)), index.uuid])).values());
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Pick a random base item the given enchant Activity can enchant.
+   * @param {EnchantActivity} activity
+   * @param {string[]} uuids  UUIDs of the candidate base items.
+   * @returns {Promise<Item5e|null>}
+   */
+  static async pickEnchantableBaseItem(activity, uuids) {
+    const pool = [...uuids];
     while ( pool.length ) {
-      const [candidate] = pool.splice(Math.floor(Math.random() * pool.length), 1);
-      const fullCandidate = await fromUuid(candidate.uuid);
-      if ( activity.canEnchant(fullCandidate) === true ) return fullCandidate;
+      const [uuid] = pool.splice(Math.floor(Math.random() * pool.length), 1);
+      const candidate = await fromUuid(uuid);
+      if ( activity.canEnchant(candidate) === true ) return candidate;
     }
     return null;
   }
@@ -185,17 +198,19 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
 
   /**
    * Resolve the `system.identifier` an enchanted item's synthesis produces for a given base item, enchant
-   * item, and effect profile.
+   * item, effect profile, and bound spell.
    * @param {Item5e} baseItem
    * @param {Item5e} enchantItem
    * @param {ActiveEffect5e} effect
+   * @param {Item5e|null} [spell]  Spell bound into the item, if any.
    * @returns {string}
    */
-  static resolveIdentifier(baseItem, enchantItem, effect) {
+  static resolveIdentifier(baseItem, enchantItem, effect, spell=null) {
     const bonusChange = effect.system.changes?.find(change => change.key === "system.magicalBonus");
-    return bonusChange
+    const identifier = bonusChange
       ? `${baseItem.system.identifier}-${bonusChange.value}`
       : `${enchantItem.system.identifier}-${baseItem.system.identifier}`;
+    return spell ? `${identifier}-${spell.identifier}` : identifier;
   }
 
   /* -------------------------------------------- */
@@ -207,12 +222,14 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
    * @param {Item5e} baseItem
    * @param {Item5e} enchantItem
    * @param {ActiveEffect5e} effect
+   * @param {Item5e|null} spell  Spell bound into the item, if any.
    * @returns {Item5e}
    */
-  static #synthesize(baseItem, enchantItem, effect) {
+  static #synthesize(baseItem, enchantItem, effect, spell) {
     const itemData = baseItem.toObject();
     delete itemData._id;
     itemData.system.quantity = 1;
+    if ( spell ) itemData.name = `${itemData.name} (${spell.name})`;
     const effectData = effect.clone({ origin: effect.parent.uuid, disabled: false }).toObject();
     effectData._id = foundry.utils.randomID();
     itemData.effects = [...(itemData.effects ?? []), effectData];
@@ -223,6 +240,7 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
       const activityData = riderActivity?.toObject();
       if ( !activityData ) continue;
       activityData._id = foundry.utils.randomID();
+      if ( spell ) activityData.spell.uuid = spell.uuid;
       itemData.system.activities[activityData._id] = activityData;
       for ( const riderProfile of riderActivity.effects ?? [] ) {
         if ( itemData.effects.some(e => e._id === riderProfile._id) ) continue;
@@ -247,7 +265,7 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
       else itemData.system.rarity = enchantRarity;
     }
 
-    itemData.system.identifier = EnchantedItemBlueprint.resolveIdentifier(baseItem, enchantItem, effect);
+    itemData.system.identifier = EnchantedItemBlueprint.resolveIdentifier(baseItem, enchantItem, effect, spell);
 
     return new Item.implementation(itemData);
   }

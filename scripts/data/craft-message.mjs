@@ -1,6 +1,5 @@
 import { MODULE_ID } from "../config.mjs";
 import { breakdownCopper } from "../utils.mjs";
-
 import { InProgressCraft } from "./in-progress-craft.mjs";
 
 const {
@@ -51,6 +50,9 @@ export class CraftMessageData extends foundry.abstract.DataModel {
       actorName: new StringField(),
       toolKey: new StringField({ nullable: true, initial: null }),
       spellUuid: new DocumentUUIDField({ type: "Item", blank: true }),
+      scrollValues: new SchemaField({
+        dc: new NumberField({ required: true }), bonus: new NumberField({ required: true })
+      }, { nullable: true, initial: null }),
       materialLines: new ArrayField(new SchemaField({
         itemId: new StringField(), name: new StringField(), img: new FilePathField({ categories: ["IMAGE"] }),
         quantity: new NumberField()
@@ -89,6 +91,8 @@ export class CraftMessageData extends foundry.abstract.DataModel {
    * @param {number} options.goldCP                     Copper amount filled in from the actor's own currency.
    * @param {string|null} options.toolKey               Tool proficiency key used, if any.
    * @param {string|null} options.spellUuid              Chosen spell UUID, for a spell-scroll recipe.
+   * @param {{ dc: number, bonus: number }|null} options.scrollValues  Save DC/attack bonus for the crafted
+   *   scroll, for a spell-scroll recipe.
    * @param {number} options.totalHours                 Total progress hours needed to finish the craft.
    * @param {number} options.hoursPerUse                Progress hours added by each "Progress Craft" activation.
    * @param {{ value: number, units: string }} options.weight              Target item's weight.
@@ -96,7 +100,8 @@ export class CraftMessageData extends foundry.abstract.DataModel {
    * @returns {Promise<ChatMessage>}
    */
   static async create({
-    actor, recipe, targetItem, materialLines, goldCP, toolKey, spellUuid, totalHours, hoursPerUse, weight, halfPrice
+    actor, recipe, targetItem, materialLines, goldCP, toolKey, spellUuid, scrollValues,
+    totalHours, hoursPerUse, weight, halfPrice
   }) {
     const craft = new CraftMessageData({
       recipeId: recipe._id,
@@ -104,7 +109,7 @@ export class CraftMessageData extends foundry.abstract.DataModel {
       targetQuantity: recipe.targetQuantity,
       targetName: targetItem.name, targetImg: targetItem.img,
       actorUuid: actor.uuid, actorName: actor.name, toolKey: toolKey || null,
-      spellUuid: spellUuid || "",
+      spellUuid: spellUuid || "", scrollValues: scrollValues ?? null,
       materialLines: materialLines.map(line => ({
         itemId: line.item.id, name: line.item.name, img: line.item.img, quantity: line.quantity
       })),

@@ -32,6 +32,7 @@
  * @property {string} generated.baseItemUuid      UUID of the base item the enchantment is applied to.
  * @property {string} generated.enchantItemUuid   UUID of the item granting the enchantment.
  * @property {string} generated.effectId          Id of the specific enchantment effect applied.
+ * @property {string} generated.spellUuid         UUID of the spell bound into an Enspelled item, empty otherwise.
  * @property {object|null} spellScroll   Recipe for a generated spell scroll, `null` for normal entries.
  * @property {string} spellScroll.spellUuid       UUID of the spell the scroll casts.
  * @property {boolean} isService         Whether this entry is a service (Services tab) instead of a normal item.
@@ -132,9 +133,13 @@
  *                                                `"individual"` (only `unlockedFor`), `"all"` (any actor), or
  *                                                `"toolProficiency"` (any actor proficient in `toolProficiencies`).
  * @property {Record<string, number>} materialPrice  Required value of the selected materials, per denomination.
- * @property {Set<string>} toolProficiencies     Required tool proficiency keys (`CONFIG.DND5E.tools`).
- * @property {Set<string>} skillProficiencies    Alternative skill proficiency keys (`CONFIG.DND5E.skills`) — any one
- *                                               satisfies the requirement without needing an owned tool.
+ * @property {Set<string>} toolProficiencies     Required tool proficiency keys (`CONFIG.DND5E.tools`) — any one
+ *                                               satisfies the tool requirement.
+ * @property {Set<string>} skillProficiencies    Required skill proficiency keys (`CONFIG.DND5E.skills`) — any one
+ *                                               satisfies the skill requirement.
+ * @property {string} proficiencyMode            How `toolProficiencies` and `skillProficiencies` combine:
+ *                                                `"both"` (at least one tool and one skill), `"either"` (at least
+ *                                                one tool or skill), or `"all"` (every listed tool and skill).
  * @property {boolean} allowWorkshopOverride     Whether players may claim workshop access instead of owning the tool.
  * @property {object} durationOverride
  * @property {number|null} durationOverride.value  Manual override amount. `null` uses the rules-based value.
@@ -155,6 +160,7 @@
  * @property {string} [targetItem.uuid]        Direct UUID reference, used when no `system.identifier` match exists.
  * @property {number} targetQuantity           Units to produce when this craft completes.
  * @property {string} spellUuid                Chosen spell UUID for a spell-scroll craft, or blank.
+ * @property {{ dc: number, bonus: number }|null} scrollValues  Save DC/attack bonus for the crafted scroll.
  * @property {string} activityId               Id of the "Progress Craft" activity on the tracked item.
  * @property {number} totalHours               Total progress hours needed to finish the craft.
  * @property {number|null} hoursPerUse         Progress hours added per activation. `null` uses the module default.
@@ -173,6 +179,7 @@
  * @property {string} baseItemUuid      UUID of the base item the enchantment is applied to.
  * @property {string} enchantItemUuid   UUID of the item granting the enchantment.
  * @property {string} effectId          Id of the specific enchantment effect applied.
+ * @property {string} spellUuid         UUID of the spell bound into an Enspelled item, empty otherwise.
  * @property {string} img               Icon override, falls back to the base item's own icon.
  * @property {string} identifier        Identifier override, falls back to the resolved enchant identifier.
  */
@@ -231,6 +238,7 @@
  * @property {string} targetName                  Display name of the produced item.
  * @property {string} targetImg                   Image path of the produced item.
  * @property {string} spellUuid                   Chosen spell UUID for a spell-scroll craft, or blank.
+ * @property {{ dc: number, bonus: number }|null} scrollValues  Save DC/attack bonus for the crafted scroll.
  * @property {string} actorUuid                   UUID of the crafting actor.
  * @property {string} actorName                   Display name of the crafting actor.
  * @property {string|null} toolKey                Tool proficiency key used, or `null` if none required.
@@ -320,16 +328,54 @@
 
 /**
  * @typedef GeneratorCandidate
- * @property {"item"|"spell"} kind
- * @property {object} index
+ * @property {"item"|"spell"|"template"} kind
+ * @property {number} weight  How likely the candidate is drawn, relative to the others.
+ * @property {object} [index]  Compendium index entry, for items and spells.
+ * @property {Item5e} [item]  The enchant item, for templates.
+ * @property {GeneratorTemplateProfile[]} [profiles]  The enchantment profiles that can be drawn, for templates.
  */
 
 /* -------------------------------------------- */
 
 /**
- * @typedef SpellFilter
- * @property {Set<string>|null} schools
- * @property {boolean} ritualOnly
- * @property {Set<string>|null} classes
- * @property {Set<number>|null} levels
+ * @typedef GeneratorTemplateProfile
+ * @property {EnchantActivity} activity  The enchant Activity offering the profile.
+ * @property {ActiveEffect5e} effect  The profile's enchantment effect.
+ * @property {number} level  Position of the profile among all of the item's profiles.
+ * @property {string[]} baseItems  UUIDs of the base items the profile can be applied to.
+ * @property {number} weight  How likely the profile is drawn, relative to the item's other profiles.
+ */
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef GeneratorPool
+ * @property {GeneratorCandidate[]} candidates  The candidates a draw picks from.
+ * @property {GeneratorPoolSummary} summary
+ */
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef GeneratorPoolSummary
+ * @property {Record<string, number>} included  Possible results in the pool per rarity ("" for mundane).
+ * @property {Record<string, number>} capped  Possible results per rarity that the settlement cap leaves out.
+ */
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef GeneratorProfileData
+ * @property {Record<string, Set<string>>} types  Selected item types, each with its selected subtypes
+ *   (`system.type.value`). An empty Set allows any subtype.
+ * @property {Set<string>} rarities  Selected rarities ("" for mundane). Empty allows any rarity.
+ * @property {"any"|"magic"|"mundane"} magic
+ * @property {"combination"|"variant"|"template"} weighting  How often an enchant item is drawn: by every
+ *   combination of profile and base item, by every profile, or once per item.
+ * @property {object} spellFilter  Restrictions on the spells of generated spell scrolls. Empty Sets allow anything.
+ * @property {Set<string>} spellFilter.schools
+ * @property {Set<string>} spellFilter.classes
+ * @property {Set<number>} spellFilter.levels
+ * @property {boolean} spellFilter.ritualOnly  Whether to restrict spell scrolls to ritual spells.
+ * @property {number} count  Number of items to generate.
  */

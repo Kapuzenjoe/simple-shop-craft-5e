@@ -1,7 +1,6 @@
 import { DEFAULT_STOCK_BY_TYPE, defaultStockKey, MODULE_ID, SETTING_KEYS, STARTER_PACKS } from "../../config.mjs";
 import { newEntryStock, Shop } from "../../data/shop-data.mjs";
 import { resolveIdentifierIndex } from "../../utils.mjs";
-
 import ShopSheet from "./shop-sheet.mjs";
 
 const { Dialog5e } = game.dnd5e.applications.api;
@@ -75,13 +74,11 @@ export default class ShopCreateDialog extends Dialog5e {
   /* -------------------------------------------- */
 
   /** @inheritDoc */
-  async _onRender(context, options) {
-    await super._onRender(context, options);
-    const select = this.element.querySelector('select[name="starterPack"]');
+  _onChangeForm(formConfig, event) {
+    super._onChangeForm(formConfig, event);
+    if ( event.target.name !== "starterPack" ) return;
     const name = this.element.querySelector('input[name="name"]');
-    select?.addEventListener("change", () => {
-      name.placeholder = select.value ? (select.selectedOptions[0]?.text ?? "") : "";
-    });
+    name.placeholder = event.target.value ? (event.target.selectedOptions[0]?.text ?? "") : "";
   }
 
   /* -------------------------------------------- */
