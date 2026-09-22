@@ -120,23 +120,28 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
    * last resort.
    * @param {EnchantActivity} activity
    * @param {Set<string>|null} [wantedSubtypes]  Restrict to these `system.type.value` subtypes, when given.
+   * @param {Set<string>|null} [wantedBaseItems]  Restrict to these `system.type.baseItem` base items, when given.
    * @returns {Promise<string[]>}
    */
-  static async listEnchantableBaseItems(activity, wantedSubtypes=null) {
+  static async listEnchantableBaseItems(activity, wantedSubtypes=null, wantedBaseItems=null) {
     const candidates = await EnchantedItemBlueprint.resolveBaseItemCandidates(activity);
 
     if ( "explicit" in candidates ) {
       return candidates.explicit
         .filter(item => !wantedSubtypes || wantedSubtypes.has(item.system.type?.value))
+        .filter(item => !wantedBaseItems || wantedBaseItems.has(item.system.type?.baseItem))
         .map(item => item.uuid);
     }
 
     const { types, categoryFilters, filters } = candidates;
     const itemType = activity.restrictions.type || activity.item.type;
     const rules = game.dnd5e.settings.rulesVersion === "modern" ? "2024" : "2014";
+    const restrictions = [
+      wantedSubtypes && { k: "system.type.value", o: "in", v: wantedSubtypes },
+      wantedBaseItems && { k: "system.type.baseItem", o: "in", v: wantedBaseItems }
+    ].filter(_ => _);
     const results = await game.dnd5e.applications.CompendiumBrowser.fetch(Item, {
-      types, indexFields: new Set(["system.source", "system.identifier"]),
-      filters: wantedSubtypes ? [...filters, { k: "system.type.value", o: "in", v: wantedSubtypes }] : filters
+      types, indexFields: new Set(["system.source", "system.identifier"]), filters: [...filters, ...restrictions]
     });
 
     const fromShopPack = results

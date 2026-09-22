@@ -1,4 +1,4 @@
-<section class="tab active generate-item-content">
+<section class="tab {{ tab.cssClass }}" data-tab="filters" data-group="{{ tab.group }}">
     <fieldset>
         <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemType" }}</legend>
         {{> "dnd5e.fieldlist" typeFields }}
@@ -10,13 +10,6 @@
         {{> "dnd5e.fieldlist" this.fields }}
     </fieldset>
     {{/each}}
-
-    {{#if spellFieldset}}
-    <fieldset>
-        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemSpellFilter" }}</legend>
-        {{> "dnd5e.fieldlist" spellFieldset.fields }}
-    </fieldset>
-    {{/if}}
 
     <fieldset>
         <legend>{{ localize "DND5E.Rarity" }}</legend>

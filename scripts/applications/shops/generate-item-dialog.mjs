@@ -1,6 +1,6 @@
 import GeneratorProfile from "../../data/generator-profile.mjs";
 import { ShopItemEntry } from "../../data/shop-data.mjs";
-import { subtypeOptions } from "../../utils.mjs";
+import { breakdownCopper, itemRarity, resolveItemPrice, subtypeOptions, toCopper } from "../../utils.mjs";
 
 const { Dialog5e } = game.dnd5e.applications.api;
 
@@ -17,8 +17,8 @@ const ANY_VALUE = "any";
 
 /**
  * GM-facing dialog to roll random shop item entries: multi-select item types, each with its own
- * subtype restriction, a global rarity/magic filter, an optional spell-scroll filter, a weighting, and a count.
- * A preview beside the filters summarizes the pool the settings draw from.
+ * subtype restriction, a global rarity/magic filter, an optional spell-scroll filter, a weighting, and a count,
+ * split into a Filters and an Options tab. A preview beside the tabs summarizes the pool the settings draw from.
  */
 export default class GenerateItemDialog extends Dialog5e {
   constructor({ shopSheet, onGenerated, ...options }={}) {
@@ -41,10 +41,14 @@ export default class GenerateItemDialog extends Dialog5e {
       closeOnSubmit: false
     },
     buttons: [
-      { action: "generate", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemRoll", icon: "fa-solid fa-dice-d20", default: true }
+      { action: "generate", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemRoll", icon: "fa-solid fa-dice-d20", default: true },
+      { action: "add", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.AddItems", icon: "fa-solid fa-plus" }
     ],
     actions: {
-      generate: GenerateItemDialog.#generate
+      generate: GenerateItemDialog.#generate,
+      add: GenerateItemDialog.#add,
+      reroll: GenerateItemDialog.#reroll,
+      remove: GenerateItemDialog.#remove
     }
   };
 
@@ -52,11 +56,39 @@ export default class GenerateItemDialog extends Dialog5e {
 
   /** @override */
   static PARTS = {
-    content: { template: "modules/simple-shop-craft-5e/templates/shops/generate-item-dialog/content.hbs" },
-    preview: { template: "modules/simple-shop-craft-5e/templates/shops/generate-item-dialog/preview.hbs" },
-    settings: { template: "modules/simple-shop-craft-5e/templates/shops/generate-item-dialog/settings.hbs" },
+    tabs: {
+      template: "systems/dnd5e/templates/shared/horizontal-tabs.hbs",
+      templates: ["templates/generic/tab-navigation.hbs"]
+    },
+    filters: { template: "modules/simple-shop-craft-5e/templates/shops/generate-item-dialog/filters.hbs" },
+    options: { template: "modules/simple-shop-craft-5e/templates/shops/generate-item-dialog/options.hbs" },
+    preview: {
+      template: "modules/simple-shop-craft-5e/templates/shops/generate-item-dialog/preview.hbs",
+      templates: ["modules/simple-shop-craft-5e/templates/shared/item-avatar-name.hbs"]
+    },
     footer: super.PARTS.footer
   };
+
+  /* -------------------------------------------- */
+
+  /** @override */
+  static TABS = {
+    primary: {
+      tabs: [
+        { id: "filters", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemFilters", icon: "fas fa-filter" },
+        { id: "options", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemOptions", icon: "fas fa-sliders" }
+      ],
+      initial: "filters"
+    }
+  };
+
+  /* -------------------------------------------- */
+
+  /**
+   * The number of milliseconds to delay between changes to the settings before rebuilding the pool.
+   * @type {number}
+   */
+  static REFRESH_DELAY = 300;
 
   /* -------------------------------------------- */
   /*  Properties                                  */
@@ -95,16 +127,18 @@ export default class GenerateItemDialog extends Dialog5e {
   /* -------------------------------------------- */
 
   /**
-   * Build the pool of the current settings and show its preview, unless the settings changed in the meantime.
+   * The rolled items awaiting addition to the shop, each with its resolved item.
+   * @type {{ entry: ShopItemEntryData, item: Item5e }[]}
+   */
+  #results = [];
+
+  /* -------------------------------------------- */
+
+  /**
+   * The function to invoke when the pool needs to be rebuilt.
    * @type {Function}
    */
-  #refreshPool = foundry.utils.debounce(async () => {
-    const profile = this.#profile;
-    const pool = await profile.buildPool(this.shopSheet.shop.settlementCap);
-    if ( profile !== this.#profile ) return;
-    this.#pool = pool;
-    await this.render({ parts: ["preview"] });
-  }, 300);
+  _debouncedRefreshPool = foundry.utils.debounce(this._onRefreshPool.bind(this), this.constructor.REFRESH_DELAY);
 
   /* -------------------------------------------- */
   /*  Rendering                                   */
@@ -113,7 +147,7 @@ export default class GenerateItemDialog extends Dialog5e {
   /** @inheritDoc */
   async _onFirstRender(context, options) {
     await super._onFirstRender(context, options);
-    this.#refreshPool();
+    this._debouncedRefreshPool();
   }
 
   /* -------------------------------------------- */
@@ -121,17 +155,25 @@ export default class GenerateItemDialog extends Dialog5e {
   /** @inheritDoc */
   async _preparePartContext(partId, context, options) {
     context = await super._preparePartContext(partId, context, options);
-    if ( partId === "preview" ) context = await this._preparePreviewContext(context, options);
-    if ( partId === "settings" ) context = await this._prepareSettingsContext(context, options);
+    context.tab = context.tabs?.[partId];
+    switch ( partId ) {
+      case "filters": context = await this._prepareFiltersContext(context, options); break;
+      case "options": context = await this._prepareOptionsContext(context, options); break;
+      case "preview": context = await this._preparePreviewContext(context, options); break;
+    }
     return context;
   }
 
   /* -------------------------------------------- */
 
-  /** @inheritDoc */
-  async _prepareContentContext(context, options) {
-    context = await super._prepareContentContext(context, options);
-
+  /**
+   * Prepare rendering context for the filters part.
+   * @param {ApplicationRenderContext} context  Context being prepared.
+   * @param {HandlebarsRenderOptions} options   Options which configure application rendering behavior.
+   * @returns {Promise<ApplicationRenderContext>}
+   * @protected
+   */
+  async _prepareFiltersContext(context, options) {
     const typeOptions = Object.keys(CONFIG.Item.dataModels)
       .filter(type => CONFIG.Item.dataModels[type]?.inventorySection)
       .map(type => ({ value: type, label: _loc(`TYPES.Item.${type}Pl`) }));
@@ -142,24 +184,88 @@ export default class GenerateItemDialog extends Dialog5e {
       options: typeOptions
     }];
 
-    context.typeFieldsets = Object.keys(this.#profile.types)
+    context.typeFieldsets = await Promise.all(Object.keys(this.#profile.types)
       .toSorted((a, b) => (CONFIG.Item.dataModels[a]?.inventorySection?.order ?? Infinity)
         - (CONFIG.Item.dataModels[b]?.inventorySection?.order ?? Infinity))
-      .map(type => {
+      .map(async type => {
         const selected = this.#profile.types[type];
-        return {
-          label: _loc(`TYPES.Item.${type}Pl`),
-          fields: [{
-            field: new foundry.data.fields.SetField(new foundry.data.fields.StringField()), name: `subtypes.${type}`,
-            label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemSubtype"),
-            value: selected.size ? Array.from(selected) : [ANY_VALUE],
+        const fields = [{
+          field: new foundry.data.fields.SetField(new foundry.data.fields.StringField()), name: `subtypes.${type}`,
+          label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemSubtype"),
+          value: selected.size ? Array.from(selected) : [ANY_VALUE],
+          options: [
+            { value: ANY_VALUE, label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemAny") },
+            ...subtypeOptions([type])
+          ]
+        }];
+        const baseItemOptions = await this.#profile.getBaseItemOptions(type);
+        if ( baseItemOptions.length ) {
+          const selectedBaseItems = this.#profile.getBaseItems(type);
+          fields.push({
+            field: new foundry.data.fields.SetField(new foundry.data.fields.StringField()), name: `baseItems.${type}`,
+            label: _loc(`DND5E.Item${type.capitalize()}Base`),
+            value: selectedBaseItems ? Array.from(selectedBaseItems) : [ANY_VALUE],
             options: [
               { value: ANY_VALUE, label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemAny") },
-              ...subtypeOptions([type])
+              ...baseItemOptions
             ]
-          }]
-        };
-      });
+          });
+        }
+        return { label: _loc(`TYPES.Item.${type}Pl`), fields };
+      }));
+
+    context.globalFields = [
+      {
+        field: new foundry.data.fields.SetField(new foundry.data.fields.StringField()), name: "rarities",
+        label: _loc("DND5E.Rarity"),
+        value: this.#profile.rarities.size
+          ? Array.from(this.#profile.rarities).map(r => r === "" ? "mundane" : r) : [ANY_VALUE],
+        options: [
+          { value: ANY_VALUE, label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemAny") },
+          { value: "mundane", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemMundane") },
+          ...Object.entries(CONFIG.DND5E.itemRarity)
+            .filter(([value]) => value !== "artifact")
+            .map(([value, label]) => ({ value, label: label.capitalize() }))
+        ]
+      },
+      {
+        field: new foundry.data.fields.StringField(), name: "magic",
+        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemMagic"), value: this.#profile.magic,
+        options: [
+          { value: ANY_VALUE, label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemAny") },
+          { value: "magic", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemMagicOnly") },
+          { value: "mundane", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemMundane") }
+        ]
+      }
+    ];
+
+    return context;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Prepare rendering context for the options part.
+   * @param {ApplicationRenderContext} context  Context being prepared.
+   * @param {HandlebarsRenderOptions} options   Options which configure application rendering behavior.
+   * @returns {Promise<ApplicationRenderContext>}
+   * @protected
+   */
+  async _prepareOptionsContext(context, options) {
+    context.spellToggles = [
+      {
+        field: new foundry.data.fields.BooleanField(), name: "includeScrolls",
+        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemScrolls"),
+        hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemScrollsHint"),
+        value: this.#profile.includeScrolls
+      },
+      {
+        field: new foundry.data.fields.BooleanField(), name: "includeEnspelled",
+        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemEnspelled"),
+        hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemEnspelledHint"),
+        value: this.#profile.includeEnspelled
+      }
+    ];
 
     const { spellFilter } = this.#profile;
     context.spellFieldset = this.#profile.includesScrolls ? {
@@ -199,44 +305,6 @@ export default class GenerateItemDialog extends Dialog5e {
       ]
     } : null;
 
-    context.globalFields = [
-      {
-        field: new foundry.data.fields.SetField(new foundry.data.fields.StringField()), name: "rarities",
-        label: _loc("DND5E.Rarity"),
-        value: this.#profile.rarities.size
-          ? Array.from(this.#profile.rarities).map(r => r === "" ? "mundane" : r) : [ANY_VALUE],
-        options: [
-          { value: ANY_VALUE, label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemAny") },
-          { value: "mundane", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemMundane") },
-          ...Object.entries(CONFIG.DND5E.itemRarity)
-            .filter(([value]) => value !== "artifact")
-            .map(([value, label]) => ({ value, label: label.capitalize() }))
-        ]
-      },
-      {
-        field: new foundry.data.fields.StringField(), name: "magic",
-        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemMagic"), value: this.#profile.magic,
-        options: [
-          { value: ANY_VALUE, label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemAny") },
-          { value: "magic", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemMagicOnly") },
-          { value: "mundane", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemMundane") }
-        ]
-      }
-    ];
-
-    return context;
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Prepare rendering context for the settings part.
-   * @param {ApplicationRenderContext} context  Context being prepared.
-   * @param {HandlebarsRenderOptions} options   Options which configure application rendering behavior.
-   * @returns {Promise<ApplicationRenderContext>}
-   * @protected
-   */
-  async _prepareSettingsContext(context, options) {
     const { weighting } = this.#profile;
     context.weightingFields = [{
       field: GeneratorProfile.schema.fields.weighting, name: "weighting",
@@ -260,36 +328,70 @@ export default class GenerateItemDialog extends Dialog5e {
    * @protected
    */
   async _preparePreviewContext(context, options) {
+    context.results = this.#results.map(({ item }) => {
+      const rarity = itemRarity(item);
+      const price = resolveItemPrice(item);
+      return {
+        name: item.name,
+        img: item.img,
+        rarity: rarity ? CONFIG.DND5E.itemRarity[rarity].capitalize()
+          : _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemMundane"),
+        price: price ? breakdownCopper(toCopper(price.value, price.denomination)) : null
+      };
+    });
     if ( !this.#pool ) return context;
-    const { included, capped } = this.#pool.summary;
+    const { included, capped, owned } = this.#pool.summary;
     const total = Object.values(included).reduce((sum, count) => sum + count, 0);
-    const weights = {};
-    for ( const { kind, weight } of this.#pool.candidates ) weights[kind] = (weights[kind] ?? 0) + weight;
-    const totalWeight = Object.values(weights).reduce((sum, weight) => sum + weight, 0);
+    const cappedTotal = Math.ceil(Object.values(capped).reduce((sum, count) => sum + count, 0));
+    const ownedTotal = Math.ceil(Object.values(owned).reduce((sum, count) => sum + count, 0));
+    const reason = cappedTotal ? (ownedTotal ? "Both" : "Capped") : (ownedTotal ? "Owned" : "");
     context.pool = {
-      total,
-      capped: Object.values(capped).reduce((sum, count) => sum + count, 0),
+      total: Math.ceil(total),
+      capped: cappedTotal,
+      owned: ownedTotal,
+      empty: total ? null : _loc(`SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemPoolEmpty${reason}`),
       rarities: ["", ...Object.keys(CONFIG.DND5E.itemRarity)]
         .filter(rarity => included[rarity] || capped[rarity])
         .map(rarity => ({
           label: rarity ? CONFIG.DND5E.itemRarity[rarity].capitalize()
             : _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemMundane"),
-          count: included[rarity] ?? 0,
-          capped: capped[rarity] ?? 0,
+          count: Math.ceil(included[rarity] ?? 0),
+          capped: Math.ceil(capped[rarity] ?? 0),
           percent: total ? Math.round(((included[rarity] ?? 0) / total) * 100) : 0
-        })),
-      chances: ["item", "template", "spell"]
-        .filter(kind => weights[kind])
-        .map(kind => ({
-          label: _loc(`SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemPoolKind${kind.capitalize()}`),
-          percent: Math.round((weights[kind] / totalWeight) * 100)
         }))
     };
     return context;
   }
 
   /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  async _prepareFooterContext(context, options) {
+    context = await super._prepareFooterContext(context, options);
+    context.buttons.find(button => button.action === "add").disabled = !this.#results.length;
+    return context;
+  }
+
+  /* -------------------------------------------- */
   /*  Event Listeners and Handlers                */
+  /* -------------------------------------------- */
+
+  /**
+   * Handle rebuilding the pool of the current settings and updating its preview, unless the settings have changed
+   * in the meantime.
+   * @returns {Promise<void>}
+   * @protected
+   */
+  async _onRefreshPool() {
+    const profile = this.#profile;
+    const pool = await profile.buildPool({
+      settlementCap: this.shopSheet.shop.settlementCap, existingKeys: this.#entryKeys()
+    });
+    if ( profile !== this.#profile ) return;
+    this.#pool = pool;
+    await this.render({ parts: ["preview"] });
+  }
+
   /* -------------------------------------------- */
 
   /**
@@ -306,9 +408,14 @@ export default class GenerateItemDialog extends Dialog5e {
       types: Object.fromEntries(
         (data.types ?? []).map(type => [type, parseMultiSelect(data.subtypes ?? {}, type)])
       ),
+      baseItems: Object.fromEntries(
+        (data.types ?? []).map(type => [type, parseMultiSelect(data.baseItems ?? {}, type)])
+      ),
       rarities: parseMultiSelect(data, "rarities").map(r => r === "mundane" ? "" : r),
       magic: data.magic || ANY_VALUE,
       weighting: data.weighting,
+      includeScrolls: !!data.includeScrolls,
+      includeEnspelled: !!data.includeEnspelled,
       spellFilter: {
         schools: parseMultiSelect(data, "schools"),
         classes: parseMultiSelect(data, "classes"),
@@ -318,14 +425,41 @@ export default class GenerateItemDialog extends Dialog5e {
       count: Math.clamp(Number(data.count) || 1, 1, 10)
     });
     this.#pool = null;
-    this.#refreshPool();
-    await this.render({ parts: ["content", "settings", "preview", "footer"] });
+    this._debouncedRefreshPool();
+    await this.render({ parts: ["filters", "options", "preview", "footer"] });
   }
 
   /* -------------------------------------------- */
 
   /**
-   * Roll and add the generated entries.
+   * Get the keys of the entries in the shop, along with those of any extra entries.
+   * @param {ShopItemEntryData[]} [extra]
+   * @returns {Set<string>}
+   */
+  #entryKeys(extra=[]) {
+    return new Set([...this.shopSheet.shop.items, ...extra].map(entry => ShopItemEntry.key(entry)));
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Roll items that are neither in the shop nor in the result list, and resolve them.
+   * @param {ShopItemEntryData[]} [listed]  Entries of the result list that must not come up again.
+   * @param {number} [count]                How many items to roll. Defaults to the count of the settings.
+   * @returns {Promise<{ entry: ShopItemEntryData, item: Item5e }[]>}
+   */
+  async #rollResults(listed=[], count=this.#profile.count) {
+    const { settlementCap, stockDefaults } = this.shopSheet.shop;
+    const rolled = await this.#profile.roll({
+      existingKeys: this.#entryKeys(listed), settlementCap, stockDefaults, pool: this.#pool, count
+    });
+    return (await ShopItemEntry.resolveMany(rolled.map(r => r.entry))).filter(({ item }) => item);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Roll items into the result list, replacing the previous ones.
    * @this {GenerateItemDialog}
    * @param {Event} event         Triggering click event.
    * @param {HTMLElement} target  Button that was clicked.
@@ -335,26 +469,69 @@ export default class GenerateItemDialog extends Dialog5e {
     target.disabled = true;
     try {
       const { count } = this.#profile;
-      const existingKeys = new Set(this.shopSheet.shop.items.map(i => ShopItemEntry.key(i)));
+      this.#results = await this.#rollResults();
+      await this.render({ parts: ["preview", "footer"] });
 
-      const { settlementCap, stockDefaults } = this.shopSheet.shop;
-      const rolled = await this.#profile.roll({ existingKeys, settlementCap, stockDefaults, pool: this.#pool });
-
-      if ( !rolled.length ) {
+      if ( !this.#results.length ) {
         ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemNone", { localize: true });
-        return;
+      } else if ( this.#results.length < count ) {
+        ui.notifications.info("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemPartial", {
+          format: { count: this.#results.length, total: count }
+        });
       }
-
-      await this.onGenerated(rolled.map(r => r.entry));
-      const [key, format] = (rolled.length === 1)
-        ? ["SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemResult", { name: rolled[0].label }]
-        : (rolled.length === count)
-          ? ["SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemResultMultiple", { count: rolled.length }]
-          : ["SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemPartial", { count: rolled.length, total: count }];
-      ui.notifications.info(key, { format });
     } finally {
       target.disabled = false;
     }
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Replace an item of the result list with a newly rolled one.
+   * @this {GenerateItemDialog}
+   * @param {Event} event         Triggering click event.
+   * @param {HTMLElement} target  Button that was clicked.
+   * @returns {Promise<void>}
+   */
+  static async #reroll(event, target) {
+    const [result] = await this.#rollResults(this.#results.map(({ entry }) => entry), 1);
+    if ( !result ) {
+      ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemNone", { localize: true });
+      return;
+    }
+    this.#results[Number(target.dataset.index)] = result;
+    await this.render({ parts: ["preview"] });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Remove an item from the result list.
+   * @this {GenerateItemDialog}
+   * @param {Event} event         Triggering click event.
+   * @param {HTMLElement} target  Button that was clicked.
+   * @returns {Promise<void>}
+   */
+  static async #remove(event, target) {
+    this.#results.splice(Number(target.dataset.index), 1);
+    await this.render({ parts: ["preview", "footer"] });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Add the rolled items to the shop and clear the result list.
+   * @this {GenerateItemDialog}
+   * @returns {Promise<void>}
+   */
+  static async #add() {
+    const count = this.#results.length;
+    await this.onGenerated(this.#results.map(({ entry }) => entry));
+    this.#results = [];
+    this.#pool = null;
+    this._debouncedRefreshPool();
+    await this.render({ parts: ["preview", "footer"] });
+    ui.notifications.info("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemAdded", { format: { count } });
   }
 }
 

@@ -342,6 +342,7 @@
  * @property {EnchantActivity} activity  The enchant Activity offering the profile.
  * @property {ActiveEffect5e} effect  The profile's enchantment effect.
  * @property {number} level  Position of the profile among all of the item's profiles.
+ * @property {string} rarity  Rarity given by the profile's enchantment.
  * @property {string[]} baseItems  UUIDs of the base items the profile can be applied to.
  * @property {number} weight  How likely the profile is drawn, relative to the item's other profiles.
  */
@@ -351,15 +352,17 @@
 /**
  * @typedef GeneratorPool
  * @property {GeneratorCandidate[]} candidates  The candidates a draw picks from.
- * @property {GeneratorPoolSummary} summary
+ * @property {GeneratorPoolSummary} summary  The entries of the pool, counted per rarity.
  */
 
 /* -------------------------------------------- */
 
 /**
  * @typedef GeneratorPoolSummary
- * @property {Record<string, number>} included  Possible results in the pool per rarity ("" for mundane).
- * @property {Record<string, number>} capped  Possible results per rarity that the settlement cap leaves out.
+ * @property {Record<string, number>} included  Entries in the pool per rarity ("" for mundane). Depending on the
+ *   weighting, an entry of an enchant item is a base item of a variant, a variant, or the item itself.
+ * @property {Record<string, number>} capped  Entries per rarity that exceed the settlement cap.
+ * @property {Record<string, number>} owned  Entries per rarity that are already in the shop.
  */
 
 /* -------------------------------------------- */
@@ -368,10 +371,15 @@
  * @typedef GeneratorProfileData
  * @property {Record<string, Set<string>>} types  Selected item types, each with its selected subtypes
  *   (`system.type.value`). An empty Set allows any subtype.
+ * @property {Record<string, Set<string>>} baseItems  Selected base items (`system.type.baseItem`) per item type.
+ *   An empty Set allows any base item.
  * @property {Set<string>} rarities  Selected rarities ("" for mundane). Empty allows any rarity.
  * @property {"any"|"magic"|"mundane"} magic
  * @property {"combination"|"variant"|"template"} weighting  How often an enchant item is drawn: by every
  *   combination of profile and base item, by every profile, or once per item.
+ * @property {boolean} includeScrolls  Whether spell scrolls, one per matching spell, are part of the pool.
+ *   Requires the Consumable type, with Scroll among its subtypes.
+ * @property {boolean} includeEnspelled  Whether Enspelled Weapons, Staffs, and Armor are part of the pool.
  * @property {object} spellFilter  Restrictions on the spells of generated spell scrolls. Empty Sets allow anything.
  * @property {Set<string>} spellFilter.schools
  * @property {Set<string>} spellFilter.classes

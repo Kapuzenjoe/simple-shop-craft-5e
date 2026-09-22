@@ -1,4 +1,4 @@
-<section class="generate-item-settings">
+<section class="tab {{ tab.cssClass }}" data-tab="options" data-group="{{ tab.group }}">
     <fieldset>
         <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemWeighting" }}</legend>
         {{> "dnd5e.fieldlist" weightingFields }}
@@ -12,5 +12,13 @@
                 <range-picker name="count" value="{{ count }}" min="1" max="10" step="1"></range-picker>
             </div>
         </div>
+    </fieldset>
+
+    <fieldset>
+        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemSpells" }}</legend>
+        {{> "dnd5e.fieldlist" spellToggles }}
+        {{#if spellFieldset}}
+        {{> "dnd5e.fieldlist" spellFieldset.fields }}
+        {{/if}}
     </fieldset>
 </section>
