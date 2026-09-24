@@ -65,6 +65,10 @@
         "skillProficiencies": {
           "label": "Skill Proficiencies"
         },
+        "proficiencyMode": {
+          "label": "Proficiency Mode",
+          "hint": "How the Tool and Skill Proficiencies above combine to determine crafting eligibility."
+        },
         "allowWorkshopOverride": {
           "label": "Allow Workshop Override",
           "hint": "Players can claim access to a proper workshop instead of owning the required tool."
@@ -162,7 +166,10 @@
       "Unlock": "Unlock",
       "UnlockModeIndividual": "Individual",
       "UnlockModeAll": "Open to All",
-      "UnlockModeToolProficient": "Tool-Proficient"
+      "UnlockModeToolProficient": "Tool-Proficient",
+      "ProficiencyModeBoth": "Tool & Skill",
+      "ProficiencyModeEither": "Tool or Skill",
+      "ProficiencyModeAll": "Every Listed Tool & Skill"
     },
     "Settings": {
       "Defaults": {
@@ -222,16 +229,41 @@
       "GenerateItemSubtype": "Subtype",
       "GenerateItemRoll": "Generate",
       "GenerateItemNone": "No matching items found.",
-      "GenerateItemResult": "Generated {name}.",
-      "GenerateItemResultMultiple": "Generated {count} items.",
+      "GenerateItemResults": "Results",
+      "GenerateItemResultsEmpty": "Generate items to review them before adding them to the shop.",
+      "GenerateItemReroll": "Reroll",
+      "GenerateItemRemove": "Remove",
+      "GenerateItemAdded": "Added {count} items.",
       "GenerateItemPartial": "Generated {count} of {total} requested items — pool exhausted.",
       "GenerateItemAny": "Any",
       "GenerateItemMagic": "Magic",
       "GenerateItemMagicOnly": "Magical Only",
-      "GenerateItemSpellFilter": "Spell Filter",
+      "GenerateItemSpells": "Spells",
+      "GenerateItemScrolls": "Spell Scrolls",
+      "GenerateItemScrollsHint": "Add a Spell Scroll to the pool for each matching spell. Requires the Consumable type, with Scroll among its subtypes.",
+      "GenerateItemEnspelled": "Enspelled Items",
+      "GenerateItemEnspelledHint": "Add Enspelled Weapons, Staffs, and Armor to the pool, each bound to a random spell of the level its rarity gives.",
       "GenerateItemRitualOnly": "Ritual Only",
       "GenerateItemCount": "Count",
       "GenerateItemClass": "Class",
+      "GenerateItemFilters": "Filters",
+      "GenerateItemOptions": "Options",
+      "GenerateItemWeighting": "Weighting",
+      "GenerateItemWeightingCombination": "Combination",
+      "GenerateItemWeightingCombinationHint": "Count each base item of each variant as an entry, so templates with many variants come up more often.",
+      "GenerateItemWeightingVariant": "Variant",
+      "GenerateItemWeightingVariantHint": "Count each variant as an entry, however many base items it fits.",
+      "GenerateItemWeightingTemplate": "Template",
+      "GenerateItemWeightingTemplateHint": "Count each template as an entry, however many variants it has.",
+      "GenerateItemPool": "Pool",
+      "GenerateItemPoolCalculating": "Calculating",
+      "GenerateItemPoolTotal": "{count} entries",
+      "GenerateItemPoolCapped": "{count} more entries exceed the settlement cap.",
+      "GenerateItemPoolOwned": "{count} more entries are already in the shop.",
+      "GenerateItemPoolEmpty": "No items found for this set of filters.",
+      "GenerateItemPoolEmptyCapped": "All matching entries exceed the settlement cap.",
+      "GenerateItemPoolEmptyOwned": "All matching entries are already in the shop.",
+      "GenerateItemPoolEmptyBoth": "All matching entries are already in the shop or exceed the settlement cap.",
       "FillFromTable": "Fill from Table",
       "FillFromTableTable": "Roll Table",
       "FillFromTableCount": "Draws",

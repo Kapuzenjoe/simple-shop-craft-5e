@@ -6,7 +6,6 @@ import {
   confirmDeleteShop, finalizeGroups, formatDuration, recipeCraftCost, resolveEntries, resolveTotalHours,
   spotlightShop, toCopper
 } from "../utils.mjs";
-
 import CraftStartDialog from "./craft/craft-start-dialog.mjs";
 import RecipeSheet from "./craft/recipe-sheet.mjs";
 import VendorConfig from "./shops/shop-config/vendor-config.mjs";

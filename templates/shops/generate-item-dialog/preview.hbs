@@ -1,0 +1,58 @@
+<section class="tab active generate-item-preview">
+    <fieldset>
+        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemPool" }}</legend>
+        {{#if pool}}
+        <p class="pool-total">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemPoolTotal" count=pool.total }}</p>
+        <ul class="pool-rarities unlist">
+            {{#each pool.rarities}}
+            <li>
+                <span class="label">{{ label }}</span>
+                <div class="meter progress meter-sm uses" role="meter" aria-valuemin="0" aria-valuemax="100"
+                     aria-valuenow="{{ percent }}" style="--bar-percentage: {{ percent }}%;"></div>
+                <span class="count">{{ count }}</span>
+                <span class="capped">{{#if capped}}<i class="fa-solid fa-ban" inert></i> {{ capped }}{{/if}}</span>
+            </li>
+            {{/each}}
+        </ul>
+        {{#if pool.capped}}
+        <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemPoolCapped" count=pool.capped }}</p>
+        {{/if}}
+        {{#if pool.owned}}
+        <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemPoolOwned" count=pool.owned }}</p>
+        {{/if}}
+        {{#if pool.empty}}
+        <p class="hint warning">{{ pool.empty }}</p>
+        {{/if}}
+        {{else}}
+        <p class="hint">
+            <i class="fa-solid fa-spinner fa-spin" inert></i>
+            {{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemPoolCalculating" }}
+        </p>
+        {{/if}}
+    </fieldset>
+
+    <fieldset>
+        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemResults" }}</legend>
+        {{#if results.length}}
+        <ul class="result-list unlist">
+            {{#each results}}
+            <li>
+                {{> "modules/simple-shop-craft-5e/templates/shared/item-avatar-name.hbs"
+                    img=img name=name subtitle=rarity }}
+                <div class="item-price">{{> "modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs" parts=price }}</div>
+                <button type="button" class="unbutton item-control item-action" data-action="reroll" data-index="{{ @index }}"
+                        data-tooltip aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemReroll' }}">
+                    <i class="fa-solid fa-dice" inert></i>
+                </button>
+                <button type="button" class="unbutton item-control item-action" data-action="remove" data-index="{{ @index }}"
+                        data-tooltip aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemRemove' }}">
+                    <i class="fa-solid fa-xmark" inert></i>
+                </button>
+            </li>
+            {{/each}}
+        </ul>
+        {{else}}
+        <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemResultsEmpty" }}</p>
+        {{/if}}
+    </fieldset>
+</section>

@@ -2,8 +2,8 @@ import { CraftMessageData } from "./data/craft-message.mjs";
 import { InProgressCraft } from "./data/in-progress-craft.mjs";
 import { ProgressSessionMessageData } from "./data/progress-session-message.mjs";
 import { PurchaseMessageData } from "./data/purchase-message.mjs";
-import { registerRecipeLocalization } from "./data/recipe-data.mjs";
-import { Shop, registerShopLocalization } from "./data/shop-data.mjs";
+import { Recipe } from "./data/recipe-data.mjs";
+import { Shop } from "./data/shop-data.mjs";
 import { registerSettings } from "./settings.mjs";
 import { preloadHandlebarsTemplates } from "./utils.mjs";
 
@@ -26,6 +26,6 @@ Hooks.once("init", () => {
 });
 
 Hooks.once("i18nInit", () => {
-  registerRecipeLocalization();
-  registerShopLocalization();
+  foundry.helpers.Localization.localizeDataModel(Recipe);
+  foundry.helpers.Localization.localizeDataModel(Shop);
 });

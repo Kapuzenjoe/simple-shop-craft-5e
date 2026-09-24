@@ -1,18 +1,15 @@
 import {
-  DEFAULT_STOCK_BY_TYPE, MAGIC_EXEMPT_TYPES, RESTOCK_MODES, SETTING_KEYS, SPELL_SCROLL_LEVELS, STOCK_MAGIC_RULES
+  DEFAULT_STOCK_BY_TYPE, MAGIC_EXEMPT_TYPES, RESTOCK_MODES, SETTING_KEYS, STOCK_MAGIC_RULES
 } from "../config.mjs";
 import { calendariaDayOfWeek, isCalendariaActive } from "../integrations/calendaria.mjs";
 import {
-  breakdownCopper, currencyRows, deductActorCurrencyChecked, excludeFilter, isCalendarModeActive, secondsPerDay,
-  isShopPackSource, itemRarity, itemRefKey, needsDefaultPrice, resolveEntries, resolveItemPrice, resolveRarityPrice,
-  shouldHandleWorldTimeAdvance, toCopper
+  breakdownCopper, currencyRows, deductActorCurrencyChecked, isCalendarModeActive, secondsPerDay, itemRefKey,
+  needsDefaultPrice, resolveEntries, resolveItemPrice, shouldHandleWorldTimeAdvance, toCopper
 } from "../utils.mjs";
-
 import { EnchantedItemBlueprint } from "./enchanted-item-blueprint.mjs";
 import { HirelingBlueprint } from "./hireling-blueprint.mjs";
 import { LodgingBlueprint } from "./lodging-blueprint.mjs";
-import { migrateRestockMode } from "./migration.mjs";
-import { SettingCollectionMixin } from "./setting-collection.mjs";
+import SettingCollectionMixin from "./setting-collection-mixin.mjs";
 import { SpellScrollBlueprint } from "./spell-scroll-blueprint.mjs";
 
 const {
@@ -21,9 +18,7 @@ const {
 } = foundry.data.fields;
 
 /**
- * @import {
- *   ShopPlayerDiscountData, ShopItemEntryData, ShopData, GeneratorCandidate, SpellFilter
- * } from "../_types.mjs";
+ * @import { ShopPlayerDiscountData, ShopItemEntryData, ShopData } from "../_types.mjs";
  */
 
 /**
@@ -66,8 +61,20 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
   /** @inheritDoc */
   static _migrateData(source) {
     super._migrateData(source);
-    migrateRestockMode(source);
+    ShopItemEntry.#migrateRestockMode(source);
     return source;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Migrate the `noRestock` boolean to the three-way `restockMode`.
+   * @param {object} source  The candidate source data from which the model will be constructed.
+   */
+  static #migrateRestockMode(source) {
+    if ( !("noRestock" in source) ) return;
+    source.restockMode = source.noRestock ? "exclude" : "normal";
+    delete source.noRestock;
   }
 
   /* -------------------------------------------- */
@@ -80,7 +87,8 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
    */
   static key(entry) {
     if ( entry.generated ) {
-      return [entry.generated.baseItemUuid, entry.generated.enchantItemUuid, entry.generated.effectId].join("|");
+      const { baseItemUuid, enchantItemUuid, effectId, spellUuid } = entry.generated;
+      return [baseItemUuid, enchantItemUuid, effectId, ...(spellUuid ? [spellUuid] : [])].join("|");
     }
     if ( entry.spellScroll ) return entry.spellScroll.spellUuid;
     return itemRefKey(entry) || entry._id;
@@ -106,198 +114,6 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
       if ( entry.hireling ) return { entry, item: await new HirelingBlueprint(entry.hireling).resolve() };
       return byEntry.get(entry);
     }));
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Roll a batch of random shop item entries from the generator's current filter selection. The candidate
-   * pool is fetched once and reused across every draw; stops early if the pool runs out.
-   * @param {object} options
-   * @param {Map<string, Set<string>|null>} options.typeConfigs  Selected types mapped to their own chosen
-   *   subtypes (`system.type.value`), or `null` for no restriction.
-   * @param {Set<string>|null} options.rarities  Wanted rarities ("" for mundane), narrows spell levels too.
-   * @param {"any"|"magic"|"mundane"} options.magic
-   * @param {SpellFilter|null} options.spellFilter
-   * @param {number} options.count
-   * @param {Set<string>} options.existingKeys  Entry keys already present in the shop, to skip duplicates.
-   * @param {{ value: number|null, denomination: string }} [options.settlementCap]  Skip plain-item candidates
-   *   or enchant-generated items whose resolved price exceeds this. Spell scrolls are unaffected.
-   * @param {{ byType: Record<string, number|null>, magicRule: string }} options.stockDefaults  The shop's
-   *   default stock configuration, applied to non-magic-exempt mundane candidates.
-   * @returns {Promise<{ entry: ShopItemEntryData, label: string }[]>}
-   */
-  static async rollMany({
-    typeConfigs, rarities, magic, spellFilter, count, existingKeys, settlementCap, stockDefaults
-  }) {
-    const candidatePool = await ShopItemEntry.#buildCandidatePool({ typeConfigs, rarities, spellFilter });
-    const capCP = settlementCap?.value != null ? toCopper(settlementCap.value, settlementCap.denomination) : null;
-    const keys = new Set(existingKeys);
-    const rolled = [];
-    for ( let i = 0; i < count; i++ ) {
-      const result = await ShopItemEntry.#drawFromPool(
-        candidatePool, typeConfigs, { rarities, magic, existingKeys: keys, capCP, stockDefaults }
-      );
-      if ( !result ) break;
-      keys.add(ShopItemEntry.key(result.entry));
-      rolled.push(result);
-    }
-    return rolled;
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Fetch the combined candidate pool for a generator submission — one item index per selected type,
-   * plus a spell index when a spell-scroll filter is set. Subtype narrowing happens in
-   * {@link ShopItemEntry.#drawFromPool}. Fetched once per submission and reused across every draw in a batch.
-   * @param {object} options
-   * @param {Map<string, Set<string>|null>} options.typeConfigs
-   * @param {Set<string>|null} options.rarities
-   * @param {SpellFilter|null} options.spellFilter
-   * @returns {Promise<GeneratorCandidate[]>}
-   */
-  static async #buildCandidatePool({ typeConfigs, rarities, spellFilter }) {
-    const rules = game.dnd5e.settings.rulesVersion === "modern" ? "2024" : "2014";
-    const pool = [];
-
-    for ( const type of typeConfigs.keys() ) {
-      const filters = [
-        { o: "NOT", v: { o: "OR", v: [
-          { k: "system.rarity", o: "in", v: ["artifact"] },
-          { k: "system.rarities", o: "hasany", v: ["artifact"] }
-        ] } },
-        excludeFilter("system.type.value", ["natural"]),
-        excludeFilter("system.identifier", ["spell-scroll", "enspelled-staff", "enspelled-weapon", "enspelled-armor"])
-      ];
-      const results = await game.dnd5e.applications.CompendiumBrowser.fetch(Item, {
-        types: new Set([type]), filters, indexFields: new Set(["system.source"])
-      });
-      const fromShopPack = results
-        .filter(index => [rules, null, undefined].includes(index.system?.source?.rules))
-        .filter(index => isShopPackSource(index.uuid));
-      pool.push(...fromShopPack.map(index => ({ kind: "item", index })));
-    }
-
-    if ( spellFilter ) {
-      let allowedLevels = rarities
-        ? Object.entries(SPELL_SCROLL_LEVELS).filter(([r]) => rarities.has(r)).flatMap(([, levels]) => levels)
-        : Object.values(SPELL_SCROLL_LEVELS).flat();
-      if ( spellFilter.levels ) allowedLevels = allowedLevels.filter(l => spellFilter.levels.has(l));
-      if ( allowedLevels.length ) {
-        const filters = [
-          { k: "system.level", o: "in", v: allowedLevels }
-        ];
-        if ( spellFilter.schools ) filters.push({ k: "system.school", o: "in", v: Array.from(spellFilter.schools) });
-        if ( spellFilter.ritualOnly ) filters.push({ k: "system.properties", o: "has", v: "ritual" });
-        if ( spellFilter.classes ) {
-          const identifiers = new Set();
-          for ( const value of spellFilter.classes ) {
-            const list = game.dnd5e.registry.spellLists.forType(value);
-            if ( list ) for ( const id of list.identifiers ) identifiers.add(id);
-          }
-          filters.push({ k: "system.identifier", o: "in", v: Array.from(identifiers) });
-        }
-        const results = await game.dnd5e.applications.CompendiumBrowser.fetch(Item, {
-          types: new Set(["spell"]), filters, indexFields: new Set(["system.source"])
-        });
-        const bySourceRules = results.filter(index => [rules, null, undefined].includes(index.system?.source?.rules));
-        pool.push(...bySourceRules.map(index => ({ kind: "spell", index })));
-      }
-    }
-
-    return pool;
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Draw one random shop item entry from a pre-built candidate pool — a plain item reference, an enchanted
-   * item blueprint, or a spell scroll blueprint.
-   * @param {GeneratorCandidate[]} candidatePool
-   * @param {Map<string, Set<string>|null>} typeConfigs  Subtype restriction per type, applied both to
-   *   plain items directly and, for enchant results, via {@link EnchantedItemBlueprint.findEnchantableBaseItem}.
-   * @param {object} options
-   * @param {Set<string>|null} options.rarities
-   * @param {"any"|"magic"|"mundane"} options.magic
-   * @param {Set<string>} options.existingKeys
-   * @param {number|null} options.capCP  Settlement cap in copper pieces, or `null` if unset.
-   * @param {{ byType: Record<string, number|null>, magicRule: string }} options.stockDefaults  The shop's
-   *   default stock configuration, applied to non-magic-exempt mundane candidates.
-   * @returns {Promise<{ entry: ShopItemEntryData, label: string }|null>}
-   */
-  static async #drawFromPool(candidatePool, typeConfigs, { rarities, magic, existingKeys, capCP, stockDefaults }) {
-    const pool = [...candidatePool];
-    while ( pool.length ) {
-      const [candidate] = pool.splice(Math.floor(Math.random() * pool.length), 1);
-
-      if ( candidate.kind === "spell" ) {
-        if ( capCP != null ) {
-          const rarity = Object.entries(SPELL_SCROLL_LEVELS)
-            .find(([, levels]) => levels.includes(candidate.index.system.level))?.[0];
-          const price = resolveRarityPrice(rarity, { isConsumable: true });
-          if ( price && (toCopper(price.value, price.denomination) > capCP) ) continue;
-        }
-        const entry = {
-          spellScroll: { spellUuid: candidate.index.uuid }, stock: { max: null, current: 1 }, restockMode: "exclude"
-        };
-        if ( existingKeys.has(ShopItemEntry.key(entry)) ) continue;
-        return { entry, label: candidate.index.name };
-      }
-
-      const candidateItem = await fromUuid(candidate.index.uuid);
-      const isMagic = candidateItem.system.properties?.has("mgc") ?? false;
-      if ( (magic === "magic") && !isMagic ) continue;
-      if ( (magic === "mundane") && isMagic ) continue;
-      const hasEnchant = candidateItem.system.activities?.some(a => a.type === "enchant");
-      if ( !hasEnchant && !candidateItem.system.price?.value && !(isMagic && itemRarity(candidateItem)) ) continue;
-
-      if ( !hasEnchant || !EnchantedItemBlueprint.canBeTemplate(candidateItem)
-        || candidateItem.system.type?.baseItem ) {
-        if ( rarities && !rarities.has(itemRarity(candidateItem)) ) continue;
-        const wantedSubtypes = typeConfigs.get(candidateItem.type);
-        if ( wantedSubtypes && !wantedSubtypes.has(candidateItem.system.type?.value) ) continue;
-        if ( capCP != null ) {
-          const price = resolveItemPrice(candidateItem);
-          if ( price && (toCopper(price.value, price.denomination) > capCP) ) continue;
-        }
-        const entry = candidateItem.system.identifier
-          ? { identifier: candidateItem.system.identifier } : { uuid: candidateItem.uuid };
-        if ( existingKeys.has(ShopItemEntry.key(entry)) ) continue;
-        return {
-          entry: { ...entry, ...newEntryStock(candidateItem, stockDefaults) }, label: candidateItem.name
-        };
-      }
-
-      const matching = EnchantedItemBlueprint.getEnchantmentProfiles(candidateItem).filter(profile => {
-        const rarity = EnchantedItemBlueprint.resolveProfileRarity(candidateItem, profile.effect);
-        return (rarity !== "artifact") && (!rarities || rarities.has(rarity));
-      });
-      if ( !matching.length ) continue;
-      const chosen = matching[Math.floor(Math.random() * matching.length)];
-      const baseType = chosen.activity.restrictions.type || chosen.activity.item.type;
-      const baseItem = await EnchantedItemBlueprint.findEnchantableBaseItem(
-        chosen.activity, typeConfigs.get(baseType) ?? null
-      );
-      if ( !baseItem ) continue;
-      if ( capCP != null ) {
-        const price = resolveItemPrice(candidateItem, {
-          rarity: EnchantedItemBlueprint.resolveProfileRarity(candidateItem, chosen.effect),
-          isAmmo: baseItem.system.type?.value === "ammo", isConsumable: baseItem.type === "consumable"
-        });
-        if ( price && (toCopper(price.value, price.denomination) > capCP) ) continue;
-      }
-
-      const generated = {
-        baseItemUuid: baseItem.uuid, enchantItemUuid: candidateItem.uuid, effectId: chosen.effect.id
-      };
-      if ( existingKeys.has(ShopItemEntry.key({ generated })) ) continue;
-      return {
-        entry: { generated, stock: { max: null, current: 1 }, restockMode: "exclude" },
-        label: `${baseItem.name} (${candidateItem.name})`
-      };
-    }
-    return null;
   }
 }
 
@@ -669,24 +485,26 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
     if ( itemUpdates.length ) await actor.updateEmbeddedDocuments("Item", itemUpdates);
     if ( itemsToDelete.length ) await actor.deleteEmbeddedDocuments("Item", itemsToDelete);
 
-    const items = shop.items.map(entry => {
-      const line = purchase.buyLines.find(l => ShopItemEntry.key(l) === ShopItemEntry.key(entry));
-      if ( !line || (entry.restockMode === "unlimited") ) return entry.toObject();
-      return { ...entry.toObject(), stock: { ...entry.stock, current: (entry.stock.current ?? 0) - line.quantity } };
+    await Shop.update(shop._id, freshShop => {
+      const items = freshShop.items.map(entry => {
+        const line = purchase.buyLines.find(l => ShopItemEntry.key(l) === ShopItemEntry.key(entry));
+        if ( !line || (entry.restockMode === "unlimited") ) return entry.toObject();
+        return { ...entry.toObject(), stock: { ...entry.stock, current: (entry.stock.current ?? 0) - line.quantity } };
+      });
+      for ( const line of purchase.sellLines ) {
+        if ( !line.identifier ) continue;
+        const existing = items.find(i => i.identifier === line.identifier);
+        if ( existing && (existing.stock.current !== null) ) existing.stock.current += line.quantity;
+      }
+
+      const goldPool = { ...freshShop.goldPool };
+      if ( effectiveGoldCurrent !== null ) {
+        const parts = breakdownCopper(effectiveGoldCurrent - purchase.netCP);
+        goldPool.current = Object.fromEntries(parts.map(p => [p.denomination, p.value]));
+      }
+
+      return { items, goldPool };
     });
-    for ( const line of purchase.sellLines ) {
-      if ( !line.identifier ) continue;
-      const existing = items.find(i => i.identifier === line.identifier);
-      if ( existing && (existing.stock.current !== null) ) existing.stock.current += line.quantity;
-    }
-
-    const goldPool = { ...shop.goldPool };
-    if ( effectiveGoldCurrent !== null ) {
-      const parts = breakdownCopper(effectiveGoldCurrent - purchase.netCP);
-      goldPool.current = Object.fromEntries(parts.map(p => [p.denomination, p.value]));
-    }
-
-    await Shop.setAll(shops.map(s => s._id === shop._id ? { ...s.toObject(), items, goldPool } : s.toObject()));
 
     return { ok: true };
   }
@@ -773,13 +591,4 @@ export function newEntryStock(item, stockDefaults) {
   const max = Shop.defaultStockMax(item, stockDefaults);
   if ( max === null ) return { restockMode: "unlimited" };
   return { stock: { max: null, current: max } };
-}
-
-/* -------------------------------------------- */
-
-/**
- * Register this module's localization for the Shop data model.
- */
-export function registerShopLocalization() {
-  foundry.helpers.Localization.localizeDataModel(Shop);
 }

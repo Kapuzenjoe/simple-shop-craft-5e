@@ -1,6 +1,5 @@
 import { MODULE_ID } from "../config.mjs";
 import { formatDuration } from "../utils.mjs";
-
 import { InProgressCraft } from "./in-progress-craft.mjs";
 
 const { BooleanField, DocumentUUIDField, FilePathField, NumberField, StringField } = foundry.data.fields;

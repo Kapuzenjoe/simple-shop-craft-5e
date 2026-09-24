@@ -1,4 +1,4 @@
-import { SPELL_SCROLL_SOURCES, UNLOCK_MODES } from "../../config.mjs";
+import { PROFICIENCY_MODES, SPELL_SCROLL_SOURCES, UNLOCK_MODES } from "../../config.mjs";
 import { Recipe, RecipeMaterial } from "../../data/recipe-data.mjs";
 import {
   applyDropArea, applyLoadingTooltip, breakdownCopper, buildItemTableSections, currencyRows,
@@ -6,7 +6,6 @@ import {
   resolveEntries, resolveIdentifierIndex, resolveItemPrice, subtypeOptions, toCopper
 } from "../../utils.mjs";
 import BaseShopConfig from "../shops/shop-config/base-shop-config.mjs";
-
 import MaterialCriteriaDialog from "./material-criteria-dialog.mjs";
 
 const { Application5e } = game.dnd5e.applications.api;
@@ -231,6 +230,10 @@ export default class RecipeSheet extends Application5e {
         field: fields.skillProficiencies, name: "skillProficiencies", value: Array.from(recipe.skillProficiencies),
         options: skillOptions()
       },
+      {
+        field: fields.proficiencyMode, name: "proficiencyMode", value: recipe.proficiencyMode,
+        options: Object.entries(PROFICIENCY_MODES).map(([value, { label }]) => ({ value, label: _loc(label) }))
+      },
       { field: fields.allowWorkshopOverride, name: "allowWorkshopOverride", value: recipe.allowWorkshopOverride }
     ];
     context.durationFields = [
@@ -256,7 +259,9 @@ export default class RecipeSheet extends Application5e {
   /** @inheritDoc */
   async _onFirstRender(context, options) {
     await super._onFirstRender(context, options);
-    new game.dnd5e.applications.ContextMenu5e(this.element, "[data-id]", this.#materialContextOptions(), { jQuery: false });
+    new game.dnd5e.applications.ContextMenu5e(
+      this.element, "[data-id]", this._getMaterialContextOptions(), { jQuery: false }
+    );
   }
 
   /* -------------------------------------------- */
@@ -365,21 +370,9 @@ export default class RecipeSheet extends Application5e {
     const item = uuid ? await fromUuid(uuid) : null;
     if ( !item ) return;
 
-    const skillProficiencies = new Set(this.recipe.skillProficiencies);
-    const toolProficiencies = new Set(this.recipe.toolProficiencies);
-    if ( item.system.properties?.has("mgc") ) skillProficiencies.add("arc");
-    let spellScroll = null;
-    if ( isSpellScrollItem(item) ) {
-      skillProficiencies.add("arc");
-      toolProficiencies.add("calligrapher");
-      spellScroll = { level: 0, spellSource: "prepared" };
-    }
-    const targetItem = await itemEntryRef(item);
-    const targetQuantity = (item.system.quantity > 1) ? item.system.quantity : 1;
-    await Recipe.update(this.recipeId, {
-      targetItem, targetQuantity, img: item.img, skillProficiencies: Array.from(skillProficiencies),
-      toolProficiencies: Array.from(toolProficiencies), spellScroll
-    });
+    await Recipe.update(
+      this.recipeId, await getTargetItemUpdate(item, this.recipe.skillProficiencies, this.recipe.toolProficiencies)
+    );
     this.render();
   }
 
@@ -399,20 +392,10 @@ export default class RecipeSheet extends Application5e {
     if ( data.targetItem?.uuid && (data.targetItem.uuid !== this.recipe.targetItem.uuid) ) {
       const item = await fromUuid(data.targetItem.uuid);
       if ( item ) {
-        data.targetItem = await itemEntryRef(item);
-        data.img = item.img;
-        data.targetQuantity = (item.system.quantity > 1) ? item.system.quantity : 1;
-        const skillProficiencies = new Set(data.skillProficiencies ?? this.recipe.skillProficiencies);
-        const toolProficiencies = new Set(data.toolProficiencies ?? this.recipe.toolProficiencies);
-        if ( item.system.properties?.has("mgc") ) skillProficiencies.add("arc");
-        data.spellScroll = null;
-        if ( isSpellScrollItem(item) ) {
-          skillProficiencies.add("arc");
-          toolProficiencies.add("calligrapher");
-          data.spellScroll = { level: 0, spellSource: "prepared" };
-        }
-        data.skillProficiencies = Array.from(skillProficiencies);
-        data.toolProficiencies = Array.from(toolProficiencies);
+        Object.assign(data, await getTargetItemUpdate(
+          item, data.skillProficiencies ?? this.recipe.skillProficiencies,
+          data.toolProficiencies ?? this.recipe.toolProficiencies
+        ));
       }
     }
     if ( data.materialPrice ) {
@@ -429,10 +412,11 @@ export default class RecipeSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
-   * Build the entries for a material row's additional-controls context menu.
+   * Prepare an array of context menu options which are available for a material row.
    * @returns {ContextMenuEntry[]}
+   * @protected
    */
-  #materialContextOptions() {
+  _getMaterialContextOptions() {
     return [
       {
         label: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.ChangeValue",
@@ -628,4 +612,31 @@ async function toolOptions() {
     .filter(([, data]) => data)
     .map(([value, { label }]) => ({ value, label }))
     .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Get the recipe update for a newly chosen target item.
+ * @param {Item5e} item                          The chosen target item.
+ * @param {Iterable<string>} skillProficiencies  Skill proficiencies to start from.
+ * @param {Iterable<string>} toolProficiencies   Tool proficiencies to start from.
+ * @returns {Promise<object>}
+ */
+async function getTargetItemUpdate(item, skillProficiencies, toolProficiencies) {
+  const skills = new Set(skillProficiencies);
+  const tools = new Set(toolProficiencies);
+  if ( item.system.identifier === "potion-of-healing" ) tools.add("herb");
+  else if ( item.system.properties?.has("mgc") ) skills.add("arc");
+  let spellScroll = null;
+  if ( isSpellScrollItem(item) ) {
+    skills.add("arc");
+    tools.add("calligrapher");
+    spellScroll = { level: 0, spellSource: "prepared" };
+  }
+  return {
+    targetItem: await itemEntryRef(item),
+    targetQuantity: (item.system.quantity > 1) ? item.system.quantity : 1,
+    img: item.img, skillProficiencies: Array.from(skills), toolProficiencies: Array.from(tools), spellScroll
+  };
 }

@@ -1,5 +1,4 @@
 import { DEFAULT_STOCK_BY_TYPE, defaultStockKey, SETTING_KEYS } from "../../config.mjs";
-
 import BaseSettingsConfig from "./base-config.mjs";
 
 /**

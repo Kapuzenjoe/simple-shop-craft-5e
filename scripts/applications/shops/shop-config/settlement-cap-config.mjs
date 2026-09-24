@@ -1,24 +1,14 @@
 import { SETTLEMENT_CAPS } from "../../../config.mjs";
 import { Shop } from "../../../data/shop-data.mjs";
 import { currencyValueField } from "../../../utils.mjs";
-
 import BaseShopConfig from "./base-shop-config.mjs";
 
 /**
- * @import ShopSheet from "../shop-sheet.mjs";
- */
-
-/**
  * Dialog to edit a shop's settlement cap.
- * @param {object} options
- * @param {ShopSheet} options.shopSheet
- * @param {(updateData: object) => Promise<void>} options.onUpdate
  */
 export default class SettlementCapConfig extends BaseShopConfig {
-  constructor({ shopSheet, onUpdate, ...options }={}) {
+  constructor(options={}) {
     super(options);
-    this.shopSheet = shopSheet;
-    this.onUpdate = onUpdate;
     const settlementCap = this.shopSheet.shop.settlementCap;
     this.#preset = Object.entries(SETTLEMENT_CAPS).find(([, v]) => v.value === settlementCap.value)?.[0]
       ?? (settlementCap.value != null ? "custom" : "");
@@ -42,22 +32,6 @@ export default class SettlementCapConfig extends BaseShopConfig {
     ...super.PARTS,
     content: { template: "modules/simple-shop-craft-5e/templates/shops/shop-config/settlement-cap-config/content.hbs" }
   };
-
-  /* -------------------------------------------- */
-
-  /**
-   * The shop editor this config belongs to.
-   * @type {ShopSheet}
-   */
-  shopSheet;
-
-  /* -------------------------------------------- */
-
-  /**
-   * Callback receiving the shop update.
-   * @type {(updateData: object) => Promise<void>}
-   */
-  onUpdate;
 
   /* -------------------------------------------- */
 

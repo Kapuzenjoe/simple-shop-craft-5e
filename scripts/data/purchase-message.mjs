@@ -1,5 +1,4 @@
 import { MODULE_ID } from "../config.mjs";
-
 import { EnchantedItemBlueprint } from "./enchanted-item-blueprint.mjs";
 import { Shop } from "./shop-data.mjs";
 import { SpellScrollBlueprint } from "./spell-scroll-blueprint.mjs";

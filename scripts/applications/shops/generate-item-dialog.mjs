@@ -1,10 +1,11 @@
+import GeneratorProfile from "../../data/generator-profile.mjs";
 import { ShopItemEntry } from "../../data/shop-data.mjs";
-import { subtypeOptions } from "../../utils.mjs";
+import { breakdownCopper, itemRarity, resolveItemPrice, subtypeOptions, toCopper } from "../../utils.mjs";
 
 const { Dialog5e } = game.dnd5e.applications.api;
 
 /**
- * @import { ShopItemEntryData } from "../../_types.mjs";
+ * @import { GeneratorPool, ShopItemEntryData } from "../../_types.mjs";
  * @import ShopSheet from "./shop-sheet.mjs";
  */
 
@@ -16,7 +17,8 @@ const ANY_VALUE = "any";
 
 /**
  * GM-facing dialog to roll random shop item entries: multi-select item types, each with its own
- * subtype restriction, a global rarity/magic filter, an optional spell-scroll filter, and a count.
+ * subtype restriction, a global rarity/magic filter, an optional spell-scroll filter, a weighting, and a count,
+ * split into a Filters and an Options tab. A preview beside the tabs summarizes the pool the settings draw from.
  */
 export default class GenerateItemDialog extends Dialog5e {
   constructor({ shopSheet, onGenerated, ...options }={}) {
@@ -32,17 +34,21 @@ export default class GenerateItemDialog extends Dialog5e {
     id: "generate-item-dialog-{id}",
     classes: ["simple-shop-craft-5e", "generate-item-dialog", "standard-form"],
     window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItem", resizable: true },
-    position: { width: 420, height: "auto" },
+    position: { width: 720, height: "auto" },
     form: {
       handler: GenerateItemDialog.#onSubmit,
       submitOnChange: true,
       closeOnSubmit: false
     },
     buttons: [
-      { action: "generate", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemRoll", icon: "fa-solid fa-dice-d20", default: true }
+      { action: "generate", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemRoll", icon: "fa-solid fa-dice-d20", default: true },
+      { action: "add", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.AddItems", icon: "fa-solid fa-plus" }
     ],
     actions: {
-      generate: GenerateItemDialog.#generate
+      generate: GenerateItemDialog.#generate,
+      add: GenerateItemDialog.#add,
+      reroll: GenerateItemDialog.#reroll,
+      remove: GenerateItemDialog.#remove
     }
   };
 
@@ -50,9 +56,39 @@ export default class GenerateItemDialog extends Dialog5e {
 
   /** @override */
   static PARTS = {
-    ...super.PARTS,
-    content: { template: "modules/simple-shop-craft-5e/templates/shops/generate-item-dialog/content.hbs" }
+    tabs: {
+      template: "systems/dnd5e/templates/shared/horizontal-tabs.hbs",
+      templates: ["templates/generic/tab-navigation.hbs"]
+    },
+    filters: { template: "modules/simple-shop-craft-5e/templates/shops/generate-item-dialog/filters.hbs" },
+    options: { template: "modules/simple-shop-craft-5e/templates/shops/generate-item-dialog/options.hbs" },
+    preview: {
+      template: "modules/simple-shop-craft-5e/templates/shops/generate-item-dialog/preview.hbs",
+      templates: ["modules/simple-shop-craft-5e/templates/shared/item-avatar-name.hbs"]
+    },
+    footer: super.PARTS.footer
   };
+
+  /* -------------------------------------------- */
+
+  /** @override */
+  static TABS = {
+    primary: {
+      tabs: [
+        { id: "filters", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemFilters", icon: "fas fa-filter" },
+        { id: "options", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemOptions", icon: "fas fa-sliders" }
+      ],
+      initial: "filters"
+    }
+  };
+
+  /* -------------------------------------------- */
+
+  /**
+   * The number of milliseconds to delay between changes to the settings before rebuilding the pool.
+   * @type {number}
+   */
+  static REFRESH_DELAY = 300;
 
   /* -------------------------------------------- */
   /*  Properties                                  */
@@ -75,164 +111,123 @@ export default class GenerateItemDialog extends Dialog5e {
   /* -------------------------------------------- */
 
   /**
-   * Selected item types.
-   * @type {Set<string>}
+   * The generator settings being edited.
+   * @type {GeneratorProfile}
    */
-  #types = new Set();
+  #profile = new GeneratorProfile();
 
   /* -------------------------------------------- */
 
   /**
-   * Selected subtypes per type. An empty (or absent) Set for a type means "Any" — no restriction.
-   * @type {Map<string, Set<string>>}
+   * The pool of the current settings, or `null` while it is being built.
+   * @type {GeneratorPool|null}
    */
-  #subtypesByType = new Map();
+  #pool = null;
 
   /* -------------------------------------------- */
 
   /**
-   * Selected rarities; empty means "Any".
-   * @type {Set<string>}
+   * The in-flight pool rebuild, if one is currently running.
+   * @type {{ promise: Promise<GeneratorPool>, profile: GeneratorProfile }|null}
    */
-  #rarities = new Set();
+  #pendingPool = null;
 
   /* -------------------------------------------- */
 
   /**
-   * Magic/Mundane filter.
-   * @type {"any"|"magic"|"mundane"}
+   * The rolled items awaiting addition to the shop, each with its resolved item.
+   * @type {{ entry: ShopItemEntryData, item: Item5e }[]}
    */
-  #magic = ANY_VALUE;
+  #results = [];
 
   /* -------------------------------------------- */
 
   /**
-   * Selected spell schools for scroll generation; empty means "Any".
-   * @type {Set<string>}
+   * The function to invoke when the pool needs to be rebuilt.
+   * @type {Function}
    */
-  #schools = new Set();
-
-  /* -------------------------------------------- */
-
-  /**
-   * Whether to restrict scroll generation to rituals only.
-   * @type {boolean}
-   */
-  #ritualOnly = false;
-
-  /* -------------------------------------------- */
-
-  /**
-   * Selected spellcasting classes for scroll generation; empty means "Any".
-   * @type {Set<string>}
-   */
-  #classes = new Set();
-
-  /* -------------------------------------------- */
-
-  /**
-   * Selected spell levels for scroll generation; empty means "Any".
-   * @type {Set<number>}
-   */
-  #levels = new Set();
-
-  /* -------------------------------------------- */
-
-  /**
-   * Number of items to generate in this batch.
-   * @type {number}
-   */
-  #count = 1;
-
-  /* -------------------------------------------- */
-
-  /**
-   * Whether the consumable type is selected with its subtypes narrowed to scrolls, showing the
-   * spell-scroll filter fieldset.
-   * @type {boolean}
-   */
-  get #showSpellFilter() {
-    return this.#types.has("consumable") && (this.#subtypesByType.get("consumable")?.has("scroll") ?? false);
-  }
+  _debouncedRefreshPool = foundry.utils.debounce(this._onRefreshPool.bind(this), this.constructor.REFRESH_DELAY);
 
   /* -------------------------------------------- */
   /*  Rendering                                   */
   /* -------------------------------------------- */
 
   /** @inheritDoc */
-  async _prepareContentContext(context, options) {
-    context = await super._prepareContentContext(context, options);
+  async _onFirstRender(context, options) {
+    await super._onFirstRender(context, options);
+    this._debouncedRefreshPool();
+  }
 
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  async _preparePartContext(partId, context, options) {
+    context = await super._preparePartContext(partId, context, options);
+    context.tab = context.tabs?.[partId];
+    switch ( partId ) {
+      case "filters": context = await this._prepareFiltersContext(context, options); break;
+      case "options": context = await this._prepareOptionsContext(context, options); break;
+      case "preview": context = await this._preparePreviewContext(context, options); break;
+    }
+    return context;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Prepare rendering context for the filters part.
+   * @param {ApplicationRenderContext} context  Context being prepared.
+   * @param {HandlebarsRenderOptions} options   Options which configure application rendering behavior.
+   * @returns {Promise<ApplicationRenderContext>}
+   * @protected
+   */
+  async _prepareFiltersContext(context, options) {
     const typeOptions = Object.keys(CONFIG.Item.dataModels)
       .filter(type => CONFIG.Item.dataModels[type]?.inventorySection)
       .map(type => ({ value: type, label: _loc(`TYPES.Item.${type}Pl`) }));
 
     context.typeFields = [{
       field: new foundry.data.fields.SetField(new foundry.data.fields.StringField()), name: "types",
-      label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemType"), value: Array.from(this.#types), options: typeOptions
+      label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemType"), value: Object.keys(this.#profile.types),
+      options: typeOptions
     }];
 
-    context.typeFieldsets = Array.from(this.#types)
+    context.typeFieldsets = await Promise.all(Object.keys(this.#profile.types)
       .toSorted((a, b) => (CONFIG.Item.dataModels[a]?.inventorySection?.order ?? Infinity)
         - (CONFIG.Item.dataModels[b]?.inventorySection?.order ?? Infinity))
-      .map(type => {
-        const selected = this.#subtypesByType.get(type) ?? new Set();
-        return {
-          label: _loc(`TYPES.Item.${type}Pl`),
-          fields: [{
-            field: new foundry.data.fields.SetField(new foundry.data.fields.StringField()), name: `subtypes.${type}`,
-            label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemSubtype"),
-            value: selected.size ? Array.from(selected) : [ANY_VALUE],
+      .map(async type => {
+        const selected = this.#profile.types[type];
+        const fields = [{
+          field: new foundry.data.fields.SetField(new foundry.data.fields.StringField()), name: `subtypes.${type}`,
+          label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemSubtype"),
+          value: selected.size ? Array.from(selected) : [ANY_VALUE],
+          options: [
+            { value: ANY_VALUE, label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemAny") },
+            ...subtypeOptions([type])
+          ]
+        }];
+        const baseItemOptions = await this.#profile.getBaseItemOptions(type);
+        if ( baseItemOptions.length ) {
+          const selectedBaseItems = this.#profile.getBaseItems(type);
+          fields.push({
+            field: new foundry.data.fields.SetField(new foundry.data.fields.StringField()), name: `baseItems.${type}`,
+            label: _loc(`DND5E.Item${type.capitalize()}Base`),
+            value: selectedBaseItems ? Array.from(selectedBaseItems) : [ANY_VALUE],
             options: [
               { value: ANY_VALUE, label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemAny") },
-              ...subtypeOptions([type])
+              ...baseItemOptions
             ]
-          }]
-        };
-      });
-
-    context.spellFieldset = this.#showSpellFilter ? {
-      fields: [
-        {
-          field: new foundry.data.fields.SetField(new foundry.data.fields.StringField()), name: "schools",
-          label: _loc("DND5E.School"),
-          value: this.#schools.size ? Array.from(this.#schools) : [ANY_VALUE],
-          options: [
-            { value: ANY_VALUE, label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemAny") },
-            ...Object.entries(CONFIG.DND5E.spellSchools).map(([value, { label }]) => ({ value, label: _loc(label) }))
-          ]
-        },
-        {
-          field: new foundry.data.fields.SetField(new foundry.data.fields.StringField()), name: "classes",
-          label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemClass"),
-          value: this.#classes.size ? Array.from(this.#classes) : [ANY_VALUE],
-          options: [
-            { value: ANY_VALUE, label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemAny") },
-            ...game.dnd5e.registry.spellLists.options.filter(o => o.type === "class")
-              .map(o => ({ value: o.value, label: o.label }))
-          ]
-        },
-        {
-          field: new foundry.data.fields.SetField(new foundry.data.fields.StringField()), name: "levels",
-          label: _loc("DND5E.Level"),
-          value: this.#levels.size ? Array.from(this.#levels) : [ANY_VALUE],
-          options: [
-            { value: ANY_VALUE, label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemAny") },
-            ...Object.entries(CONFIG.DND5E.spellLevels).map(([value, label]) => ({ value, label: _loc(label) }))
-          ]
-        },
-        {
-          field: new foundry.data.fields.BooleanField(), name: "ritualOnly",
-          label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemRitualOnly"), value: this.#ritualOnly
+          });
         }
-      ]
-    } : null;
+        return { label: _loc(`TYPES.Item.${type}Pl`), fields };
+      }));
 
     context.globalFields = [
       {
         field: new foundry.data.fields.SetField(new foundry.data.fields.StringField()), name: "rarities",
         label: _loc("DND5E.Rarity"),
-        value: this.#rarities.size ? Array.from(this.#rarities).map(r => r === "" ? "mundane" : r) : [ANY_VALUE],
+        value: this.#profile.rarities.size
+          ? Array.from(this.#profile.rarities).map(r => r === "" ? "mundane" : r) : [ANY_VALUE],
         options: [
           { value: ANY_VALUE, label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemAny") },
           { value: "mundane", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemMundane") },
@@ -243,7 +238,7 @@ export default class GenerateItemDialog extends Dialog5e {
       },
       {
         field: new foundry.data.fields.StringField(), name: "magic",
-        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemMagic"), value: this.#magic,
+        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemMagic"), value: this.#profile.magic,
         options: [
           { value: ANY_VALUE, label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemAny") },
           { value: "magic", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemMagicOnly") },
@@ -252,12 +247,153 @@ export default class GenerateItemDialog extends Dialog5e {
       }
     ];
 
-    context.count = this.#count;
+    return context;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Prepare rendering context for the options part.
+   * @param {ApplicationRenderContext} context  Context being prepared.
+   * @param {HandlebarsRenderOptions} options   Options which configure application rendering behavior.
+   * @returns {Promise<ApplicationRenderContext>}
+   * @protected
+   */
+  async _prepareOptionsContext(context, options) {
+    context.spellToggles = [
+      {
+        field: new foundry.data.fields.BooleanField(), name: "includeScrolls",
+        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemScrolls"),
+        hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemScrollsHint"),
+        value: this.#profile.includeScrolls
+      },
+      {
+        field: new foundry.data.fields.BooleanField(), name: "includeEnspelled",
+        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemEnspelled"),
+        hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemEnspelledHint"),
+        value: this.#profile.includeEnspelled
+      }
+    ];
+
+    const { spellFilter } = this.#profile;
+    context.spellFieldset = this.#profile.includesScrolls ? {
+      fields: [
+        {
+          field: new foundry.data.fields.SetField(new foundry.data.fields.StringField()), name: "schools",
+          label: _loc("DND5E.School"),
+          value: spellFilter.schools.size ? Array.from(spellFilter.schools) : [ANY_VALUE],
+          options: [
+            { value: ANY_VALUE, label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemAny") },
+            ...Object.entries(CONFIG.DND5E.spellSchools).map(([value, { label }]) => ({ value, label: _loc(label) }))
+          ]
+        },
+        {
+          field: new foundry.data.fields.SetField(new foundry.data.fields.StringField()), name: "classes",
+          label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemClass"),
+          value: spellFilter.classes.size ? Array.from(spellFilter.classes) : [ANY_VALUE],
+          options: [
+            { value: ANY_VALUE, label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemAny") },
+            ...game.dnd5e.registry.spellLists.options.filter(o => o.type === "class")
+              .map(o => ({ value: o.value, label: o.label }))
+          ]
+        },
+        {
+          field: new foundry.data.fields.SetField(new foundry.data.fields.StringField()), name: "levels",
+          label: _loc("DND5E.Level"),
+          value: spellFilter.levels.size ? Array.from(spellFilter.levels) : [ANY_VALUE],
+          options: [
+            { value: ANY_VALUE, label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemAny") },
+            ...Object.entries(CONFIG.DND5E.spellLevels).map(([value, label]) => ({ value, label: _loc(label) }))
+          ]
+        },
+        {
+          field: new foundry.data.fields.BooleanField(), name: "ritualOnly",
+          label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemRitualOnly"), value: spellFilter.ritualOnly
+        }
+      ]
+    } : null;
+
+    const { weighting } = this.#profile;
+    context.weightingFields = [{
+      field: GeneratorProfile.schema.fields.weighting, name: "weighting",
+      label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemWeighting"), value: weighting,
+      hint: _loc(`SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemWeighting${weighting.capitalize()}Hint`),
+      options: GeneratorProfile.schema.fields.weighting.choices.map(value => ({
+        value, label: _loc(`SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemWeighting${value.capitalize()}`)
+      }))
+    }];
+    context.count = this.#profile.count;
+    return context;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Prepare rendering context for the preview part.
+   * @param {ApplicationRenderContext} context  Context being prepared.
+   * @param {HandlebarsRenderOptions} options   Options which configure application rendering behavior.
+   * @returns {Promise<ApplicationRenderContext>}
+   * @protected
+   */
+  async _preparePreviewContext(context, options) {
+    context.results = this.#results.map(({ item }) => {
+      const rarity = itemRarity(item);
+      const price = resolveItemPrice(item);
+      return {
+        name: item.name,
+        img: item.img,
+        rarity: rarity ? CONFIG.DND5E.itemRarity[rarity].capitalize()
+          : _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemMundane"),
+        price: price ? breakdownCopper(toCopper(price.value, price.denomination)) : null
+      };
+    });
+    if ( !this.#pool ) return context;
+    const { included, capped, owned } = this.#pool.summary;
+    const total = Object.values(included).reduce((sum, count) => sum + count, 0);
+    const cappedTotal = Math.ceil(Object.values(capped).reduce((sum, count) => sum + count, 0));
+    const ownedTotal = Math.ceil(Object.values(owned).reduce((sum, count) => sum + count, 0));
+    const reason = cappedTotal ? (ownedTotal ? "Both" : "Capped") : (ownedTotal ? "Owned" : "");
+    context.pool = {
+      total: Math.ceil(total),
+      capped: cappedTotal,
+      owned: ownedTotal,
+      empty: total ? null : _loc(`SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemPoolEmpty${reason}`),
+      rarities: ["", ...Object.keys(CONFIG.DND5E.itemRarity)]
+        .filter(rarity => included[rarity] || capped[rarity])
+        .map(rarity => ({
+          label: rarity ? CONFIG.DND5E.itemRarity[rarity].capitalize()
+            : _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemMundane"),
+          count: Math.ceil(included[rarity] ?? 0),
+          capped: Math.ceil(capped[rarity] ?? 0),
+          percent: total ? Math.round(((included[rarity] ?? 0) / total) * 100) : 0
+        }))
+    };
+    return context;
+  }
+
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  async _prepareFooterContext(context, options) {
+    context = await super._prepareFooterContext(context, options);
+    context.buttons.find(button => button.action === "add").disabled = !this.#results.length;
     return context;
   }
 
   /* -------------------------------------------- */
   /*  Event Listeners and Handlers                */
+  /* -------------------------------------------- */
+
+  /**
+   * Handle rebuilding the pool of the current settings and updating its preview.
+   * @returns {Promise<void>}
+   * @protected
+   */
+  async _onRefreshPool() {
+    await this.#buildPool();
+    await this.render({ parts: ["preview"] });
+  }
+
   /* -------------------------------------------- */
 
   /**
@@ -270,32 +406,87 @@ export default class GenerateItemDialog extends Dialog5e {
    */
   static async #onSubmit(event, form, formData) {
     const data = foundry.utils.expandObject(formData.object);
-
-    this.#types = new Set(data.types ?? []);
-
-    const subtypesByType = new Map();
-    for ( const type of this.#types ) subtypesByType.set(type, parseMultiSelect(data.subtypes ?? {}, type));
-    this.#subtypesByType = subtypesByType;
-
-    this.#rarities = new Set(Array.from(parseMultiSelect(data, "rarities")).map(r => r === "mundane" ? "" : r));
-
-    this.#magic = data.magic || ANY_VALUE;
-
-    this.#schools = parseMultiSelect(data, "schools");
-    this.#ritualOnly = !!data.ritualOnly;
-
-    this.#classes = parseMultiSelect(data, "classes");
-    this.#levels = new Set(Array.from(parseMultiSelect(data, "levels")).map(Number));
-
-    this.#count = Math.clamp(Number(data.count) || 1, 1, 10);
-
-    await this.render({ parts: ["content", "footer"] });
+    const profile = new GeneratorProfile({
+      types: Object.fromEntries(
+        (data.types ?? []).map(type => [type, parseMultiSelect(data.subtypes ?? {}, type)])
+      ),
+      baseItems: Object.fromEntries(
+        (data.types ?? []).map(type => [type, parseMultiSelect(data.baseItems ?? {}, type)])
+      ),
+      rarities: parseMultiSelect(data, "rarities").map(r => r === "mundane" ? "" : r),
+      magic: data.magic || ANY_VALUE,
+      weighting: data.weighting,
+      includeScrolls: !!data.includeScrolls,
+      includeEnspelled: !!data.includeEnspelled,
+      spellFilter: form.querySelector('[name="schools"]') ? {
+        schools: parseMultiSelect(data, "schools"),
+        classes: parseMultiSelect(data, "classes"),
+        levels: parseMultiSelect(data, "levels").map(Number),
+        ritualOnly: !!data.ritualOnly
+      } : this.#profile.toObject().spellFilter,
+      count: Math.clamp(Number(data.count) || 1, 1, 10)
+    });
+    const previous = { ...this.#profile.toObject(), count: 0 };
+    if ( !foundry.utils.objectsEqual(previous, { ...profile.toObject(), count: 0 }) ) this.#pool = null;
+    this.#profile = profile;
+    this._debouncedRefreshPool();
+    await this.render({ parts: ["filters", "options", "preview", "footer"] });
   }
 
   /* -------------------------------------------- */
 
   /**
-   * Roll and add the generated entries.
+   * Get the keys of the entries in the shop, along with those of any extra entries.
+   * @param {ShopItemEntryData[]} [extra]
+   * @returns {Set<string>}
+   */
+  #entryKeys(extra=[]) {
+    return new Set([...this.shopSheet.shop.items, ...extra].map(entry => ShopItemEntry.key(entry)));
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Build the pool of the current settings, or await the build already in flight for them.
+   * @returns {Promise<GeneratorPool>}
+   */
+  async #buildPool() {
+    if ( this.#pool ) return this.#pool;
+    const profile = this.#profile;
+    if ( this.#pendingPool?.profile !== profile ) {
+      const promise = profile.buildPool({
+        settlementCap: this.shopSheet.shop.settlementCap, existingKeys: this.#entryKeys()
+      }).then(pool => {
+        if ( this.#pendingPool?.profile === profile ) this.#pendingPool = null;
+        if ( profile === this.#profile ) this.#pool = pool;
+        return pool;
+      });
+      this.#pendingPool = { promise, profile };
+    }
+    return this.#pendingPool.promise;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Roll items that are neither in the shop nor in the result list, and resolve them.
+   * @param {ShopItemEntryData[]} [listed]  Entries of the result list that must not come up again.
+   * @param {number} [count]                How many items to roll. Defaults to the count of the settings.
+   * @returns {Promise<{ entry: ShopItemEntryData, item: Item5e }[]>}
+   */
+  async #rollResults(listed=[], count=this.#profile.count) {
+    const { settlementCap, stockDefaults } = this.shopSheet.shop;
+    const pool = await this.#buildPool();
+    const rolled = await this.#profile.roll({
+      existingKeys: this.#entryKeys(listed), settlementCap, stockDefaults, pool, count
+    });
+    return (await ShopItemEntry.resolveMany(rolled.map(r => r.entry))).filter(({ item }) => item);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Roll items into the result list, replacing the previous ones.
    * @this {GenerateItemDialog}
    * @param {Event} event         Triggering click event.
    * @param {HTMLElement} target  Button that was clicked.
@@ -304,52 +495,90 @@ export default class GenerateItemDialog extends Dialog5e {
   static async #generate(event, target) {
     target.disabled = true;
     try {
-      const typeConfigs = new Map(Array.from(this.#types).map(type => {
-        const subtypes = this.#subtypesByType.get(type);
-        return [type, subtypes?.size ? subtypes : null];
-      }));
-      const spellFilter = this.#showSpellFilter
-        ? {
-          schools: this.#schools.size ? this.#schools : null, ritualOnly: this.#ritualOnly,
-          classes: this.#classes.size ? this.#classes : null, levels: this.#levels.size ? this.#levels : null
-        }
-        : null;
-      const existingKeys = new Set(this.shopSheet.shop.items.map(i => ShopItemEntry.key(i)));
+      const { count } = this.#profile;
+      this.#results = await this.#rollResults();
+      await this.render({ parts: ["preview", "footer"] });
 
-      const rolled = await ShopItemEntry.rollMany({
-        typeConfigs, rarities: this.#rarities.size ? this.#rarities : null, magic: this.#magic,
-        spellFilter, count: this.#count, existingKeys, settlementCap: this.shopSheet.shop.settlementCap,
-        stockDefaults: this.shopSheet.shop.stockDefaults
-      });
-
-      if ( !rolled.length ) {
+      if ( !this.#results.length ) {
         ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemNone", { localize: true });
-        return;
+      } else if ( this.#results.length < count ) {
+        ui.notifications.info("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemPartial", {
+          format: { count: this.#results.length, total: count }
+        });
       }
-
-      await this.onGenerated(rolled.map(r => r.entry));
-      const [key, format] = (rolled.length === 1)
-        ? ["SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemResult", { name: rolled[0].label }]
-        : (rolled.length === this.#count)
-          ? ["SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemResultMultiple", { count: rolled.length }]
-          : ["SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemPartial", { count: rolled.length, total: this.#count }];
-      ui.notifications.info(key, { format });
     } finally {
       target.disabled = false;
     }
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Replace an item of the result list with a newly rolled one.
+   * @this {GenerateItemDialog}
+   * @param {Event} event         Triggering click event.
+   * @param {HTMLElement} target  Button that was clicked.
+   * @returns {Promise<void>}
+   */
+  static async #reroll(event, target) {
+    const previous = this.#results[Number(target.dataset.index)];
+    if ( !previous ) return;
+    target.disabled = true;
+    try {
+      const [result] = await this.#rollResults(this.#results.map(({ entry }) => entry), 1);
+      if ( !result ) {
+        ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemNone", { localize: true });
+        return;
+      }
+      const index = this.#results.indexOf(previous);
+      if ( index === -1 ) return;
+      this.#results[index] = result;
+      await this.render({ parts: ["preview"] });
+    } finally {
+      target.disabled = false;
+    }
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Remove an item from the result list.
+   * @this {GenerateItemDialog}
+   * @param {Event} event         Triggering click event.
+   * @param {HTMLElement} target  Button that was clicked.
+   * @returns {Promise<void>}
+   */
+  static async #remove(event, target) {
+    this.#results.splice(Number(target.dataset.index), 1);
+    await this.render({ parts: ["preview", "footer"] });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Add the rolled items to the shop and clear the result list.
+   * @this {GenerateItemDialog}
+   * @returns {Promise<void>}
+   */
+  static async #add() {
+    const count = this.#results.length;
+    await this.onGenerated(this.#results.map(({ entry }) => entry));
+    this.#results = [];
+    this.#pool = null;
+    this._debouncedRefreshPool();
+    await this.render({ parts: ["preview", "footer"] });
+    ui.notifications.info("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemAdded", { format: { count } });
   }
 }
 
 /* -------------------------------------------- */
 
 /**
- * Read a multi-select field's submitted values into a clean Set, with the "Any" sentinel stripped.
+ * Read a multi-select field's submitted values, with the "Any" sentinel stripped.
  * @param {object} data
  * @param {string} key
- * @returns {Set<string>}
+ * @returns {string[]}
  */
 function parseMultiSelect(data, key) {
-  const set = new Set(data[key] ?? []);
-  set.delete(ANY_VALUE);
-  return set;
+  return (data[key] ?? []).filter(value => value !== ANY_VALUE);
 }

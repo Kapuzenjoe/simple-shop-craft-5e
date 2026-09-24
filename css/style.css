@@ -150,6 +150,63 @@
     .uuid-field-row .hint { color: var(--dnd5e-color-note-warn); }
   }
 
+  &.generate-item-dialog .window-content {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 21rem;
+    grid-template-rows: auto 1fr auto;
+    grid-template-areas:
+      "tabs preview"
+      "panel preview"
+      "footer footer";
+    align-items: start;
+    column-gap: 1rem;
+
+    [data-application-part="tabs"] { grid-area: tabs; }
+    [data-application-part="filters"],
+    [data-application-part="options"] { grid-area: panel; }
+    [data-application-part="preview"] { grid-area: preview; }
+    [data-application-part="footer"] { grid-area: footer; }
+
+    .pool-total {
+      font-size: var(--font-size-16);
+      font-weight: bold;
+    }
+
+    .result-list {
+      max-height: 16rem;
+      overflow-y: auto;
+
+      li {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+
+        .item-image {
+          flex: none;
+          width: 32px;
+          height: 32px;
+        }
+
+        .name-stacked { flex: 1; }
+        .item-control { flex: none; }
+      }
+    }
+
+    .pool-rarities li {
+      display: grid;
+      grid-template-columns: 4.5rem 1fr 2.5rem 2.5rem;
+      align-items: center;
+      gap: 0.5rem;
+
+      .count {
+        font-weight: bold;
+        text-align: end;
+      }
+
+      .capped { color: var(--color-text-secondary); }
+    }
+  }
+
   .item-quantity {
     display: flex;
     align-items: center;

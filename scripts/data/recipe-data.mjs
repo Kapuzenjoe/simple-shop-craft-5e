@@ -1,8 +1,6 @@
-import { SETTING_KEYS, SPELL_SCROLL_SOURCES, UNLOCK_MODES } from "../config.mjs";
+import { PROFICIENCY_MODES, SETTING_KEYS, SPELL_SCROLL_SOURCES, UNLOCK_MODES } from "../config.mjs";
 import { toCopper } from "../utils.mjs";
-
-import { migrateUnlockMode } from "./migration.mjs";
-import { SettingCollectionMixin } from "./setting-collection.mjs";
+import SettingCollectionMixin from "./setting-collection-mixin.mjs";
 
 const {
   ArrayField, BooleanField, DocumentIdField, DocumentUUIDField, EmbeddedDataField, FilePathField, NumberField,
@@ -76,6 +74,9 @@ export class Recipe extends SettingCollectionMixin(foundry.abstract.DataModel, S
       materialPrice: new ObjectField({ initial: {} }),
       toolProficiencies: new SetField(new StringField()),
       skillProficiencies: new SetField(new StringField()),
+      proficiencyMode: new StringField({
+        initial: "both", choices: Object.keys(PROFICIENCY_MODES), required: true
+      }),
       allowWorkshopOverride: new BooleanField({ initial: false }),
       durationOverride: new SchemaField({
         value: new NumberField({ initial: null, nullable: true, integer: true, min: 0 }),
@@ -91,12 +92,26 @@ export class Recipe extends SettingCollectionMixin(foundry.abstract.DataModel, S
   }
 
   /* -------------------------------------------- */
+  /*  Data Migration                              */
+  /* -------------------------------------------- */
 
   /** @inheritDoc */
   static _migrateData(source) {
     super._migrateData(source);
-    migrateUnlockMode(source);
+    Recipe.#migrateUnlockMode(source);
     return source;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Migrate the `openToAll` boolean to the three-way `unlockMode`.
+   * @param {object} source  The candidate source data from which the model will be constructed.
+   */
+  static #migrateUnlockMode(source) {
+    if ( !("openToAll" in source) ) return;
+    source.unlockMode = source.openToAll ? "all" : "individual";
+    delete source.openToAll;
   }
 
   /* -------------------------------------------- */
@@ -149,15 +164,6 @@ export class Recipe extends SettingCollectionMixin(foundry.abstract.DataModel, S
     if ( explicit > 0 ) return Math.ceil(explicit * scale);
     return craftCost ? toCopper(craftCost.gold * scale, "gp") : 0;
   }
-}
-
-/* -------------------------------------------- */
-
-/**
- * Register this module's localization for the Recipe data model.
- */
-export function registerRecipeLocalization() {
-  foundry.helpers.Localization.localizeDataModel(Recipe);
 }
 
 /* -------------------------------------------- */

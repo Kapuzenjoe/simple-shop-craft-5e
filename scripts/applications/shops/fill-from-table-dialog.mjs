@@ -110,10 +110,16 @@ export default class FillFromTableDialog extends Dialog5e {
     const counted = new Map();
     let skipped = 0;
     for ( const item of drawnItems ) {
-      if ( !CONFIG.Item.dataModels[item?.type]?.inventorySection ) { skipped++; continue; }
+      if ( !CONFIG.Item.dataModels[item?.type]?.inventorySection ) {
+        skipped++;
+        continue;
+      }
       if ( capCP != null ) {
         const price = resolveItemPrice(item);
-        if ( price && (toCopper(price.value, price.denomination) > capCP) ) { skipped++; continue; }
+        if ( price && (toCopper(price.value, price.denomination) > capCP) ) {
+          skipped++;
+          continue;
+        }
       }
       const entry = item.system.identifier ? { identifier: item.system.identifier } : { uuid: item.uuid };
       const key = ShopItemEntry.key(entry);

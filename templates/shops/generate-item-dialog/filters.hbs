@@ -1,0 +1,18 @@
+<section class="tab {{ tab.cssClass }}" data-tab="filters" data-group="{{ tab.group }}">
+    <fieldset>
+        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemType" }}</legend>
+        {{> "dnd5e.fieldlist" typeFields }}
+    </fieldset>
+
+    {{#each typeFieldsets}}
+    <fieldset>
+        <legend>{{ this.label }}</legend>
+        {{> "dnd5e.fieldlist" this.fields }}
+    </fieldset>
+    {{/each}}
+
+    <fieldset>
+        <legend>{{ localize "DND5E.Rarity" }}</legend>
+        {{> "dnd5e.fieldlist" globalFields }}
+    </fieldset>
+</section>
