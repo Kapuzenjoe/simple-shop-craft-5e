@@ -175,8 +175,8 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
   /* -------------------------------------------- */
 
   /**
-   * Resolve an enchant activity's own base-item restriction from its description header — either a fixed
-   * list of explicitly named base items, or a type/category filter set for a `CompendiumBrowser` search.
+   * Resolve an enchant activity's own base-item restriction from its restrictions and description header — either
+   * a fixed list of explicitly named base items, or a type/category filter set for a `CompendiumBrowser` search.
    * @param {EnchantActivity} activity
    * @returns {Promise<{ explicit: Item5e[], label: string }
    *   |{ types: Set<string>, categoryFilters: object[], filters: object[], label: string }>}
@@ -188,8 +188,12 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
       return { explicit: items, label: EnchantedItemBlueprint.#describeExplicit(items) };
     }
     const itemType = activity.restrictions.type || activity.item.type;
-    const categoryFilters = EnchantedItemBlueprint.#parseRestrictionCategory(activity.item);
+    const { categories, properties } = activity.restrictions;
+    const categoryFilters = categories.size
+      ? [{ k: "system.type.value", o: "in", v: Array.from(categories) }]
+      : EnchantedItemBlueprint.#parseRestrictionCategory(activity.item);
     const filters = [excludeFilter("system.type.value", ["natural"]), ...categoryFilters];
+    if ( properties.size ) filters.push({ k: "system.properties", o: "hasany", v: Array.from(properties) });
     if ( !activity.restrictions.allowMagical ) {
       filters.push({ o: "NOT", v: { k: "system.properties", o: "has", v: "mgc" } });
     }
@@ -296,13 +300,25 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
   /* -------------------------------------------- */
 
   /**
+   * The restriction-header text of an enchant item's description — the DMG stat block's italicized first line,
+   * e.g. "Weapon (Battleaxe, Greataxe, ...), Rarity" — or `""` if the item has none.
+   * @param {Item5e} item
+   * @returns {string}
+   */
+  static getRestrictionHeader(item) {
+    return item.system.description?.value?.match(/<p><em>(.*?)<\/em><\/p>/)?.[1] ?? "";
+  }
+
+  /* -------------------------------------------- */
+
+  /**
    * Map known restriction-header phrases to CompendiumBrowser filters narrowing eligible base items, for
    * enchant items whose description gives only a broad category rather than a specific @UUID list.
    * @param {Item5e} item
    * @returns {FilterDescription[]}
    */
   static #parseRestrictionCategory(item) {
-    const header = item.system.description?.value?.match(/<p><em>(.*?)<\/em><\/p>/)?.[1]?.toLowerCase() ?? "";
+    const header = EnchantedItemBlueprint.getRestrictionHeader(item).toLowerCase();
     const filters = [];
     if ( (item.type === "weapon") && header.includes("melee weapon") ) {
       filters.push({ k: "system.type.value", o: "in", v: ["simpleM", "martialM"] });
@@ -359,7 +375,7 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
    * @returns {string[]}
    */
   static #parseRestrictionUuids(item) {
-    const header = item.system.description?.value?.match(/<p><em>(.*?)<\/em><\/p>/)?.[1] ?? "";
+    const header = EnchantedItemBlueprint.getRestrictionHeader(item);
     return [...header.matchAll(/@UUID\[([^\]]+)\]/g)].map(([, uuid]) => uuid);
   }
 }

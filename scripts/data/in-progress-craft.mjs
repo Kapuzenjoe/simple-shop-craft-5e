@@ -373,7 +373,6 @@ export class InProgressCraft extends foundry.abstract.DataModel {
       ? actor.items.find(i => (i.id !== item.id) && (i.system.identifier === fullItem.system.identifier))
       : null;
 
-    await item.delete();
     if ( existing ) {
       await actor.updateEmbeddedDocuments("Item", [
         { _id: existing.id, "system.quantity": existing.system.quantity + itemData.system.quantity }
@@ -381,6 +380,7 @@ export class InProgressCraft extends foundry.abstract.DataModel {
     } else {
       await actor.createEmbeddedDocuments("Item", [itemData]);
     }
+    await item.delete();
 
     await ChatMessage.create({
       content: `<p>${_loc("SIMPLE_SHOP_CRAFT_5E.Craft.CompleteMessage", { name: fullItem.name, actor: actor.name })}</p>`,

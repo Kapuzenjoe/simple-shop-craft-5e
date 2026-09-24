@@ -1536,13 +1536,14 @@ export default class ShopSheet extends Application5e {
 
 /**
  * Build a property-attribution source entry for an additive percent term, matching dnd5e's own
- * convention of flipping negative "add" values to type "subtract" with an absolute display value.
+ * convention of flipping negative "add" values to type "subtract" with an absolute display value. The `mode` and
+ * `negative` fields are for the dnd5e 5.3 template.
  * @param {string} label
  * @param {number} value
- * @returns {{ label: string, value: string, type: string }}
+ * @returns {{ label: string, value: string, type: string, mode: number, negative: boolean }}
  */
 function additiveSource(label, value) {
-  return { label, value: `${Math.abs(value)}%`, type: (value < 0) ? "subtract" : "add" };
+  return { label, value: `${Math.abs(value)}%`, type: (value < 0) ? "subtract" : "add", mode: 2, negative: value < 0 };
 }
 
 /* -------------------------------------------- */

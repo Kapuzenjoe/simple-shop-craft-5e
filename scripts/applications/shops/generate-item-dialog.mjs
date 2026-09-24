@@ -127,6 +127,14 @@ export default class GenerateItemDialog extends Dialog5e {
   /* -------------------------------------------- */
 
   /**
+   * The in-flight pool rebuild, if one is currently running.
+   * @type {{ promise: Promise<GeneratorPool>, profile: GeneratorProfile }|null}
+   */
+  #pendingPool = null;
+
+  /* -------------------------------------------- */
+
+  /**
    * The rolled items awaiting addition to the shop, each with its resolved item.
    * @type {{ entry: ShopItemEntryData, item: Item5e }[]}
    */
@@ -377,18 +385,12 @@ export default class GenerateItemDialog extends Dialog5e {
   /* -------------------------------------------- */
 
   /**
-   * Handle rebuilding the pool of the current settings and updating its preview, unless the settings have changed
-   * in the meantime.
+   * Handle rebuilding the pool of the current settings and updating its preview.
    * @returns {Promise<void>}
    * @protected
    */
   async _onRefreshPool() {
-    const profile = this.#profile;
-    const pool = await profile.buildPool({
-      settlementCap: this.shopSheet.shop.settlementCap, existingKeys: this.#entryKeys()
-    });
-    if ( profile !== this.#profile ) return;
-    this.#pool = pool;
+    await this.#buildPool();
     await this.render({ parts: ["preview"] });
   }
 
@@ -404,7 +406,7 @@ export default class GenerateItemDialog extends Dialog5e {
    */
   static async #onSubmit(event, form, formData) {
     const data = foundry.utils.expandObject(formData.object);
-    this.#profile = new GeneratorProfile({
+    const profile = new GeneratorProfile({
       types: Object.fromEntries(
         (data.types ?? []).map(type => [type, parseMultiSelect(data.subtypes ?? {}, type)])
       ),
@@ -416,15 +418,17 @@ export default class GenerateItemDialog extends Dialog5e {
       weighting: data.weighting,
       includeScrolls: !!data.includeScrolls,
       includeEnspelled: !!data.includeEnspelled,
-      spellFilter: {
+      spellFilter: form.querySelector('[name="schools"]') ? {
         schools: parseMultiSelect(data, "schools"),
         classes: parseMultiSelect(data, "classes"),
         levels: parseMultiSelect(data, "levels").map(Number),
         ritualOnly: !!data.ritualOnly
-      },
+      } : this.#profile.toObject().spellFilter,
       count: Math.clamp(Number(data.count) || 1, 1, 10)
     });
-    this.#pool = null;
+    const previous = { ...this.#profile.toObject(), count: 0 };
+    if ( !foundry.utils.objectsEqual(previous, { ...profile.toObject(), count: 0 }) ) this.#pool = null;
+    this.#profile = profile;
     this._debouncedRefreshPool();
     await this.render({ parts: ["filters", "options", "preview", "footer"] });
   }
@@ -443,6 +447,28 @@ export default class GenerateItemDialog extends Dialog5e {
   /* -------------------------------------------- */
 
   /**
+   * Build the pool of the current settings, or await the build already in flight for them.
+   * @returns {Promise<GeneratorPool>}
+   */
+  async #buildPool() {
+    if ( this.#pool ) return this.#pool;
+    const profile = this.#profile;
+    if ( this.#pendingPool?.profile !== profile ) {
+      const promise = profile.buildPool({
+        settlementCap: this.shopSheet.shop.settlementCap, existingKeys: this.#entryKeys()
+      }).then(pool => {
+        if ( this.#pendingPool?.profile === profile ) this.#pendingPool = null;
+        if ( profile === this.#profile ) this.#pool = pool;
+        return pool;
+      });
+      this.#pendingPool = { promise, profile };
+    }
+    return this.#pendingPool.promise;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
    * Roll items that are neither in the shop nor in the result list, and resolve them.
    * @param {ShopItemEntryData[]} [listed]  Entries of the result list that must not come up again.
    * @param {number} [count]                How many items to roll. Defaults to the count of the settings.
@@ -450,8 +476,9 @@ export default class GenerateItemDialog extends Dialog5e {
    */
   async #rollResults(listed=[], count=this.#profile.count) {
     const { settlementCap, stockDefaults } = this.shopSheet.shop;
+    const pool = await this.#buildPool();
     const rolled = await this.#profile.roll({
-      existingKeys: this.#entryKeys(listed), settlementCap, stockDefaults, pool: this.#pool, count
+      existingKeys: this.#entryKeys(listed), settlementCap, stockDefaults, pool, count
     });
     return (await ShopItemEntry.resolveMany(rolled.map(r => r.entry))).filter(({ item }) => item);
   }
@@ -494,13 +521,22 @@ export default class GenerateItemDialog extends Dialog5e {
    * @returns {Promise<void>}
    */
   static async #reroll(event, target) {
-    const [result] = await this.#rollResults(this.#results.map(({ entry }) => entry), 1);
-    if ( !result ) {
-      ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemNone", { localize: true });
-      return;
+    const previous = this.#results[Number(target.dataset.index)];
+    if ( !previous ) return;
+    target.disabled = true;
+    try {
+      const [result] = await this.#rollResults(this.#results.map(({ entry }) => entry), 1);
+      if ( !result ) {
+        ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemNone", { localize: true });
+        return;
+      }
+      const index = this.#results.indexOf(previous);
+      if ( index === -1 ) return;
+      this.#results[index] = result;
+      await this.render({ parts: ["preview"] });
+    } finally {
+      target.disabled = false;
     }
-    this.#results[Number(target.dataset.index)] = result;
-    await this.render({ parts: ["preview"] });
   }
 
   /* -------------------------------------------- */

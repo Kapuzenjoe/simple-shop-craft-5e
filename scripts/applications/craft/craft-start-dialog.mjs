@@ -255,7 +255,7 @@ export default class CraftStartDialog extends Dialog5e {
       }
     }
 
-    context.statusList = (state.toolStatuses.length || state.skillStatuses.length) ? [
+    context.statusList = (!state.chosenToolKey && (state.toolStatuses.length || state.skillStatuses.length)) ? [
       ...state.toolStatuses.map(({ key, met }) => ({
         met, label: game.dnd5e.documents.Trait.keyLabel(key, { trait: "tool" })
       })),
@@ -303,31 +303,35 @@ export default class CraftStartDialog extends Dialog5e {
     await super._onRender(context, options);
     if ( this.hasFrame ) this.window.title.innerText = this.title;
 
-    this.element.addEventListener("change", event => {
-      if ( event.target.name === "selectedActor" ) {
-        this.selectedActorUuid = event.target.value;
-        this.#freeformIds.clear();
-        this.#toolKey = null;
-        this.#workshopClaimed = false;
-        this.#fillWithGold = false;
-        this.#materialQuantities.clear();
-        this.#chosenSpellUuid = null;
-        this.#scrollDC = null;
-        this.#scrollBonus = null;
-      }
-      else if ( event.target.name === "toolKey" ) this.#toolKey = event.target.value;
-      else if ( event.target.name === "workshopClaimed" ) this.#workshopClaimed = event.target.checked;
-      else if ( event.target.name === "fillWithGold" ) this.#fillWithGold = event.target.checked;
-      else if ( event.target.name === "spellUuid" ) this.#chosenSpellUuid = event.target.value || null;
-      else if ( event.target.name === "scrollDC" ) this.#scrollDC = Number(event.target.value);
-      else if ( event.target.name === "scrollBonus" ) this.#scrollBonus = Number(event.target.value);
-      else return;
-      this.render({ parts: ["content", "footer"] });
-    });
-
     applyDropArea(this.element.querySelector("[data-drop-area]"), event => this.#onDropItem(event));
 
     this.element.querySelectorAll(".item-tooltip[data-uuid]").forEach(applyLoadingTooltip);
+  }
+
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  _onChangeForm(formConfig, event) {
+    super._onChangeForm(formConfig, event);
+    if ( event.target.name === "selectedActor" ) {
+      this.selectedActorUuid = event.target.value;
+      this.#freeformIds.clear();
+      this.#toolKey = null;
+      this.#workshopClaimed = false;
+      this.#fillWithGold = false;
+      this.#materialQuantities.clear();
+      this.#chosenSpellUuid = null;
+      this.#scrollDC = null;
+      this.#scrollBonus = null;
+    }
+    else if ( event.target.name === "toolKey" ) this.#toolKey = event.target.value;
+    else if ( event.target.name === "workshopClaimed" ) this.#workshopClaimed = event.target.checked;
+    else if ( event.target.name === "fillWithGold" ) this.#fillWithGold = event.target.checked;
+    else if ( event.target.name === "spellUuid" ) this.#chosenSpellUuid = event.target.value || null;
+    else if ( event.target.name === "scrollDC" ) this.#scrollDC = event.target.value === "" ? null : Number(event.target.value);
+    else if ( event.target.name === "scrollBonus" ) this.#scrollBonus = event.target.value === "" ? null : Number(event.target.value);
+    else return;
+    this.render({ parts: ["content", "footer"] });
   }
 
   /* -------------------------------------------- */

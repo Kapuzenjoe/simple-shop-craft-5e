@@ -485,24 +485,26 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
     if ( itemUpdates.length ) await actor.updateEmbeddedDocuments("Item", itemUpdates);
     if ( itemsToDelete.length ) await actor.deleteEmbeddedDocuments("Item", itemsToDelete);
 
-    const items = shop.items.map(entry => {
-      const line = purchase.buyLines.find(l => ShopItemEntry.key(l) === ShopItemEntry.key(entry));
-      if ( !line || (entry.restockMode === "unlimited") ) return entry.toObject();
-      return { ...entry.toObject(), stock: { ...entry.stock, current: (entry.stock.current ?? 0) - line.quantity } };
+    await Shop.update(shop._id, freshShop => {
+      const items = freshShop.items.map(entry => {
+        const line = purchase.buyLines.find(l => ShopItemEntry.key(l) === ShopItemEntry.key(entry));
+        if ( !line || (entry.restockMode === "unlimited") ) return entry.toObject();
+        return { ...entry.toObject(), stock: { ...entry.stock, current: (entry.stock.current ?? 0) - line.quantity } };
+      });
+      for ( const line of purchase.sellLines ) {
+        if ( !line.identifier ) continue;
+        const existing = items.find(i => i.identifier === line.identifier);
+        if ( existing && (existing.stock.current !== null) ) existing.stock.current += line.quantity;
+      }
+
+      const goldPool = { ...freshShop.goldPool };
+      if ( effectiveGoldCurrent !== null ) {
+        const parts = breakdownCopper(effectiveGoldCurrent - purchase.netCP);
+        goldPool.current = Object.fromEntries(parts.map(p => [p.denomination, p.value]));
+      }
+
+      return { items, goldPool };
     });
-    for ( const line of purchase.sellLines ) {
-      if ( !line.identifier ) continue;
-      const existing = items.find(i => i.identifier === line.identifier);
-      if ( existing && (existing.stock.current !== null) ) existing.stock.current += line.quantity;
-    }
-
-    const goldPool = { ...shop.goldPool };
-    if ( effectiveGoldCurrent !== null ) {
-      const parts = breakdownCopper(effectiveGoldCurrent - purchase.netCP);
-      goldPool.current = Object.fromEntries(parts.map(p => [p.denomination, p.value]));
-    }
-
-    await Shop.setAll(shops.map(s => s._id === shop._id ? { ...s.toObject(), items, goldPool } : s.toObject()));
 
     return { ok: true };
   }

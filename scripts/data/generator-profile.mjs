@@ -45,13 +45,14 @@ export default class GeneratorProfile extends foundry.abstract.DataModel {
   /* -------------------------------------------- */
 
   /**
-   * Does the pool include spell scrolls? Requires the Consumable type, with Scroll among its subtypes. Brings in
-   * the spell filter.
+   * Does the pool include spell scrolls? Requires the Consumable type, with Scroll among its subtypes, and no
+   * restriction to mundane items. Brings in the spell filter.
    * @type {boolean}
    */
   get includesScrolls() {
     const subtypes = this.getSubtypes("consumable");
-    return this.includeScrolls && ("consumable" in this.types) && (subtypes?.has("scroll") ?? true);
+    return this.includeScrolls && (this.magic !== "mundane") && ("consumable" in this.types)
+      && (subtypes?.has("scroll") ?? true);
   }
 
   /* -------------------------------------------- */
@@ -160,6 +161,7 @@ export default class GeneratorProfile extends foundry.abstract.DataModel {
     const summary = { included: {}, capped: {}, owned: {} };
     const pool = [];
     const found = [];
+    const baseItemCache = new Map();
     const excluded = ["spell-scroll", ...(this.includeEnspelled ? [] : Object.keys(ENSPELLED_ITEMS))];
 
     for ( const type of Object.keys(this.types) ) {
@@ -200,7 +202,7 @@ export default class GeneratorProfile extends foundry.abstract.DataModel {
       const document = documents.get(index.uuid);
       if ( document && ((system.identifier in ENSPELLED_ITEMS)
         || document.system.activities?.some(a => a.type === "enchant")) ) {
-        const template = await this.#buildTemplate(document, capCP, summary, existingKeys);
+        const template = await this.#buildTemplate(document, capCP, summary, existingKeys, baseItemCache);
         if ( template ) pool.push(template);
         continue;
       }
@@ -278,23 +280,27 @@ export default class GeneratorProfile extends foundry.abstract.DataModel {
    * @param {number|null} capCP  Settlement cap in copper pieces, or `null` if unset.
    * @param {GeneratorPoolSummary} summary  The pool summary to add the entries of the profiles to.
    * @param {Set<string>} existingKeys  Entry keys already present in the shop.
+   * @param {Map<string, string[]>} baseItemCache  Eligible base-item UUIDs already resolved this run, keyed by
+   *   restriction.
    * @returns {Promise<GeneratorCandidate|null>}  `null` if no profile remains.
    */
-  async #buildTemplate(item, capCP, summary, existingKeys) {
+  async #buildTemplate(item, capCP, summary, existingKeys, baseItemCache) {
     const { rarities, weighting } = this;
-    const baseItemsByActivity = new Map();
     const open = [];
     for ( const [level, profile] of EnchantedItemBlueprint.getEnchantmentProfiles(item).entries() ) {
       const rarity = EnchantedItemBlueprint.resolveProfileRarity(item, profile.effect);
       if ( (rarity === "artifact") || (rarities.size && !rarities.has(rarity)) ) continue;
       const { activity } = profile;
-      if ( !baseItemsByActivity.has(activity) ) {
-        const baseType = activity.restrictions.type || activity.item.type;
-        baseItemsByActivity.set(activity, await EnchantedItemBlueprint.listEnchantableBaseItems(
+      const baseType = activity.restrictions.type || item.type;
+      const { allowMagical, categories, properties } = activity.restrictions;
+      const header = EnchantedItemBlueprint.getRestrictionHeader(item);
+      const key = [baseType, allowMagical, Array.from(categories), Array.from(properties), header].join("|");
+      if ( !baseItemCache.has(key) ) {
+        baseItemCache.set(key, await EnchantedItemBlueprint.listEnchantableBaseItems(
           activity, this.getSubtypes(baseType), this.getBaseItems(baseType)
         ));
       }
-      const baseItems = baseItemsByActivity.get(activity);
+      const baseItems = baseItemCache.get(key);
       if ( !baseItems.length ) continue;
       open.push({ ...profile, level, rarity, baseItems, weight: (weighting === "combination") ? baseItems.length : 1 });
     }
@@ -366,13 +372,14 @@ export default class GeneratorProfile extends foundry.abstract.DataModel {
   /* -------------------------------------------- */
 
   /**
-   * Pick a random entry, more likely the higher its weight.
+   * Pick a random index into `entries`, more likely the higher that entry's weight.
    * @param {{ weight: number }[]} entries
-   * @returns {{ weight: number }}
+   * @returns {number}
    */
   static #pickWeighted(entries) {
     let roll = Math.random() * entries.reduce((total, entry) => total + entry.weight, 0);
-    return entries.find(entry => (roll -= entry.weight) < 0) ?? entries.at(-1);
+    const index = entries.findIndex(entry => (roll -= entry.weight) < 0);
+    return index === -1 ? entries.length - 1 : index;
   }
 
   /* -------------------------------------------- */
@@ -391,7 +398,7 @@ export default class GeneratorProfile extends foundry.abstract.DataModel {
   async #drawFromPool(candidatePool, { existingKeys, stockDefaults }) {
     const pool = [...candidatePool];
     while ( pool.length ) {
-      const [candidate] = pool.splice(pool.indexOf(GeneratorProfile.#pickWeighted(pool)), 1);
+      const [candidate] = pool.splice(GeneratorProfile.#pickWeighted(pool), 1);
 
       if ( candidate.kind === "spell" ) {
         const entry = {
@@ -402,9 +409,9 @@ export default class GeneratorProfile extends foundry.abstract.DataModel {
       }
 
       if ( candidate.kind === "item" ) {
-        const candidateItem = await fromUuid(candidate.index.uuid);
-        const entry = itemRef(candidateItem);
+        const entry = itemRef(candidate.index);
         if ( existingKeys.has(ShopItemEntry.key(entry)) ) continue;
+        const candidateItem = await fromUuid(candidate.index.uuid);
         return { entry: { ...entry, ...newEntryStock(candidateItem, stockDefaults) } };
       }
 
@@ -416,7 +423,7 @@ export default class GeneratorProfile extends foundry.abstract.DataModel {
         })
         .filter(profile => profile.baseItems.length);
       if ( !open.length ) continue;
-      const chosen = GeneratorProfile.#pickWeighted(open);
+      const chosen = open[GeneratorProfile.#pickWeighted(open)];
       const baseItem = await EnchantedItemBlueprint.pickEnchantableBaseItem(chosen.activity, chosen.baseItems);
       if ( !baseItem ) continue;
       const generated = { baseItemUuid: baseItem.uuid, enchantItemUuid: item.uuid, effectId: chosen.effect.id };

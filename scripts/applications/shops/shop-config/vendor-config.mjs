@@ -155,7 +155,7 @@ export default class VendorConfig extends BaseShopConfig {
    */
   static async #onSubmit(event, form, formData) {
     const data = foundry.utils.expandObject(formData.object);
-    const currentGoldPool = this.shop.goldPool;
+    const currentGoldPool = Shop.get(this.shop._id).goldPool;
     const sellDisabled = !!data.sellDisabled;
     const unlimited = sellDisabled ? currentGoldPool.unlimited : !!data.unlimited;
     const max = sellDisabled ? currentGoldPool.max : goldPoolCurrencies().reduce((obj, denom) => {
