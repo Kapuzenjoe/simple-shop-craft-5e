@@ -1,6 +1,17 @@
 # Changelog
 
+## 0.6.1
+
+- Added a warning to shop entries and recipe target items without a distinct identifier, and when adding a duplicated item that shares its original's identifier.
+- Changed items added to shops and recipes to prefer a distinct identifier and fall back to the UUID.
+- Fixed a spell-scroll recipe's Proficiency Mode defaulting to "Tool & Skill" instead of "Tool or Skill".
+- Fixed the Crafter feat's discount applying to services.
+- Fixed "By UUID" and a recipe's UUID field storing the item by its identifier.
+- Fixed a bought item from a UUID or spell-scroll entry not stacking onto the same item already owned.
+- Fixed adding an item already in a shop overwriting its price, discount, and stock.
+
 ## 0.6.0
+
 - Added a Proficiency Mode to recipes for how Tool and Skill Proficiencies combine: Tool & Skill (default), Tool or Skill, or Every Listed Tool & Skill.
 - Added editable Save DC/Attack Bonus for a crafted spell scroll, defaulting to the crafting character's own spellcasting values.
 - Fixed the Craft Start dialog's spell picker for a compendium-source spell-scroll recipe showing no results instead of the recipe's eligible spells.

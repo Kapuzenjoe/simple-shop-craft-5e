@@ -488,6 +488,23 @@ export function itemRef(item) {
 /* -------------------------------------------- */
 
 /**
+ * Warn about duplicated world or actor items that keep the identifier of the item they were copied from, since a
+ * reference by that identifier resolves to the original instead.
+ * @param {Item5e[]} items  Items about to be referenced by {@link itemRef}.
+ */
+export function warnSharedIdentifiers(items) {
+  const names = Array.from(new Set(items))
+    .filter(i => !i.pack && i._stats?.duplicateSource && !isDefaultIdentifier(i))
+    .map(i => i.name);
+  if ( !names.length ) return;
+  ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SharedIdentifierWarning", {
+    format: { names: names.join(", ") }
+  });
+}
+
+/* -------------------------------------------- */
+
+/**
  * Whether an item's own price is unset, meaning a rarity-based fallback price is being shown for it
  * instead.
  * @param {Item5e|null} item

@@ -3,8 +3,9 @@ import {
 } from "../config.mjs";
 import { calendariaDayOfWeek, isCalendariaActive } from "../integrations/calendaria.mjs";
 import {
-  breakdownCopper, currencyRows, deductActorCurrencyChecked, isCalendarModeActive, secondsPerDay, itemRefKey,
-  needsDefaultPrice, resolveEntries, resolveItemPrice, shouldHandleWorldTimeAdvance, toCopper
+  breakdownCopper, currencyRows, deductActorCurrencyChecked, isCalendarModeActive, isDefaultIdentifier,
+  secondsPerDay, itemRefKey, needsDefaultPrice, resolveEntries, resolveItemPrice, shouldHandleWorldTimeAdvance,
+  toCopper
 } from "../utils.mjs";
 import { EnchantedItemBlueprint } from "./enchanted-item-blueprint.mjs";
 import { HirelingBlueprint } from "./hireling-blueprint.mjs";
@@ -436,11 +437,9 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
       const indexEntry = resolved[index].item;
       const totalQuantity = line.quantity * line.bundleSize;
 
-      const existing = line.identifier
-        ? actor.items.find(i => i.system.identifier === line.identifier)
-        : (line.generated && indexEntry?.system.identifier
-          ? actor.items.find(i => i.system.identifier === indexEntry.system.identifier)
-          : null);
+      const stackIdentifier = line.identifier
+        || ((indexEntry && !isDefaultIdentifier(indexEntry)) ? indexEntry.system.identifier : null);
+      const existing = stackIdentifier ? actor.items.find(i => i.system.identifier === stackIdentifier) : null;
       if ( existing && (existing.type !== "container") ) {
         itemUpdates.push({ _id: existing.id, "system.quantity": existing.system.quantity + totalQuantity });
         continue;

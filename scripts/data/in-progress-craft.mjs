@@ -111,7 +111,7 @@ export class InProgressCraft extends foundry.abstract.DataModel {
       img: craft.targetImg,
       system: {
         quantity: 1, price: craft.halfPrice ?? { value: 0, denomination: "gp" },
-        weight: craft.weight ?? { value: 0, units: "lb" },
+        weight: craft.weight ?? { value: 0, units: game.dnd5e.utils.defaultUnits("weight") },
         description: { value: inProgress.applyProgressDescription("") }
       },
       flags: { [MODULE_ID]: { craft: inProgress.toObject() } }

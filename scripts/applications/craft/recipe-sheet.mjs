@@ -2,8 +2,8 @@ import { PROFICIENCY_MODES, SPELL_SCROLL_SOURCES, UNLOCK_MODES } from "../../con
 import { Recipe, RecipeMaterial } from "../../data/recipe-data.mjs";
 import {
   applyDropArea, applyLoadingTooltip, breakdownCopper, buildItemTableSections, currencyRows,
-  currencyValueField, goldPoolCurrencies, isDefaultIdentifier, isSpellScrollItem, itemRefKey, recipeCraftCost,
-  resolveEntries, resolveIdentifierIndex, resolveItemPrice, subtypeOptions, toCopper
+  currencyValueField, goldPoolCurrencies, isDefaultIdentifier, isSpellScrollItem, itemRef, itemRefKey,
+  recipeCraftCost, resolveEntries, resolveIdentifierIndex, resolveItemPrice, subtypeOptions, toCopper
 } from "../../utils.mjs";
 import BaseShopConfig from "../shops/shop-config/base-shop-config.mjs";
 import MaterialCriteriaDialog from "./material-criteria-dialog.mjs";
@@ -116,6 +116,7 @@ export default class RecipeSheet extends Application5e {
 
     const [targetResolved] = await resolveEntries([recipe.targetItem]);
     context.targetItem = targetResolved.item;
+    context.targetNoIdentifier = !!targetResolved.item && isDefaultIdentifier(targetResolved.item);
     this.#targetItemName = recipe.displayName(targetResolved.item);
     context.craftCost = await recipeCraftCost(recipe, targetResolved.item);
     const craftCostBreakdown = Object.fromEntries(goldPoolCurrencies().map(d => [d, 0]));
@@ -293,7 +294,7 @@ export default class RecipeSheet extends Application5e {
     if ( !selection?.size ) return;
 
     const items = await Promise.all(Array.from(selection).map(uuid => fromUuid(uuid)));
-    const newEntries = await Promise.all(items.filter(Boolean).map(itemEntryRef));
+    const newEntries = items.filter(Boolean).map(itemRef);
     if ( !newEntries.length ) return;
 
     const recipe = this.recipe;
@@ -371,7 +372,8 @@ export default class RecipeSheet extends Application5e {
     if ( !item ) return;
 
     await Recipe.update(
-      this.recipeId, await getTargetItemUpdate(item, this.recipe.skillProficiencies, this.recipe.toolProficiencies)
+      this.recipeId,
+      getTargetItemUpdate(item, itemRef(item), this.recipe.skillProficiencies, this.recipe.toolProficiencies)
     );
     this.render();
   }
@@ -392,8 +394,8 @@ export default class RecipeSheet extends Application5e {
     if ( data.targetItem?.uuid && (data.targetItem.uuid !== this.recipe.targetItem.uuid) ) {
       const item = await fromUuid(data.targetItem.uuid);
       if ( item ) {
-        Object.assign(data, await getTargetItemUpdate(
-          item, data.skillProficiencies ?? this.recipe.skillProficiencies,
+        Object.assign(data, getTargetItemUpdate(
+          item, { uuid: item.uuid }, data.skillProficiencies ?? this.recipe.skillProficiencies,
           data.toolProficiencies ?? this.recipe.toolProficiencies
         ));
       }
@@ -560,29 +562,12 @@ export default class RecipeSheet extends Application5e {
     if ( !item ) return;
 
     const recipe = this.recipe;
-    const entry = await itemEntryRef(item);
+    const entry = itemRef(item);
     if ( recipe.materials.some(m => itemRefKey(m) === itemRefKey(entry)) ) return;
 
     await Recipe.update(this.recipeId, { materials: [...recipe.materials.map(m => m.toObject()), entry] });
     this.render();
   }
-}
-
-/* -------------------------------------------- */
-
-/**
- * Build an identifier/uuid reference for an item. Prefers `identifier` when it resolves against a real
- * compendium/world source (stable regardless of where the item currently lives — a compendium, an actor's
- * inventory, or the world), falls back to `uuid` for items with no identifier or an unresolvable one.
- * @param {Item5e} item
- * @returns {Promise<{ identifier: string }|{ uuid: string }>}
- */
-async function itemEntryRef(item) {
-  if ( item.system.identifier ) {
-    const resolved = await resolveIdentifierIndex(new Set([item.system.identifier]));
-    if ( resolved.size ) return { identifier: item.system.identifier };
-  }
-  return { uuid: item.uuid };
 }
 
 /* -------------------------------------------- */
@@ -618,25 +603,29 @@ async function toolOptions() {
 
 /**
  * Get the recipe update for a newly chosen target item.
- * @param {Item5e} item                          The chosen target item.
- * @param {Iterable<string>} skillProficiencies  Skill proficiencies to start from.
- * @param {Iterable<string>} toolProficiencies   Tool proficiencies to start from.
- * @returns {Promise<object>}
+ * @param {Item5e} item                                           The chosen target item.
+ * @param {{ identifier: string }|{ uuid: string }} targetItem    Reference to store for the target item.
+ * @param {Iterable<string>} skillProficiencies                   Skill proficiencies to start from.
+ * @param {Iterable<string>} toolProficiencies                    Tool proficiencies to start from.
+ * @returns {object}
  */
-async function getTargetItemUpdate(item, skillProficiencies, toolProficiencies) {
+function getTargetItemUpdate(item, targetItem, skillProficiencies, toolProficiencies) {
   const skills = new Set(skillProficiencies);
   const tools = new Set(toolProficiencies);
   if ( item.system.identifier === "potion-of-healing" ) tools.add("herb");
   else if ( item.system.properties?.has("mgc") ) skills.add("arc");
   let spellScroll = null;
+  let proficiencyMode;
   if ( isSpellScrollItem(item) ) {
     skills.add("arc");
     tools.add("calligrapher");
     spellScroll = { level: 0, spellSource: "prepared" };
+    proficiencyMode = "either";
   }
   return {
-    targetItem: await itemEntryRef(item),
+    targetItem,
     targetQuantity: (item.system.quantity > 1) ? item.system.quantity : 1,
-    img: item.img, skillProficiencies: Array.from(skills), toolProficiencies: Array.from(tools), spellScroll
+    img: item.img, skillProficiencies: Array.from(skills), toolProficiencies: Array.from(tools), spellScroll,
+    ...(proficiencyMode ? { proficiencyMode } : {})
   };
 }

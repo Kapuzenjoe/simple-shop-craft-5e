@@ -26,6 +26,10 @@
             <i class="fa-solid fa-triangle-exclamation warning" data-tooltip="{{ suppressReason }}"></i>
             {{/if}}
             {{/if}}
+            {{#if (and @root.editable noIdentifier)}}
+            <i class="fa-solid fa-triangle-exclamation warning"
+               data-tooltip="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoIdentifierWarning' }}"></i>
+            {{/if}}
         </div>
         <div class="item-detail item-discount"
              data-tooltip="{{ discountTooltip }}"

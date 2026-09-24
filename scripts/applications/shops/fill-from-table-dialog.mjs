@@ -1,5 +1,5 @@
 import { ShopItemEntry } from "../../data/shop-data.mjs";
-import { resolveItemPrice, toCopper } from "../../utils.mjs";
+import { itemRef, resolveItemPrice, toCopper, warnSharedIdentifiers } from "../../utils.mjs";
 
 const { Dialog5e } = game.dnd5e.applications.api;
 const { DocumentUUIDField, StringField } = foundry.data.fields;
@@ -108,6 +108,7 @@ export default class FillFromTableDialog extends Dialog5e {
     const capCP = settlementCap?.value != null ? toCopper(settlementCap.value, settlementCap.denomination) : null;
 
     const counted = new Map();
+    const added = [];
     let skipped = 0;
     for ( const item of drawnItems ) {
       if ( !CONFIG.Item.dataModels[item?.type]?.inventorySection ) {
@@ -121,13 +122,15 @@ export default class FillFromTableDialog extends Dialog5e {
           continue;
         }
       }
-      const entry = item.system.identifier ? { identifier: item.system.identifier } : { uuid: item.uuid };
+      added.push(item);
+      const entry = itemRef(item);
       const key = ShopItemEntry.key(entry);
       const existing = counted.get(key);
       if ( existing ) existing.count++;
       else counted.set(key, { entry, label: item.name, count: 1 });
     }
     const rolled = Array.from(counted.values());
+    warnSharedIdentifiers(added);
 
     if ( !rolled.length ) {
       ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.FillFromTableNone", { localize: true });

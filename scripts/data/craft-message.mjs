@@ -61,7 +61,8 @@ export class CraftMessageData extends foundry.abstract.DataModel {
       totalHours: new NumberField({ initial: 0 }),
       hoursPerUse: new NumberField({ nullable: true, initial: null }),
       weight: new SchemaField({
-        value: new NumberField({ initial: 0 }), units: new StringField({ initial: "lb" })
+        value: new NumberField({ initial: 0 }),
+        units: new StringField({ initial: () => game.dnd5e.utils.defaultUnits("weight") })
       }),
       halfPrice: new SchemaField({
         value: new NumberField({ initial: 0 }), denomination: new StringField({ initial: "gp" })

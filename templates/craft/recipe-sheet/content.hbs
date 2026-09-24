@@ -8,6 +8,10 @@
                 <div class="item-name">
                     {{> "modules/simple-shop-craft-5e/templates/shared/item-avatar-name.hbs"
                         img=recipe.img name=targetItem.name }}
+                    {{#if targetNoIdentifier}}
+                    <i class="fa-solid fa-triangle-exclamation warning"
+                       data-tooltip="{{ localize 'SIMPLE_SHOP_CRAFT_5E.RecipeEditor.TargetNoIdentifierWarning' }}"></i>
+                    {{/if}}
                 </div>
                 <div class="item-detail item-controls always-visible">
                     <button type="button" class="unbutton control-button" data-action="removeTargetItem"

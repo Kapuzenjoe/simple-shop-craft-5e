@@ -5,8 +5,8 @@ import { EnchantedItemBlueprint } from "../../data/enchanted-item-blueprint.mjs"
 import { newEntryStock, Shop, ShopItemEntry } from "../../data/shop-data.mjs";
 import {
   applyItemSort, applyListControls, applyLoadingTooltip, applyRichTooltip, breakdownCopper, buildItemTableSections,
-  confirmDeleteShop, finalizeGroups, isCalendarModeActive, isSpellScrollItem, itemRef, needsDefaultPrice,
-  openItemSheet, resolveItemPrice, selectableActors, spotlightShop, toCopper
+  confirmDeleteShop, finalizeGroups, isCalendarModeActive, isDefaultIdentifier, isSpellScrollItem, itemRef,
+  needsDefaultPrice, openItemSheet, resolveItemPrice, selectableActors, spotlightShop, toCopper, warnSharedIdentifiers
 } from "../../utils.mjs";
 import AddEntryDialog from "./add-entry-dialog.mjs";
 import ConfigureTemplatesDialog from "./configure-templates-dialog.mjs";
@@ -482,7 +482,7 @@ export default class ShopSheet extends Application5e {
       rows: serviceResolved, settlementCap: context.shop.settlementCap, buyModifier: context.shop.buyModifier,
       cart: this.cart, fixedValueLootTypes: context.shop.fixedValueLootTypes, playerBuyModifier: playerOverride.buy,
       actorName: context.actor?.name, stockDefaults: context.shop.stockDefaults,
-      hasCrafterFeat
+      hasCrafterFeat: false
     });
     this.#lastServiceGroups = context.serviceGroups;
 
@@ -816,6 +816,7 @@ export default class ShopSheet extends Application5e {
           if ( data.type !== "Item" ) return;
           const item = await fromUuid(data.uuid);
           if ( !item || !CONFIG.Item.dataModels[item.type]?.inventorySection ) return;
+          warnSharedIdentifiers([item]);
           await this.#mergeItemEntries([
             { ...itemRef(item), isService: partId === "services", ...newEntryStock(item, this.shop.stockDefaults) }
           ]);
@@ -959,7 +960,7 @@ export default class ShopSheet extends Application5e {
       } else if ( EnchantedItemBlueprint.getEnchantmentProfiles(item)
         .some(p => EnchantedItemBlueprint.resolveProfileRarity(item, p.effect) !== "artifact") ) {
         templates.push({ kind: "enchant", item });
-      } else if ( item.system?.identifier ) {
+      } else {
         entries.push({ ...itemRef(item), isService, ...newEntryStock(item, this.shop.stockDefaults) });
       }
     }
@@ -988,7 +989,7 @@ export default class ShopSheet extends Application5e {
       return;
     }
     await this.#mergeItemEntries([
-      { ...itemRef(item), isService, ...newEntryStock(item, this.shop.stockDefaults) }
+      { uuid: item.uuid, isService, ...newEntryStock(item, this.shop.stockDefaults) }
     ]);
   }
 
@@ -1470,27 +1471,32 @@ export default class ShopSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
-   * Merge new item entries into the shop's item list, replacing any existing entry with the same
-   * {@link ShopItemEntry.key}. An entry whose key already exists with a different `isService` value
-   * (same catalog item present in both Buy and Services) is skipped with a warning instead of overwriting it.
+   * Merge item entries into the shop's item list. An entry carrying the `_id` of the existing entry with the
+   * same {@link ShopItemEntry.key} replaces it. A new entry whose key already exists is skipped with a warning
+   * instead of overwriting the existing entry.
    * @param {ShopItemEntryData[]} newEntries
    * @returns {Promise<void>}
    */
   async #mergeItemEntries(newEntries) {
     const entries = new Map(this.shop.items.map(i => [ShopItemEntry.key(i), i.toObject()]));
-    let blocked = false;
+    let blockedOtherTab = false;
+    let blockedSameTab = false;
     let changed = false;
     for ( const entry of newEntries ) {
       const key = ShopItemEntry.key(entry);
       const existing = entries.get(key);
-      if ( existing && (!!existing.isService !== !!entry.isService) ) {
-        blocked = true;
+      if ( existing && (existing._id !== entry._id) ) {
+        if ( !!existing.isService !== !!entry.isService ) blockedOtherTab = true;
+        else blockedSameTab = true;
         continue;
       }
       entries.set(key, entry);
       changed = true;
     }
-    if ( blocked ) ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.AlreadyExistsOtherTab", { localize: true });
+    if ( blockedOtherTab ) {
+      ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.AlreadyExistsOtherTab", { localize: true });
+    }
+    if ( blockedSameTab ) ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.AlreadyExists", { localize: true });
     if ( changed ) await this.#updateShop({ items: Array.from(entries.values()) });
   }
 
@@ -1581,7 +1587,7 @@ async function groupByType({
   rows, settlementCap, buyModifier, cart, fixedValueLootTypes, playerBuyModifier, actorName, stockDefaults,
   hasCrafterFeat
 }) {
-  const targetUnit = game.settings.get("dnd5e", "metricWeightUnits") ? "kg" : "lb";
+  const targetUnit = game.dnd5e.utils.defaultUnits("weight");
   const capCP = settlementCap?.value != null ? toCopper(settlementCap.value, settlementCap.denomination) : null;
   const groups = new Map();
   for ( const row of rows ) {
@@ -1621,6 +1627,8 @@ async function groupByType({
     if ( (capCP != null) && (baseCP > capCP) ) reasons.push(_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SuppressedCap"));
     row.suppressed = reasons.length > 0;
     row.suppressReason = reasons.join(", ");
+    row.noIdentifier = !!row.entry.uuid && !row.entry.generated && !row.entry.spellScroll && !!row.item
+      && isDefaultIdentifier(row.item);
     row.itemImg = row.item?.img ?? "icons/svg/hazard.svg";
     row.itemName = row.item?.name ?? row.entry.identifier ?? row.entry.uuid ?? "?";
 
@@ -1652,7 +1660,7 @@ async function groupByType({
 async function groupSellItems({
   items, sellModifier, sellCart, fixedValueLootTypes, playerSellModifier, actorName, settlementCap
 }) {
-  const targetUnit = game.settings.get("dnd5e", "metricWeightUnits") ? "kg" : "lb";
+  const targetUnit = game.dnd5e.utils.defaultUnits("weight");
   const capCP = (settlementCap?.value != null) && settlementCap.appliesToSell
     ? toCopper(settlementCap.value, settlementCap.denomination) : null;
   const sellable = Array.from(items).filter(item => CONFIG.Item.dataModels[item.type]?.inventorySection);
@@ -1759,13 +1767,14 @@ function resolveDiscountSources({
 /**
  * Convert an item's weight to the world's configured weight unit, if it has one.
  * @param {object} [itemSystem]  The item's system data.
- * @param {string} targetUnit    "kg" or "lb", per the world's `metricWeightUnits` setting.
+ * @param {string} targetUnit    The world's default weight unit.
  * @returns {{ value: number, unit: string }|undefined}
  */
 function resolveWeight(itemSystem, targetUnit) {
   if ( !itemSystem?.weight ) return undefined;
   return {
-    value: game.dnd5e.utils.convertWeight(itemSystem.weight.value, itemSystem.weight.units || "lb", targetUnit),
+    value: game.dnd5e.utils.convertWeight(itemSystem.weight.value, itemSystem.weight.units || targetUnit,
+      targetUnit),
     unit: targetUnit
   };
 }
