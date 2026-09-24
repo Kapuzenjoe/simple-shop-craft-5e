@@ -1,4 +1,4 @@
-# Simple Shop & Craft 5e
+<img src="docs/banner.png" alt="Simple Shop & Craft 5e — Buy, Sell & Services · Random Item Generator · Haggling & Player Discounts · Recipe-Based Downtime Crafting" width="100%">
 
 ![Static Badge](https://img.shields.io/badge/Foundry-v14-informational)
 ![Static Badge](https://img.shields.io/badge/Dnd5e-v5.3-informational)
@@ -6,49 +6,48 @@
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/peterlankton86911)
 
-**Simple Shop & Craft 5e** brings the shop and the workshop to the table. GMs stock the shelves and write
-the recipes; players buy, sell, haggle, and craft straight from their own character sheet.
+**Simple Shop & Craft 5e** adds shops and downtime crafting to the dnd5e system.
 
-> No coin changes hands and no craft begins without the GM's word — every purchase, sale, and craft order
-> goes out as a confirmation chat card first.
+The GM sets up shops with their own stock, prices, and opening hours. Shops restock on their own as days
+pass in the world calendar. Players buy and sell, haggle with the shopkeeper, and craft items from recipes
+the GM provides.
 
-## Highlights
+Every purchase, sale, and craft order goes to the GM as a chat card and only takes effect once approved.
 
-- **Stand up as many shops as a campaign needs.** Each one keeps its own buy/sell modifiers, Settlement Cap,
-  and money pool; stock it by item identifier or a direct UUID, then let players buy and sell straight from
-  their own character sheet — restocking, price overrides, and per-item caps are one click away for the GM.
-- **Roll up magic items that are the real deal.** Filter by type, subtype, and Rarity, and the generator
-  doesn't hand back a placeholder — a "+1 Dagger" comes out as a genuine enchanted Dagger, and a Spell
-  Scroll arrives with its actual spell already inscribed.
-- **Every search runs through the Compendium Browser.** Lookups resolve by identifier against whatever
-  sources a GM has enabled there, so a shop's stock keeps working even as compendiums get added, swapped,
-  or retired.
-- **Haggling and per-player deals.** A skill check against the shopkeeper's attitude shaves a temporary
-  discount off the shop's prices on a success; GMs can also set a fixed buy/sell discount for an individual
-  player, which stacks additively on top of the shop's own modifier.
-- **Full Downtime Crafting, per the 2024 PHB/DMG rules.** GMs write the recipe — target item, materials,
-  tool, duration — players supply the goods and put in the workdays; progress lives on a real in-progress
-  item, and the finished piece appears the moment the clock runs out.
+## Contents
+
+- [Getting Started](#getting-started)
+- [Shops](#shops)
+- [Prices & Haggling](#prices--haggling)
+- [Random Item Generator](#random-item-generator)
+- [Crafting](#crafting)
+- [Settings](#settings)
+- [Credits & License](#credits--license)
 
 ---
 
-## Shops & Trading
+## Getting Started
 
-The "Shop & Craft" window — opened via its icon at the top of the Items sidebar tab — is where a GM builds
-out a campaign's shops, and where players go to open one for themselves.
+Open the **Shop & Craft** window with its button at the top of the Items sidebar. The GM builds shops and
+recipes here, and players come here to browse the shops and recipes available to them.
 
-- **Creating a shop** starts from a short prompt: give it a name, and optionally pick a Starter Pack — a
-  ready-made set of stock for a common shop type (Blacksmith, Alchemist, Tavern, General Store, Magic Shop,
-  Blackmarket) — to skip populating it item by item.
-- **Active and Inactive** shops are split into their own sections. An Inactive shop stays invisible to
-  players — it simply doesn't appear in their list — while the GM keeps full access to finish setting it
-  up. Toggle it Active once it's ready for business.
-- **Show to All Players** pushes a shop open on every connected client immediately, bypassing the list
-  entirely — useful for putting a shop in front of the party the moment it matters, without asking them to
-  go find it themselves.
-- GMs can duplicate or delete a shop directly from the list.
-- The shop list and the Craft tab's recipe list both support search, filtering, and sorting for quick
-  navigation.
+A new shop needs only a name. Pick a Starter Pack to fill its shelves right away with the stock of a
+Blacksmith, Alchemist, Tavern, General Store, Magic Shop, or Blackmarket. Every new shop starts out
+Inactive and stays hidden from players until the GM opens it for business.
+
+---
+
+## Shops
+
+### Shop Manager
+
+The Shops tab lists every shop with its owner, opening hours, Settlement Cap, and status.
+
+- **Active and Inactive.** Shops sit in separate groups, and players only ever see the Active ones.
+- **Shop actions.** Right-click a shop to toggle it Active, open its Vendor Settings, duplicate it, or
+  delete it.
+- **Show to All Players.** Opens the shop on every connected screen at once, for the moment the party steps
+  through the door.
 
 <table>
   <tr>
@@ -59,140 +58,151 @@ out a campaign's shops, and where players go to open one for themselves.
   </tr>
 </table>
 
-### Buy & Sell
+### Shop Sheet
 
-- The Buy and Sell tabs list every item's price, weight, and stock; each line has its own +/- stepper for
-  adding it to the cart.
-- Adding items pulls from the Compendium Browser and stores them by identifier — resolved against whichever
-  pack matches the world's D&D rules version when one is available — a modern (2024) table prefers PHB/DMG
-  content over a matching SRD (2014) entry, but falls back to whatever's found (including the world's own
-  Items) when nothing rules-matching exists. Dragging an item in instead stores it by UUID, for one-off
-  pieces with no matching compendium entry.
-- Fill from Table draws items straight from a RollTable into the shop's stock, resolving each result the
-  same way as adding it by hand.
-- Search, filter by type, and sort by name or price to navigate a large Buy or Sell table quickly.
-- Buying an item the character already owns (matched by identifier) increases its quantity instead of
-  creating a duplicate — containers are the exception, since each one holds its own separate contents.
-- Items sold as a bundle — ammunition and other stackable gear — are bought as a set, but a player selling
-  one back to the shop always sells a single piece; the price is divided down to match.
-- Stock is tracked per item with three modes — Normal (capped, restocks), Unlimited (untracked), or Exclude
-  (tracked but never auto-restocked, e.g. a unique magic item). A shop's Vendor Settings dialog sets a
-  default max stock per item type, plus a Magical Items rule deciding which magic types skip that default
-  and start Excluded instead; any item can still override the default from its own stock dialog.
-- The Settlement Cap enforces the DMG 2024 guidance on the priciest single item a settlement's size can
-  support — anything above it is hidden from players and flagged for the GM, optionally applying to sales
-  too.
-- The shop's money pool has a Current and a Max value, set from Vendor Settings (which also holds a
-  Purchase Only toggle to disable selling entirely). Current can run past Max as sales come in; hitting
-  "Reset Stock & Shop Money" caps it back down to Max and restocks every Normal-mode item.
-- On the days a GM picks, a shop automatically restocks and clears failed-haggle lockouts at the next
-  in-game day change — this needs dnd5e's own Calendar Configuration (with daily recovery) or the
-  Calendaria module active to track elapsed days. Opening Hours, Closed Weekdays, Closed Festivals, and a
-  manual Status Override (Automatic/Force Open/Force Closed) all live on the shop's Description tab
-  alongside its Location and free-text description; a closed shop can't be opened by players and shows a
-  warning to the GM.
-- The header shows an Icon, the Owner (a linked NPC), and the Buy/Sell modifiers at a glance.
-- Every purchase or sale goes out as a chat card for GM confirmation — accepting it writes or removes the
-  items and adjusts currency immediately.
-- Final prices always round down to the nearest copper piece.
-- Platinum is left out of price breakdowns by default — capped at the world's own default currency — though
-  it still folds correctly into the underlying copper math, and the shop's own money pool editor lists
-  every currency the world has configured, platinum included.
+Each shop opens in its own sheet with four tabs. The header shows the shop's owner, Settlement Cap, Buy and
+Sell modifiers, and the coin in its till.
+
+- **Buy.** The GM adds items from the Compendium Browser, by UUID, or by dragging them in. Fill from Table
+  draws stock from a RollTable, and Generate Item rolls up new wares (see
+  [Random Item Generator](#random-item-generator)).
+- **Sell.** Lists the items of the buying character. Items bought as a bundle, such as arrows, are sold back
+  one piece at a time.
+- **Services.** Holds Lodging and Hirelings, along with any Buy item marked as a Service. A service costs
+  coin but hands over no item.
+- **Description.** The shop's location, opening hours, restock days, and a description of the place.
+  Outside its opening hours players can't enter the shop, unless the GM forces it open.
+- **Who buys.** Players shop with their own character or with the Party actor.
+- **Checkout.** Purchases and sales gather in a cart. On confirmation the order goes to the GM as a chat
+  card, and items and coin change hands once the GM accepts.
+- **Stacking.** An item the character already owns gains quantity instead of arriving as a copy. Containers
+  are the exception.
 
 <table>
   <tr>
-    <td width="70%">
-      <strong>Shop sheet</strong><br>
+    <td width="60%">
+      <strong>Buy tab</strong><br>
       <img src="docs/example_shop_sheet.png" alt="Shop sheet showing the Buy tab of the Blacksmith shop">
     </td>
-    <td width="30%">
-      <strong>Vendor Settings</strong><br>
-      <img src="docs/example_vendor_setting.png" alt="Vendor Settings">
-    </td>
-  </tr>
-</table>
-  <table>
-  <tr>
-    <td width="50%">
-      <strong>Shopping cart</strong><br>
-      <img src="docs/example_shopping_cart.png" alt="Shopping cart summarizing items to buy and sell before confirming">
-    </td>
-    <td width="50%">
-      <strong>Purchase confirmation</strong><br>
+    <td width="40%">
+      <strong>Cart and GM confirmation</strong><br>
+      <img src="docs/example_shopping_cart.png" alt="Shopping cart summarizing items to buy and sell before confirming"><br>
       <img src="docs/example_chat_card.png" alt="Chat card requesting GM confirmation for a purchase">
     </td>
   </tr>
 </table>
+<table>
+  <tr>
+    <td width="50%">
+      <strong>Services tab</strong><br>
+      <img src="docs/example_shop_service.png" alt="Services tab listing a service item, a lodging room, and a hireling">
+    </td>
+    <td width="50%">
+      <strong>Description tab</strong><br>
+      <img src="docs/example_shop_description.png" alt="Description tab with location, opening hours, closed days, and restock days">
+    </td>
+  </tr>
+</table>
 
-### Magic Item Generator
+### Stock & Restock
 
-- Filters stack per submission: pick one or more item types (Weapon, Equipment, Consumable, …), each with
-  its own subtype filter — e.g. "Weapons: Martial only" and "Equipment: Wondrous only" combine into a
-  single roll. A multi-select Rarity filter (including a Mundane option) and an Any/Magical Only/Mundane
-  control apply across every selected type, and a count slider rolls up to ten items at once.
-- Selecting the Scroll subtype under Consumables unlocks spell filters — school, class (drawn from the same
-  registered spell lists the Compendium Browser uses), level, and ritual-only — and each scroll is drawn
-  straight from a matching spell, not just a random scroll shell.
-- The underlying search runs through the Compendium Browser, matched by identifier, the same way Buy tab
-  entries are.
-- Enchant templates resolve into the genuine item they describe: rolling a "+1, +2, or +3 Weapon" template
-  against a Dagger produces an actual "+1 Dagger", built by pairing a real base item with the
-  enchantment's effect.
-- Price comes from whichever the enchantment effect itself defines first; failing that, from the enchant
-  item's own listed price; and only as a last resort from the same rarity-based default table used
-  elsewhere in the shop.
-- A purchased Spell Scroll gets its identifier rewritten to include its level and the spell it carries, so
-  two different scrolls never collide or get treated as the same item.
-- Rolled items shown in the Buy tab that don't already exist as their own compendium document —
-  synthesized enchant results, scrolls tied to a spell — are placeholders assembled purely for display.
-  They aren't a real item yet, so their sheet can't be edited, and only become one once the purchase goes
-  through.
-- Ammunition without its own listed price defaults to a tenth of its rarity's consumable value per piece,
-  per the DMG 2024 guidance that ten pieces equal one potion of the same rarity.
+Vendor Settings hold the shop's name, its money, and the default stock for new items.
+
+- **Stock modes.** Each item has Normal Stock, Unlimited Stock, or Exclude from Stock. Excluded items keep
+  their count but never restock, for the one-of-a-kind piece.
+- **Default stock.** New items start with a max stock set per item type. The Magical Items rule decides
+  which magic items skip that default and start excluded instead. Any item can still set its own stock.
+- **Shop money.** The till has a Current and a Max amount, or is Unlimited. Purchases by players can push
+  Current past Max. With Purchase Only, the shop buys nothing from players.
+- **Restock.** Reset Stock & Shop Money refills every Normal item and returns the till to Max. On the chosen
+  Restock Days this happens on its own at the next in-game day change, which also lifts failed haggling
+  locks. This needs a calendar source (see [Settings](#settings)).
+
+<table>
+  <tr>
+    <td>
+      <strong>Vendor Settings</strong><br>
+      <img src="docs/example_vendor_setting.png" alt="Vendor Settings with shop name, shop money, and default stock per item type" width="320">
+    </td>
+  </tr>
+</table>
+
+---
+
+## Prices & Haggling
+
+### Price Modifiers
+
+Every price starts from the item's own value and passes through the shop's modifiers. A tooltip on each price
+shows which modifiers applied.
+
+- **Shop modifiers.** A Buy and a Sell modifier apply to every trade, by default +0% and −50%.
+- **Item overrides.** The GM can give a single item its own price, or its own modifier in place of the
+  shop's.
+- **Fixed-Value items.** Gemstones and art objects keep their full value, bought or sold. The list of loot
+  types is set per shop.
+- **Crafter.** A character with the Crafter feat pays 20% less for nonmagical items.
+- **Settlement Cap.** A village, town, or city only deals in items up to 20, 2,000, or 200,000 GP, or up to a
+  custom cap. Pricier items stay hidden from players, and the cap can apply to selling as well.
+
+<table>
+  <tr>
+    <td width="30%">
+      <strong>Price modifier breakdown</strong><br>
+      <img src="docs/example_price_mod.png" alt="Tooltip breaking down a price modifier into its individual sources">
+    </td>
+  </tr>
+</table>
+
+### Player Discounts & Haggling
+
+The GM can grant single players their own deal, and players can try to haggle the price down.
+
+- **Player discounts.** Drop an actor into the Players dialog and give it its own Buy and Sell modifier. It
+  adds to the shop's modifier.
+- **Haggling.** The player rolls a Charisma skill against a DC equal to the shopkeeper's Intelligence score,
+  minimum 15. A Friendly shopkeeper grants Advantage, a Hostile one Disadvantage.
+- **Result.** The roll sets no discount on its own. The GM decides what a success is worth and enters it as
+  a player discount.
+- **Cooldown.** After a failed roll, that skill can't be tried again at this shop for 24 hours. The lock lifts
+  at the next in-game day change, or the GM resets it in the Players dialog.
+
+<table>
+  <tr>
+    <td width="50%">
+      <strong>Haggle dialog</strong><br>
+      <img src="docs/example_haggle_dialog.png" alt="Haggle dialog with a skill and NPC attitude selection">
+    </td>
+    <td width="50%">
+      <strong>Player discounts</strong><br>
+      <img src="docs/example_players_discount.png" alt="Per-player buy and sell discount overrides">
+    </td>
+  </tr>
+</table>
+
+---
+
+## Random Item Generator
+
+Generate Item rolls up new stock for a shop. The GM reviews every result before it goes on the shelf.
+
+- **Filters.** Combine item types, each with its own subtypes and base items, and narrow the roll by rarity
+  and magic.
+- **Genuine magic items.** Enchantment templates become the real thing, so a "+1 Weapon" rolled for a Dagger
+  arrives as a true +1 Dagger.
+- **Spell Scrolls.** Each scroll carries a real spell, filtered by school, class, level, or rituals.
+- **Enspelled Items.** Enspelled Staffs, Weapons, and Armor come bound to a random spell of the level their
+  rarity allows.
+- **Weighting.** Sets how often enchanted items come up: per Combination, Variant, or Template.
+- **Pool.** Shows how many entries each rarity holds, and how many the Settlement Cap or the shop's current
+  stock leave out.
+- **Results.** Up to ten items per roll. Reroll or remove single results, then add the rest to the shop.
 
 <table>
   <tr>
     <td width="100%">
       <strong>Generate Item dialog</strong><br>
-      <img src="docs/example_item_generator.png" alt="Generate Item dialog with type, subtype, spell, rarity, and count filters" width="80%">
-    </td>
-  </tr>
-</table>
-
-### Discounts & Haggling
-
-- The shop's own Buy and Sell modifiers apply to every purchase and sale by default (0% and -50%).
-- Beyond that shop-wide rate, any single item can carry its own price override and its own discount
-  override, layered on top.
-- Certain item types — gemstones and art objects, by default, configurable per shop — are Fixed-Value:
-  their price never takes any discount or markup, shop-wide or per-item.
-- Every price carries a tooltip breaking down exactly which modifiers applied — item override, Fixed-Value,
-  shop rate, player override — down to the final percentage.
-- Either a player's own character or the shared Party actor can buy and sell, when both are eligible.
-- Per-player discounts live in their own dialog: drag an actor in, then set a buy/sell percentage for them
-  by hand — nothing here is computed automatically.
-- Haggling opens a roll dialog for a Charisma skill against a DC set by the shop NPC — the NPC's
-  Intelligence score, floored at 15, per the rules. The NPC's attitude toward the party grants advantage
-  (Friendly) or disadvantage (Hostile), also per the rules.
-- The roll itself never touches the shop's percentages — there's no official formula for how big a haggled
-  discount should be, so the GM decides and applies it by hand through the Player Discounts dialog.
-- A failed haggle locks that player out of trying again with this shop for 24 hours, per RAW — it clears
-  automatically at the next in-game day change (same calendar requirement as restocking), or a GM can lift
-  it early by hand from the Player Discounts dialog.
-
-<table>
-  <tr>
-    <td width="40%">
-      <strong>Haggle dialog</strong><br>
-      <img src="docs/example_haggle_dialog.png" alt="Haggle dialog with a skill and NPC attitude selection">
-    </td>
-    <td width="40%">
-      <strong>Player discounts</strong><br>
-      <img src="docs/example_players_discount.png" alt="Per-player buy and sell discount overrides">
-    </td>
-    <td width="20%">
-      <strong>Price modifier breakdown</strong><br>
-      <img src="docs/example_price_mod.png" alt="Tooltip breaking down a price modifier into its individual sources">
+      <img src="docs/example_item_generator.png" alt="Generate Item dialog with filters, pool preview, and a list of rolled results" width="80%">
     </td>
   </tr>
 </table>
@@ -201,34 +211,31 @@ out a campaign's shops, and where players go to open one for themselves.
 
 ## Crafting
 
-### Creating Recipes
+### Recipes
 
-- The Craft tab lists every recipe grouped by its target item's type, so players can see at a glance what's
-  available to make, its material value and crafting duration, and which tool/skill proficiencies it needs.
-- A recipe can be open to every player, or locked down to a specific list of actors.
-- Building one starts with a target item — required — picked from the Compendium Browser or dropped in
-  directly by UUID, plus how many of it the recipe produces per craft.
-- From there a GM sets the material value threshold, the required tool proficiency (with an optional
-  Arcana-style skill proficiency requirement, auto-suggested for magic target items), whether freeform
-  substitutes are allowed, and a duration. Price and duration default to the target item's rules-based cost
-  — with the DMG's own exceptions for Spell Scrolls (cost by spell level) and the Potion of Healing (1 day
-  / 25 GP) used instead of the generic rarity formula — or a recipe can ignore crafting value entirely and
-  rely only on its material list.
-- Materials come either as a fixed item reference or a rule (item type, subtype, and/or a minimum value),
-  matched by identifier the same way the target item is, or dropped in directly by UUID. By default only
-  the total material value needs to clear the threshold — a player can mix and match, or fill any gap with
-  freeform substitutes/gold — but a GM can mark any material Required, with its own required quantity, to
-  force it into every craft regardless of value.
-- A tool can be claimed as accessible without owning it — Allow Workshop Override — for recipes tied to a
-  fixed workshop rather than a personal toolkit.
-- The Recipe Editor flags a fixed material whose identifier won't reliably match an owned item, and a
-  target/material reference that can't currently be resolved at all.
+The Craft tab lists every recipe by the type of item it makes, with its material value, duration, and
+required proficiencies. Click a recipe to start crafting it. The GM writes recipes in the Recipe Editor.
+
+- **Target item.** The item a recipe makes and how many per craft. Cost and duration follow the item's
+  crafting value, or the GM sets a custom duration. A recipe can also skip the crafting value and rely on its
+  materials alone.
+- **Materials.** Each material is a fixed item or a rule, such as any gemstone worth 50 GP. The materials
+  only need to reach the recipe's total value, unless the GM marks one as Required. With Freeform Materials,
+  players may offer any item of enough value.
+- **Proficiencies.** Tools and skills combine by Proficiency Mode: Tool & Skill, Tool or Skill, or Every
+  Listed Tool & Skill. With Workshop Override, a character can work in a proper workshop instead of owning
+  the tool.
+- **Unlock.** A recipe is open to listed actors only, to everyone, or to every character proficient with its
+  tool.
+- **Spell Scrolls.** With a Spell Scroll as its target, the crafter picks a spell of the recipe's level, from
+  their prepared or known spells or from any compendium.
+- **Sharing.** Export recipes to JSON and import them into another world.
 
 <table>
   <tr>
     <td width="40%">
       <strong>Recipe editor</strong><br>
-      <img src="docs/example_new_recipe.png" alt="Recipe editor defining a target item, materials, tool, duration, and unlock rules">
+      <img src="docs/example_new_recipe.png" alt="Recipe editor with target item, material rule, tool and skill proficiencies, and proficiency mode">
     </td>
     <td width="60%">
       <strong>Recipe list</strong><br>
@@ -239,18 +246,21 @@ out a campaign's shops, and where players go to open one for themselves.
 
 ### Crafting an Item
 
-- Starting a craft opens a player-facing dialog: pick the tool (if the recipe allows more than one), choose
-  which owned materials to contribute, and optionally fill any remaining value gap with gold.
-- Starting it sends a chat card that needs GM confirmation before anything is consumed.
-- Once confirmed, the materials and gold are spent and an in-progress craft item spawns directly in the
-  character's inventory.
-- Clicking the item's activity advances progress by the recipe's own per-use duration (a workday, by DMG
-  default, when the recipe doesn't set one) once per Long Rest.
-- If that activity ever gets deleted by accident, it's recreated automatically the next time the sheet
-  renders; the in-progress item itself is not.
-- Once progress reaches the full duration, the in-progress item is replaced by the real target item.
-- If the character already owns an item with the same identifier, the finished item stacks onto it instead
-  of creating a duplicate.
+A player starts a craft from the Craft tab. Once the GM approves, the work goes on through the character's
+downtime.
+
+- **Start Craft.** Choose the character and tool, then add owned materials. Any value still missing can be
+  paid in gold. For a Spell Scroll, pick the spell and set its save DC and attack bonus, which default to
+  the crafter's own.
+- **Approval.** The order goes to the GM as a chat card. On acceptance, materials and gold are spent and an
+  in-progress item appears in the character's inventory.
+- **Working.** Use the Progress Craft activity of the in-progress item and enter the hours to work. A
+  character works up to 8 hours a day by default, and the count resets on a Long Rest. Each session posts
+  its progress to chat.
+- **Calendar time.** With a calendar source active, a session runs as in-game time passes. It completes on its
+  own once the planned hours are done, or the GM ends it early and credits the time spent.
+- **Completion.** When the work is done, the in-progress item becomes the finished item. If the character
+  already owns one, it stacks.
 
 <table>
   <tr>
@@ -265,8 +275,30 @@ out a campaign's shops, and where players go to open one for themselves.
   </tr>
   <tr>
     <td colspan="2">
-      <strong>In-progress craft item</strong><br>
-      <img src="docs/example_craft_item.png" alt="In-progress crafted item showing workday progress in its description" width="50%">
+      <strong>Crafting progress</strong><br>
+      <img src="docs/example_craft_item.png" alt="Progress Craft dialog for entering hours next to a crafting session chat card with an End Progress button" width="100%">
     </td>
   </tr>
 </table>
+
+---
+
+## Settings
+
+Two menus in the module settings hold world-wide options.
+
+- **Configure Defaults.** The Buy and Sell modifiers, shop money, Magical Items rule, and default stock per
+  item type that every new shop starts with.
+- **Configure Homebrew.** Max Hours per Workday for crafting, 8 by default, and the Calendar Mode.
+- **Calendar Mode.** Restock days, haggling cooldowns, and crafting sessions can follow Foundry's world
+  calendar. Calendar Mode turns on by itself when a world clearly keeps its calendar in use: Calendaria or
+  Ember is active, or dnd5e's Daily Recovery Mode is set to Calendar Recovery. Set it to Always On or Always
+  Off to decide by hand.
+
+---
+
+## Credits & License
+
+- **License.** Released under the [MIT License](LICENSE).
+- **Font.** The banner uses [Roboto Slab](https://fonts.google.com/specimen/Roboto+Slab) under the Apache
+  License 2.0.
