@@ -1,10 +1,14 @@
 <li class="item" data-index="{{ index }}"{{#if hasContextMenu}} data-id="{{ index }}"{{/if}}>
     <div class="item-row">
-        <div class="item-name item-tooltip" {{#if uuid}}data-uuid="{{ uuid }}"{{/if}}>
+        <div class="item-name item-tooltip{{#if uuid}} rollable{{/if}}"
+             {{#if uuid}}data-action="openItemSheet" data-uuid="{{ uuid }}" role="button" aria-label="{{ name }}"{{/if}}>
             {{> "modules/simple-shop-craft-5e/templates/shared/item-avatar-name.hbs"
                 img=img name=name subtitle=subtitle bundleSize=bundleSize }}
             {{#if warning}}
             <i class="fa-solid fa-triangle-exclamation warning" data-tooltip="{{ warningTooltip }}"></i>
+            {{/if}}
+            {{#if info}}
+            <i class="fa-solid fa-circle-info" data-tooltip="{{ info }}"></i>
             {{/if}}
         </div>
         {{#if price}}
@@ -15,14 +19,12 @@
         <div class="item-detail item-quantity">
             {{#if showQuantity}}
             <a class="adjustment-button always-interactive" data-action="stepMaterialQuantity" data-index="{{ index }}"
-               {{#if itemId}}data-item-id="{{ itemId }}"{{/if}} data-step="-1" data-max="{{ maxUnits }}"
-               aria-label="{{ localize 'DND5E.Decrease' }}">
+               data-step="-1" aria-label="{{ localize 'DND5E.Decrease' }}">
                 <i class="fa-solid fa-minus" inert></i>
             </a>
             <span class="value">{{ quantityLabel }}</span>
             <a class="adjustment-button always-interactive" data-action="stepMaterialQuantity" data-index="{{ index }}"
-               {{#if itemId}}data-item-id="{{ itemId }}"{{/if}} data-step="1" data-max="{{ maxUnits }}"
-               aria-label="{{ localize 'DND5E.Increase' }}">
+               data-step="1" aria-label="{{ localize 'DND5E.Increase' }}">
                 <i class="fa-solid fa-plus" inert></i>
             </a>
             {{else}}

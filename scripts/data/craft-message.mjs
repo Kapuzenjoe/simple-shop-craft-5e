@@ -1,4 +1,4 @@
-import { MODULE_ID } from "../config.mjs";
+import { CARD_STATUSES, MODULE_ID } from "../config.mjs";
 import { breakdownCopper } from "../utils.mjs";
 import { InProgressCraft } from "./in-progress-craft.mjs";
 
@@ -18,16 +18,6 @@ const {
 const TEMPLATE = "modules/simple-shop-craft-5e/templates/chat/craft-card.hbs";
 
 /**
- * Localization keys for each pending-craft status.
- * @type {Record<string, string>}
- */
-const STATUS_LABELS = {
-  pending: "SIMPLE_SHOP_CRAFT_5E.Status.Pending",
-  accepted: "SIMPLE_SHOP_CRAFT_5E.Status.Accepted",
-  rejected: "SIMPLE_SHOP_CRAFT_5E.Status.Rejected"
-};
-
-/**
  * A data model that represents a craft-start chat card's own flag data.
  * @extends {foundry.abstract.DataModel<CraftMessageCardData>}
  * @mixes CraftMessageCardData
@@ -37,13 +27,14 @@ export class CraftMessageData extends foundry.abstract.DataModel {
   /** @override */
   static defineSchema() {
     return {
-      status: new StringField({ initial: "pending", choices: ["pending", "accepted", "rejected"] }),
+      status: new StringField({ initial: "pending", choices: Object.keys(CARD_STATUSES) }),
       recipeId: new StringField({ blank: true }),
       targetItem: new SchemaField({
         identifier: new StringField({ blank: true }),
         uuid: new DocumentUUIDField({ type: "Item", blank: true })
       }),
       targetQuantity: new NumberField({ initial: 1, integer: true, min: 1 }),
+      count: new NumberField({ initial: 1, integer: true, min: 1 }),
       targetName: new StringField(),
       targetImg: new FilePathField({ categories: ["IMAGE"] }),
       actorUuid: new DocumentUUIDField({ type: "Actor" }),
@@ -98,11 +89,12 @@ export class CraftMessageData extends foundry.abstract.DataModel {
    * @param {number} options.hoursPerUse                Progress hours added by each "Progress Craft" activation.
    * @param {{ value: number, units: string }} options.weight              Target item's weight.
    * @param {{ value: number, denomination: string }} options.halfPrice    Half the target item's price.
+   * @param {number} options.count                      Runs of the recipe started by this craft.
    * @returns {Promise<ChatMessage>}
    */
   static async create({
     actor, recipe, targetItem, materialLines, goldCP, toolKey, spellUuid, scrollValues,
-    totalHours, hoursPerUse, weight, halfPrice
+    totalHours, hoursPerUse, weight, halfPrice, count
   }) {
     const craft = new CraftMessageData({
       recipeId: recipe._id,
@@ -114,7 +106,7 @@ export class CraftMessageData extends foundry.abstract.DataModel {
       materialLines: materialLines.map(line => ({
         itemId: line.item.id, name: line.item.name, img: line.item.img, quantity: line.quantity
       })),
-      goldCP, totalHours, hoursPerUse, weight, halfPrice
+      goldCP, totalHours, hoursPerUse, weight, halfPrice, count
     });
 
     return ChatMessage.create({
@@ -154,7 +146,7 @@ export class CraftMessageData extends foundry.abstract.DataModel {
   async renderContent() {
     return foundry.applications.handlebars.renderTemplate(TEMPLATE, {
       ...this.toObject(), goldParts: this.goldParts,
-      pending: this.status === "pending", statusLabel: _loc(STATUS_LABELS[this.status])
+      pending: this.status === "pending", statusLabel: _loc(CARD_STATUSES[this.status].label)
     });
   }
 

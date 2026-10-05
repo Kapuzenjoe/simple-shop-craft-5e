@@ -18,8 +18,12 @@
                                     data-tooltip aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.SettlementCap' }}">
                                 <i class="fas fa-cog" inert></i>
                             </button>
+                            {{else if settlementCapDisplay}}
+                            <span class="value">
+                            {{> "modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs" parts=settlementCapDisplay}}
+                            </span>
                             {{else}}
-                            <span class="value">{{ settlementCapDisplay }}</span>
+                            <span class="value">∞</span>
                             {{/if}}
                         </div>
                         {{/if}}

@@ -1,15 +1,7 @@
 <section class="tab {{ tab.cssClass }}" data-tab="filters" data-group="{{ tab.group }}">
-    <fieldset>
-        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemType" }}</legend>
-        {{> "dnd5e.fieldlist" typeFields }}
-    </fieldset>
-
-    {{#each typeFieldsets}}
-    <fieldset>
-        <legend>{{ this.label }}</legend>
-        {{> "dnd5e.fieldlist" this.fields }}
-    </fieldset>
-    {{/each}}
+    {{> "modules/simple-shop-craft-5e/templates/shared/type-filter.hbs"
+        legend=(localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemType") typeFields=typeFields
+        typeFieldsets=typeFieldsets }}
 
     <fieldset>
         <legend>{{ localize "DND5E.Rarity" }}</legend>

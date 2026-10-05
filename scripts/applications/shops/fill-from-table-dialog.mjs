@@ -1,5 +1,5 @@
 import { ShopItemEntry } from "../../data/shop-data.mjs";
-import { itemRef, resolveItemPrice, toCopper, warnSharedIdentifiers } from "../../utils.mjs";
+import { itemRef, resolveItemPrice, toCopper } from "../../utils.mjs";
 
 const { Dialog5e } = game.dnd5e.applications.api;
 const { DocumentUUIDField, StringField } = foundry.data.fields;
@@ -85,7 +85,7 @@ export default class FillFromTableDialog extends Dialog5e {
   /**
    * Handle drawing from the selected table and adding the resolved items to the shop's stock. A new item
    * is excluded from restock with current stock set to how many times it was drawn; an item already in
-   * the shop just has its current stock increased by that count, restock mode and max left untouched.
+   * the shop's Buy tab just has its current stock increased by that count, restock mode and max left untouched.
    * @this {FillFromTableDialog}
    * @param {Event} event                Triggering submit event.
    * @param {HTMLFormElement} form       The submitted form.
@@ -108,7 +108,6 @@ export default class FillFromTableDialog extends Dialog5e {
     const capCP = settlementCap?.value != null ? toCopper(settlementCap.value, settlementCap.denomination) : null;
 
     const counted = new Map();
-    const added = [];
     let skipped = 0;
     for ( const item of drawnItems ) {
       if ( !CONFIG.Item.dataModels[item?.type]?.inventorySection ) {
@@ -122,24 +121,22 @@ export default class FillFromTableDialog extends Dialog5e {
           continue;
         }
       }
-      added.push(item);
       const entry = itemRef(item);
-      const key = ShopItemEntry.key(entry);
+      const key = ShopItemEntry.key(entry, item);
       const existing = counted.get(key);
       if ( existing ) existing.count++;
-      else counted.set(key, { entry, label: item.name, count: 1 });
+      else counted.set(key, { key, entry, label: item.name, count: 1 });
     }
     const rolled = Array.from(counted.values());
-    warnSharedIdentifiers(added);
 
     if ( !rolled.length ) {
       ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.FillFromTableNone", { localize: true });
       return;
     }
 
-    const existingByKey = new Map(this.shopSheet.shop.items.map(i => [ShopItemEntry.key(i), i]));
-    await this.onFilled(rolled.map(({ entry, count }) => {
-      const existing = existingByKey.get(ShopItemEntry.key(entry));
+    const inShop = await ShopItemEntry.byKey(this.shopSheet.shop.items.filter(i => !i.isService));
+    await this.onFilled(rolled.map(({ key, entry, count }) => {
+      const existing = inShop.get(key);
       if ( existing ) {
         return { ...existing.toObject(), stock: { ...existing.stock, current: (existing.stock.current ?? 0) + count } };
       }

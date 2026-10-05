@@ -10,8 +10,9 @@ export default class SettlementCapConfig extends BaseShopConfig {
   constructor(options={}) {
     super(options);
     const settlementCap = this.shopSheet.shop.settlementCap;
-    this.#preset = Object.entries(SETTLEMENT_CAPS).find(([, v]) => v.value === settlementCap.value)?.[0]
-      ?? (settlementCap.value != null ? "custom" : "");
+    this.#preset = Object.entries(SETTLEMENT_CAPS).find(([, v]) => {
+      return (v.value === settlementCap.value) && (settlementCap.denomination === "gp");
+    })?.[0] ?? (settlementCap.value != null ? "custom" : "");
     this.#customValue = settlementCap.value;
     this.#customDenomination = settlementCap.denomination;
   }
@@ -66,7 +67,8 @@ export default class SettlementCapConfig extends BaseShopConfig {
     const presetOptions = [
       { value: "", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoCap") },
       ...Object.entries(SETTLEMENT_CAPS).map(([key, { label, value }]) => ({
-        value: key, label: `${_loc(label)} (${new Intl.NumberFormat(game.i18n.lang).format(value)} GP)`
+        value: key,
+        label: `${_loc(label)} (${new Intl.NumberFormat(game.i18n.lang).format(value)} ${CONFIG.DND5E.currencies.gp.abbreviation})`
       })),
       { value: "custom", label: _loc("SIMPLE_SHOP_CRAFT_5E.Custom") }
     ];

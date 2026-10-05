@@ -1,5 +1,5 @@
 import { PROFICIENCY_MODES, SETTING_KEYS, SPELL_SCROLL_SOURCES, UNLOCK_MODES } from "../config.mjs";
-import { toCopper } from "../utils.mjs";
+import { resolveBundleSize, toCopper } from "../utils.mjs";
 import SettingCollectionMixin from "./setting-collection-mixin.mjs";
 
 const {
@@ -159,8 +159,7 @@ export class Recipe extends SettingCollectionMixin(foundry.abstract.DataModel, S
   craftThreshold(craftCost, targetItem) {
     const explicit = Object.entries(this.materialPrice)
       .reduce((sum, [denom, value]) => sum + toCopper(value ?? 0, denom), 0);
-    const targetBundleSize = (targetItem?.system?.quantity > 1) ? targetItem.system.quantity : 1;
-    const scale = this.targetQuantity / targetBundleSize;
+    const scale = this.targetQuantity / resolveBundleSize(targetItem);
     if ( explicit > 0 ) return Math.ceil(explicit * scale);
     return craftCost ? toCopper(craftCost.gold * scale, "gp") : 0;
   }

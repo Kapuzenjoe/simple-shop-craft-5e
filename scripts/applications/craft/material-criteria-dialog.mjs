@@ -1,5 +1,5 @@
 import { RecipeMaterial } from "../../data/recipe-data.mjs";
-import { currencyValueField, subtypeOptions } from "../../utils.mjs";
+import { currencyValueField, itemTypeOptions, subtypeOptions } from "../../utils.mjs";
 
 const { Dialog5e } = game.dnd5e.applications.api;
 
@@ -58,16 +58,14 @@ export default class MaterialCriteriaDialog extends Dialog5e {
   async _prepareContentContext(context, options) {
     context = await super._prepareContentContext(context, options);
     context.legend = this.options.window?.title;
-    const typeOptions = Object.keys(CONFIG.Item.dataModels)
-      .filter(type => CONFIG.Item.dataModels[type]?.inventorySection)
-      .map(type => ({ value: type, label: _loc(`TYPES.Item.${type}Pl`) }));
     const subtypes = this.#type ? subtypeOptions([this.#type]) : [];
     context.fields = [
       {
         field: new foundry.data.fields.StringField(), name: "type", value: this.#type ?? "",
         label: _loc("SIMPLE_SHOP_CRAFT_5E.RecipeEditor.MaterialCriteriaType"),
         options: [
-          { value: "", label: _loc("SIMPLE_SHOP_CRAFT_5E.RecipeEditor.MaterialCriteriaChooseType") }, ...typeOptions
+          { value: "", label: _loc("SIMPLE_SHOP_CRAFT_5E.RecipeEditor.MaterialCriteriaChooseType") },
+          ...itemTypeOptions()
         ]
       },
       ...(subtypes.length ? [{

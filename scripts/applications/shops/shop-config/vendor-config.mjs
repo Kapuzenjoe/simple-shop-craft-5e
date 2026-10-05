@@ -1,6 +1,6 @@
 import { STOCK_MAGIC_RULES } from "../../../config.mjs";
 import { Shop } from "../../../data/shop-data.mjs";
-import { currencyRows, goldPoolCurrencies } from "../../../utils.mjs";
+import { currencyRows, goldPoolCurrencies, parseTypeFilter, typeFilterFields } from "../../../utils.mjs";
 import BaseShopConfig from "./base-shop-config.mjs";
 
 /**
@@ -11,12 +11,7 @@ import BaseShopConfig from "./base-shop-config.mjs";
 export default class VendorConfig extends BaseShopConfig {
   constructor({ shop, ...options }={}) {
     super(options);
-    this.shop = shop;
-    this.#unlimited = !!this.shop.goldPool.unlimited;
-    this.#amounts = { ...this.shop.goldPool.max };
-    this.#sellDisabled = !!this.shop.goldPool.sellDisabled;
-    this.#stockByType = { ...this.shop.stockDefaults.byType };
-    this.#magicRule = this.shop.stockDefaults.magicRule;
+    this.#shopId = shop._id;
   }
 
   /* -------------------------------------------- */
@@ -39,56 +34,27 @@ export default class VendorConfig extends BaseShopConfig {
   /* -------------------------------------------- */
 
   /**
+   * ID of the shop being configured.
+   * @type {string}
+   */
+  #shopId;
+
+  /* -------------------------------------------- */
+
+  /**
    * The shop being configured.
    * @type {Shop}
    */
-  shop;
-
-  /* -------------------------------------------- */
-
-  /**
-   * Whether the gold pool is unlimited, toggled live before submit.
-   * @type {boolean}
-   */
-  #unlimited;
-
-  /* -------------------------------------------- */
-
-  /**
-   * Whether this shop is purchase-only, toggled live before submit.
-   * @type {boolean}
-   */
-  #sellDisabled;
-
-  /* -------------------------------------------- */
-
-  /**
-   * Default max stock per item type, toggled live before submit. `null` per type means unlimited.
-   * @type {Record<string, number|null>}
-   */
-  #stockByType;
-
-  /* -------------------------------------------- */
-
-  /**
-   * Magic-item stock exemption rule, toggled live before submit.
-   * @type {string}
-   */
-  #magicRule;
-
-  /* -------------------------------------------- */
-
-  /**
-   * Currency amounts as last edited, keyed by denomination.
-   * @type {Record<string, number>}
-   */
-  #amounts;
+  get shop() {
+    return Shop.get(this.#shopId);
+  }
 
   /* -------------------------------------------- */
 
   /** @inheritDoc */
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
+    const { goldPool, stockDefaults } = this.shop;
 
     context.nameFields = [
       { field: Shop.schema.fields.name, name: "name", value: this.shop.name }
@@ -96,51 +62,37 @@ export default class VendorConfig extends BaseShopConfig {
 
     context.moneyFields = [
       {
-        field: Shop.schema.fields.goldPool.fields.sellDisabled, name: "sellDisabled", value: this.#sellDisabled,
+        field: Shop.schema.fields.goldPool.fields.sellDisabled, name: "sellDisabled", value: goldPool.sellDisabled,
         hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SellDisabledHint")
       }
     ];
     context.currencyRows = null;
-    if ( !this.#sellDisabled ) {
+    context.typeFilter = null;
+    if ( !goldPool.sellDisabled ) {
       context.moneyFields.push({
-        field: Shop.schema.fields.goldPool.fields.unlimited, name: "unlimited", value: this.#unlimited,
+        field: Shop.schema.fields.goldPool.fields.unlimited, name: "unlimited", value: goldPool.unlimited,
         hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GoldPoolMaxHint")
       });
-      if ( !this.#unlimited ) context.currencyRows = currencyRows(this.#amounts);
+      if ( !goldPool.unlimited ) context.currencyRows = currencyRows(goldPool.max);
+      context.typeFilter = typeFilterFields(this.shop.sellTypes);
+      context.typeFilter.typeFields[0].hint = _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SellTypesHint");
     }
 
     const byTypeField = Shop.schema.fields.stockDefaults.fields.byType.element;
     context.stockFields = [
       {
-        field: Shop.schema.fields.stockDefaults.fields.magicRule, name: "magicRule", value: this.#magicRule,
+        field: Shop.schema.fields.stockDefaults.fields.magicRule, name: "magicRule", value: stockDefaults.magicRule,
         options: Object.entries(STOCK_MAGIC_RULES).map(([value, { label }]) => ({ value, label: _loc(label) })),
         hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StockMagicRuleHint")
       },
-      ...Object.keys(this.#stockByType).map((type, index, types) => ({
-        field: byTypeField, name: `stockByType.${type}`, value: this.#stockByType[type], placeholder: "—",
+      ...Object.keys(stockDefaults.byType).map((type, index, types) => ({
+        field: byTypeField, name: `stockByType.${type}`, value: stockDefaults.byType[type], placeholder: "—",
         label: _loc(`TYPES.Item.${type}Pl`),
         hint: (index === types.length - 1) ? _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StockDefaultHint") : undefined
       }))
     ];
 
     return context;
-  }
-
-  /* -------------------------------------------- */
-
-  /** @inheritDoc */
-  _onChangeForm(formConfig, event) {
-    super._onChangeForm(formConfig, event);
-    const formData = new foundry.applications.ux.FormDataExtended(this.form);
-    foundry.utils.mergeObject(this.#amounts, formData.object);
-    if ( event.target.name === "sellDisabled" ) {
-      this.#sellDisabled = event.target.checked;
-      this.render({ parts: ["content"] });
-      return;
-    }
-    if ( event.target.name !== "unlimited" ) return;
-    this.#unlimited = event.target.checked;
-    this.render({ parts: ["content"] });
   }
 
   /* -------------------------------------------- */
@@ -155,7 +107,7 @@ export default class VendorConfig extends BaseShopConfig {
    */
   static async #onSubmit(event, form, formData) {
     const data = foundry.utils.expandObject(formData.object);
-    const currentGoldPool = Shop.get(this.shop._id).goldPool;
+    const currentGoldPool = this.shop.goldPool;
     const sellDisabled = !!data.sellDisabled;
     const unlimited = sellDisabled ? currentGoldPool.unlimited : !!data.unlimited;
     const max = sellDisabled ? currentGoldPool.max : goldPoolCurrencies().reduce((obj, denom) => {
@@ -174,7 +126,9 @@ export default class VendorConfig extends BaseShopConfig {
     await this.onUpdate({
       name: data.name || this.shop.name,
       goldPool: { ...currentGoldPool, max, unlimited, sellDisabled },
-      stockDefaults: { byType, magicRule: data.magicRule ?? "gear" }
+      stockDefaults: { byType, magicRule: data.magicRule ?? "gear" },
+      ...(sellDisabled ? {} : { sellTypes: parseTypeFilter(data) })
     });
+    if ( ["sellDisabled", "unlimited", "types"].includes(event.target?.name) ) this.render({ parts: ["content"] });
   }
 }

@@ -1,8 +1,7 @@
 import DefaultsConfig from "./applications/settings/defaults-config.mjs";
 import HomebrewConfig from "./applications/settings/homebrew-config.mjs";
 import {
-  CALENDAR_MODES, DEFAULT_STOCK_BY_TYPE, defaultStockKey, GOLD_POOL_DEFAULT, HOURS_PER_USE, MODULE_ID, SETTING_KEYS,
-  STOCK_MAGIC_RULES
+  CALENDAR_MODES, DEFAULT_STOCK_BY_TYPE, defaultStockKey, HOURS_PER_USE, MODULE_ID, SETTING_KEYS, STOCK_MAGIC_RULES
 } from "./config.mjs";
 import { Recipe } from "./data/recipe-data.mjs";
 import { Shop } from "./data/shop-data.mjs";
@@ -50,7 +49,7 @@ const SETTINGS = [
     hint: "SIMPLE_SHOP_CRAFT_5E.Settings.Defaults.GoldPool.Hint",
     key: SETTING_KEYS.DEFAULT_GOLD_POOL,
     scope: "world",
-    type: new NumberField({ required: true, nullable: false, initial: GOLD_POOL_DEFAULT, integer: true, min: 0 })
+    type: new NumberField({ required: true, nullable: false, initial: 100, integer: true, min: 0 })
   },
   {
     config: false,

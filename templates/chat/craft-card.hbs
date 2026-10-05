@@ -3,7 +3,10 @@
         <header class="summary">
             <img class="gold-icon" src="{{ targetImg }}" alt="{{ targetName }}">
             <div class="name-stacked">
-                <span class="title">{{ targetName }}</span>
+                <span class="title">
+                    {{ targetName }}
+                    {{#if (gt count 1)}}<span class="bundle-size">(&times;{{ count }})</span>{{/if}}
+                </span>
                 <span class="subtitle">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftCard.Crafter" }}: {{ actorName }}</span>
             </div>
         </header>

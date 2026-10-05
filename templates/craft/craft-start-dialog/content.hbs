@@ -26,6 +26,9 @@
             </div>
         </li>
     </ol>
+    {{#if countField}}
+    {{> "dnd5e.fieldlist" countField}}
+    {{/if}}
 </fieldset>
 
 {{#if recipe.spellScroll}}

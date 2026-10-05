@@ -5,12 +5,12 @@
     <ol class="item-list unlist">
         <li class="item">
             <div class="item-row">
-                <div class="item-name">
+                <div class="item-name item-tooltip rollable" data-action="openItemSheet" data-uuid="{{ targetItem.uuid }}"
+                     role="button" aria-label="{{ targetItem.name }}">
                     {{> "modules/simple-shop-craft-5e/templates/shared/item-avatar-name.hbs"
                         img=recipe.img name=targetItem.name }}
-                    {{#if targetNoIdentifier}}
-                    <i class="fa-solid fa-triangle-exclamation warning"
-                       data-tooltip="{{ localize 'SIMPLE_SHOP_CRAFT_5E.RecipeEditor.TargetNoIdentifierWarning' }}"></i>
+                    {{#if targetIdentifierWarning}}
+                    <i class="fa-solid fa-triangle-exclamation warning" data-tooltip="{{ targetIdentifierWarning }}"></i>
                     {{/if}}
                 </div>
                 <div class="item-detail item-controls always-visible">
@@ -71,7 +71,7 @@
     </p>
     {{> "modules/simple-shop-craft-5e/templates/shared/item-table.hbs" materialsTable}}
     <div class="drop-area" data-drop-area>
-        <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.DropMaterialHint" }}</p>
+        <p class="hint">{{{ localize "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.DropMaterialHint" }}}</p>
     </div>
 </fieldset>
 

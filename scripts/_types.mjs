@@ -54,6 +54,8 @@
  *                                          shop buys items back; 0 = no change.
  * @property {Set<string>} fixedValueLootTypes  Loot subtypes (e.g. gems, art objects) with a fixed market value,
  *                                          exempt from any buy/sell modifier.
+ * @property {Record<string, Set<string>>} sellTypes  Subtypes by item type this shop buys from players. Empty = any
+ *                                          type; an empty set = any subtype.
  * @property {ShopPlayerDiscountData[]} playerDiscounts  Per-actor buy/sell modifier overrides.
  * @property {string} [npc]                  UUID of the NPC actor this shop is assigned to.
  * @property {string} [location]             Optional free-text location (e.g. "Baldur's Gate").
@@ -159,6 +161,7 @@
  * @property {string} [targetItem.identifier]  Stable `system.identifier` of the item this craft produces.
  * @property {string} [targetItem.uuid]        Direct UUID reference, used when no `system.identifier` match exists.
  * @property {number} targetQuantity           Units to produce when this craft completes.
+ * @property {number} remaining                Runs of this craft still to finish, including the current one.
  * @property {string} spellUuid                Chosen spell UUID for a spell-scroll craft, or blank.
  * @property {{ dc: number, bonus: number }|null} scrollValues  Save DC/attack bonus for the crafted scroll.
  * @property {string} activityId               Id of the "Progress Craft" activity on the tracked item.
@@ -235,6 +238,7 @@
  * @property {string} [targetItem.identifier]     Stable `system.identifier` of the produced item.
  * @property {string} [targetItem.uuid]           Direct UUID reference, used when no `system.identifier` match exists.
  * @property {number} targetQuantity              Units to produce when this craft completes.
+ * @property {number} count                       Runs of the recipe started by this craft.
  * @property {string} targetName                  Display name of the produced item.
  * @property {string} targetImg                   Image path of the produced item.
  * @property {string} spellUuid                   Chosen spell UUID for a spell-scroll craft, or blank.
@@ -300,7 +304,6 @@
 /**
  * @typedef PurchaseSellLine
  * @property {string} itemId           Id of the sold item.
- * @property {string} identifier       Stable `system.identifier` of the sold item.
  * @property {string} name             Display name of the sold item.
  * @property {string} img              Image path of the sold item.
  * @property {number} quantity         Quantity sold.

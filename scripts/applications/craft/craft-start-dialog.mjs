@@ -1,9 +1,9 @@
 import { CraftMessageData } from "../../data/craft-message.mjs";
 import { Recipe } from "../../data/recipe-data.mjs";
 import {
-  applyDropArea, applyLoadingTooltip, breakdownCopper, buildItemTableSections, maxHoursPerWorkday,
-  needsDefaultPrice, openItemSheet, recipeCraftCost, resolveBundleSizes, resolveEntries, resolveItemPrice,
-  resolveTotalHours, selectableActors, subtypeOptions, toCopper
+  applyDropArea, applyLoadingTooltip, breakdownCopper, buildItemTableSections, matchIdentifier, maxHoursPerWorkday,
+  openItemSheet, recipeCraftCost, resolveEntries, resolveTotalHours, resolveUnitPrice, selectableActors,
+  subtypeOptions, toCopper
 } from "../../utils.mjs";
 
 const { Dialog5e } = game.dnd5e.applications.api;
@@ -104,10 +104,18 @@ export default class CraftStartDialog extends Dialog5e {
   /* -------------------------------------------- */
 
   /**
-   * Selected quantity per criteria-slot candidate, keyed by `{index}:{itemId}`.
+   * Selected quantity per material candidate, keyed by `{index}:{itemId}`.
    * @type {Map<string, number>}
    */
   #materialQuantities = new Map();
+
+  /* -------------------------------------------- */
+
+  /**
+   * Number of runs of the recipe to craft at once.
+   * @type {number}
+   */
+  #count = 1;
 
   /* -------------------------------------------- */
 
@@ -195,6 +203,11 @@ export default class CraftStartDialog extends Dialog5e {
     context.targetItem = state.targetItem;
     context.displayName = this.#targetItemName;
     context.noActor = !state.actor;
+
+    context.countField = (state.targetItem?.type === "container") ? null : [{
+      field: new foundry.data.fields.NumberField({ integer: true, min: 1 }), name: "count", value: state.count,
+      label: _loc("DND5E.Quantity")
+    }];
 
     context.spellField = null;
     context.noEligibleSpell = false;
@@ -325,6 +338,7 @@ export default class CraftStartDialog extends Dialog5e {
       this.#scrollBonus = null;
     }
     else if ( event.target.name === "toolKey" ) this.#toolKey = event.target.value;
+    else if ( event.target.name === "count" ) this.#count = Math.max(1, Math.floor(Number(event.target.value)) || 1);
     else if ( event.target.name === "workshopClaimed" ) this.#workshopClaimed = event.target.checked;
     else if ( event.target.name === "fillWithGold" ) this.#fillWithGold = event.target.checked;
     else if ( event.target.name === "spellUuid" ) this.#chosenSpellUuid = event.target.value || null;
@@ -373,7 +387,7 @@ export default class CraftStartDialog extends Dialog5e {
   /* -------------------------------------------- */
 
   /**
-   * Handle adjusting how many units of a criteria-slot candidate are contributed.
+   * Handle adjusting how many units of a material candidate are contributed.
    * @this {CraftStartDialog}
    * @param {Event} event         Triggering click event.
    * @param {HTMLElement} target  Button that was clicked.
@@ -391,10 +405,10 @@ export default class CraftStartDialog extends Dialog5e {
   /* -------------------------------------------- */
 
   /**
-   * Handle opening a criteria candidate's item sheet.
+   * Handle opening a material's or criteria candidate's item sheet.
    * @this {CraftStartDialog}
    * @param {Event} event         Triggering click event.
-   * @param {HTMLElement} target  Button that was clicked.
+   * @param {HTMLElement} target  Element that was clicked.
    * @returns {Promise<void>}
    */
   static async #openItemSheet(event, target) {
@@ -449,17 +463,15 @@ export default class CraftStartDialog extends Dialog5e {
     if ( !state.canStart ) return;
 
     const materialLines = [
-      ...state.fixedLines.flatMap(l => l.criteria
-        ? l.candidates.filter(c => c.selected > 0)
-          .map(c => ({ item: state.actor.items.get(c.id), quantity: c.selected }))
-        : distributeAcrossStacks(l.ownedStacks, l.suppliedUnits)),
+      ...state.fixedLines.flatMap(l => l.candidates.filter(c => c.selected > 0)
+        .map(c => ({ item: state.actor.items.get(c.id), quantity: c.selected }))),
       ...state.freeformItems.map(item => ({ item, quantity: 1 }))
     ];
     await CraftMessageData.create({
       actor: state.actor, recipe: state.recipe, targetItem: state.chosenSpell ?? state.targetItem,
       materialLines, spellUuid: state.chosenSpell?.uuid ?? null, scrollValues: state.scrollValues,
       goldCP: state.goldCP, toolKey: state.chosenToolKey, totalHours: state.totalHours,
-      hoursPerUse: state.hoursPerUse, weight: state.weight, halfPrice: state.halfPrice
+      hoursPerUse: state.hoursPerUse, weight: state.weight, halfPrice: state.halfPrice, count: state.count
     });
     ui.notifications.info("SIMPLE_SHOP_CRAFT_5E.CraftStart.Requested", { localize: true });
     this.close();
@@ -480,15 +492,16 @@ export default class CraftStartDialog extends Dialog5e {
 
     const [targetResolved] = await resolveEntries([recipe.targetItem]);
     const targetItem = targetResolved.item;
+    const count = (targetItem?.type === "container") ? 1 : this.#count;
     const craftCost = await recipeCraftCost(recipe, targetItem);
     let weight = null;
     let halfPrice = null;
     if ( !recipe.spellScroll && targetItem?.uuid ) {
       const fullTargetItem = await fromUuid(targetItem.uuid);
       if ( fullTargetItem ) {
-        weight = { ...fullTargetItem.system.weight };
+        weight = { ...fullTargetItem.system.weight, value: fullTargetItem.system.weight.value * count };
         halfPrice = {
-          value: Math.floor(fullTargetItem.system.price.value / 2),
+          value: Math.floor(fullTargetItem.system.price.value / 2) * count,
           denomination: fullTargetItem.system.price.denomination
         };
       }
@@ -519,84 +532,67 @@ export default class CraftStartDialog extends Dialog5e {
     const freeformItems = actor
       ? Array.from(this.#freeformIds).map(id => actor.items.get(id)).filter(Boolean)
       : [];
-    const rawCandidates = materialsResolved.map(({ entry }) => {
-      if ( !actor || !entry.criteria?.type ) return [];
-      return actor.items.filter(i => {
-        if ( i.type !== entry.criteria.type ) return false;
-        if ( entry.criteria.subtype && (i.system.type?.value !== entry.criteria.subtype) ) return false;
-        return true;
-      });
+    const rawCandidates = materialsResolved.map(({ entry, item }) => {
+      if ( !actor ) return [];
+      if ( entry.criteria?.type ) {
+        return actor.items.filter(i => {
+          if ( i.type !== entry.criteria.type ) return false;
+          if ( entry.criteria.subtype && (i.system.type?.value !== entry.criteria.subtype) ) return false;
+          return true;
+        });
+      }
+      const identifier = matchIdentifier(entry, item);
+      return identifier
+        ? actor.items.filter(i => (i.system.identifier === identifier) && (!item || (i.type === item.type)))
+        : [];
     });
-    const bundleSizes = await resolveBundleSizes([...rawCandidates.flat(), ...freeformItems]);
     const allocated = new Map(freeformItems.map(item => [item.id, 1]));
 
     const fixedLines = materialsResolved.map(({ entry, item }, index) => {
-      if ( entry.criteria?.type ) {
-        const minValueCP = (entry.value?.value != null) ? toCopper(entry.value.value, entry.value.denomination) : null;
-        const candidates = rawCandidates[index]
-          .filter(i => materialValueCP(i, bundleSizes.get(i.id)) >= (minValueCP ?? 0))
-          .map(i => {
-            const valueCP = materialValueCP(i, bundleSizes.get(i.id));
-            const available = Math.max(0, i.system.quantity - (allocated.get(i.id) ?? 0));
-            const selected = Math.min(this.#materialQuantities.get(`${index}:${i.id}`) ?? 0, available);
-            allocated.set(i.id, (allocated.get(i.id) ?? 0) + selected);
-            return {
-              id: i.id, name: i.name, img: i.img, uuid: i.uuid, available, selected, valueCP,
-              quantity: i.system.quantity,
-              price: breakdownCopper(valueCP)
-            };
-          });
-        const suppliedUnits = candidates.reduce((sum, c) => sum + c.selected, 0);
-        const suppliedLineCP = (minValueCP != null)
-          ? Math.min(suppliedUnits, entry.quantity) * minValueCP
-          : candidates.reduce((sum, c) => sum + (c.selected * c.valueCP), 0);
-        const subtypeLabel = entry.criteria.subtype
-          ? subtypeOptions([entry.criteria.type]).find(o => o.value === entry.criteria.subtype)?.label
-          : null;
-        const name = subtypeLabel ?? _loc(`TYPES.Item.${entry.criteria.type}Pl`);
-        return {
-          name, criteria: entry.criteria, candidates, index, required: entry.required, quantity: entry.quantity,
-          suppliedUnits, suppliedLineCP, slotMet: suppliedUnits >= entry.quantity,
-          priceOverride: (entry.value?.value != null) ? entry.value : null
-        };
-      }
-      const materialIdentifier = item?.system?.identifier || entry.identifier;
-      const ownedStacks = (actor && materialIdentifier)
-        ? actor.items.filter(i => i.system.identifier === materialIdentifier)
-        : [];
-      const owned = ownedStacks[0] ?? null;
-      const ownedQuantity = ownedStacks.reduce(
-        (sum, i) => sum + Math.max(0, i.system.quantity - (allocated.get(i.id) ?? 0)), 0
-      );
-      const maxUnits = Math.min(ownedQuantity, entry.quantity);
-      const overrideKey = owned ? `${index}:${owned.id}` : null;
-      const suppliedUnits = owned ? Math.min(this.#materialQuantities.get(overrideKey) ?? 0, maxUnits) : 0;
-      if ( owned ) allocated.set(owned.id, (allocated.get(owned.id) ?? 0) + suppliedUnits);
-      const itemBundleSize = (item?.system?.quantity > 1) ? item.system.quantity : 1;
-      const itemValueCP = (entry.value?.value != null)
-        ? toCopper(entry.value.value, entry.value.denomination)
-        : (owned ? materialValueCP(owned, itemBundleSize) : 0);
-      const ownedPrice = owned ? resolveItemPrice(owned) : null;
+      const isRule = !!entry.criteria?.type;
+      const needed = entry.quantity * count;
+      const limit = isRule ? Infinity : needed;
+      const minValueCP = (entry.value?.value != null) ? toCopper(entry.value.value, entry.value.denomination) : null;
+      let suppliedUnits = 0;
+      const candidates = rawCandidates[index]
+        .filter(i => !isRule || (materialValueCP(i) >= (minValueCP ?? 0)))
+        .map(i => {
+          const valueCP = materialValueCP(i);
+          const available = Math.max(0, i.system.quantity - (allocated.get(i.id) ?? 0));
+          const requested = this.#materialQuantities.get(`${index}:${i.id}`) ?? 0;
+          const selected = Math.min(requested, available, limit - suppliedUnits);
+          suppliedUnits += selected;
+          allocated.set(i.id, (allocated.get(i.id) ?? 0) + selected);
+          return {
+            id: i.id, name: i.name, img: i.img, uuid: i.uuid, available, selected, valueCP,
+            quantity: i.system.quantity,
+            price: breakdownCopper(valueCP)
+          };
+        });
+      const suppliedLineCP = (minValueCP != null)
+        ? Math.min(suppliedUnits, needed) * minValueCP
+        : candidates.reduce((sum, c) => sum + (c.selected * c.valueCP), 0);
+      const subtypeLabel = entry.criteria?.subtype
+        ? subtypeOptions([entry.criteria.type]).find(o => o.value === entry.criteria.subtype)?.label
+        : null;
+      const name = isRule
+        ? (subtypeLabel ?? _loc(`TYPES.Item.${entry.criteria.type}Pl`))
+        : (item?.name || entry.identifier || entry.uuid);
       return {
-        name: item?.name ?? entry.identifier ?? entry.uuid, img: item?.img, item: owned, ownedStacks,
-        required: entry.required, quantity: entry.quantity, suppliedUnits, ownedQuantity,
-        suppliedLineCP: suppliedUnits * itemValueCP, slotMet: suppliedUnits >= entry.quantity,
-        priceOverride: (entry.value?.value != null) ? entry.value : (ownedPrice
-          ? { value: ownedPrice.value / itemBundleSize, denomination: ownedPrice.denomination }
-          : null)
+        name, img: item?.img, uuid: item?.uuid ?? null, criteria: isRule ? entry.criteria : null, candidates, index,
+        required: entry.required, quantity: needed, suppliedUnits,
+        availableUnits: candidates.reduce((sum, c) => sum + c.available, 0), suppliedLineCP,
+        slotMet: suppliedUnits >= needed,
+        priceOverride: (entry.value?.value != null) ? entry.value : null
       };
     });
     const suppliedCP = fixedLines.reduce((sum, l) => sum + l.suppliedLineCP, 0)
-      + freeformItems.reduce((sum, item) => sum + materialValueCP(item, bundleSizes.get(item.id)), 0);
-    const thresholdCP = recipe.craftThreshold(craftCost, targetItem);
+      + freeformItems.reduce((sum, item) => sum + materialValueCP(item), 0);
+    const thresholdCP = recipe.craftThreshold(craftCost, targetItem) * count;
     const shortfallCP = Math.max(0, thresholdCP - suppliedCP);
     const materialsMet = recipe.ignoreCraftValue || (suppliedCP >= thresholdCP);
     const requiredMet = fixedLines.every(l => !l.required || l.slotMet);
-    const requiredAvailable = fixedLines.every(l => {
-      if ( !l.required ) return true;
-      if ( l.criteria ) return l.candidates.reduce((sum, c) => sum + c.available, 0) >= l.quantity;
-      return l.ownedQuantity >= l.quantity;
-    });
+    const requiredAvailable = fixedLines.every(l => !l.required || (l.availableUnits >= l.quantity));
 
     let goldCP = 0;
     let goldInsufficient = false;
@@ -653,7 +649,7 @@ export default class CraftStartDialog extends Dialog5e {
       suppliedCP, thresholdCP, shortfallCP, materialsMet, goldCP, goldInsufficient,
       toolKeys, chosenToolKey, proficient, toolOwned, toolEligible, skillProficient,
       skillRequired: skillKeys.length > 0, toolStatuses, skillStatuses, canStart, totalHours,
-      hoursPerUse, weight, halfPrice, requiredMet, requiredAvailable, spellOptions, chosenSpell,
+      hoursPerUse, weight, halfPrice, count, requiredMet, requiredAvailable, spellOptions, chosenSpell,
       scrollValues
     };
   }
@@ -662,8 +658,8 @@ export default class CraftStartDialog extends Dialog5e {
 /* -------------------------------------------- */
 
 /**
- * Build item-table row data for the crafting-materials list: fixed material lines, one row per criteria
- * slot (with its candidates nested as an activity list), and freeform items.
+ * Build item-table row data for the crafting-materials list: one row per material line (with its candidates
+ * nested as an activity list), and freeform items.
  * @param {object} state  Computed dialog state.
  * @returns {{ hasRows: boolean, emptyLabel: string, sections: object[] }}
  */
@@ -682,15 +678,13 @@ function buildMaterialsTable(state) {
       };
     }
     return {
-      ...shared, img: line.img, name: line.name, uuid: line.item?.uuid ?? null, price,
-      showQuantity: !!line.item, quantity: line.suppliedUnits, itemId: line.item?.id ?? null,
-      maxUnits: line.item ? Math.min(line.ownedQuantity, line.quantity) : 0,
-      quantityLabel: !line.item ? null : (line.required ? `${line.suppliedUnits}/${line.quantity}` : line.suppliedUnits),
-      subtitle: (line.ownedQuantity >= line.quantity)
+      ...shared, img: line.img, name: line.name, uuid: line.uuid, price,
+      quantityLabel: `${line.suppliedUnits}/${line.quantity}`, candidates: line.candidates,
+      subtitle: (line.availableUnits >= line.quantity)
         ? null
-        : (line.ownedQuantity > 0
+        : (line.availableUnits > 0
           ? _loc("SIMPLE_SHOP_CRAFT_5E.CraftStart.MaterialInsufficient",
-            { owned: line.ownedQuantity, required: line.quantity })
+            { owned: line.availableUnits, required: line.quantity })
           : _loc("SIMPLE_SHOP_CRAFT_5E.CraftStart.MaterialMissing"))
     };
   });
@@ -715,35 +709,12 @@ function buildMaterialsTable(state) {
 /* -------------------------------------------- */
 
 /**
- * Distribute a required quantity across an owned material's stacks, consuming each in order (by owned
- * item collection order) until the quantity is satisfied or the stacks run out.
- * @param {Item5e[]} stacks
- * @param {number} quantity
- * @returns {{ item: Item5e, quantity: number }[]}
- */
-function distributeAcrossStacks(stacks, quantity) {
-  const lines = [];
-  let remaining = quantity;
-  for ( const stack of stacks ) {
-    if ( remaining <= 0 ) break;
-    const take = Math.min(stack.system.quantity, remaining);
-    if ( take > 0 ) lines.push({ item: stack, quantity: take });
-    remaining -= take;
-  }
-  return lines;
-}
-
-/* -------------------------------------------- */
-
-/**
  * Resolve an owned item's contributed value in copper, per unit — via its own price or the rarity-based
- * fallback, divided by its canonical bundle size (e.g. a stack of 20 arrows priced as a whole).
+ * fallback, divided by its bundle size (e.g. a stack of 20 arrows priced as a whole).
  * @param {Item5e} item
- * @param {number} [bundleSize]
  * @returns {number}
  */
-function materialValueCP(item, bundleSize=1) {
-  const price = needsDefaultPrice(item) ? resolveItemPrice(item) : item.system.price;
-  if ( !price?.value ) return 0;
-  return toCopper(price.value / bundleSize, price.denomination);
+function materialValueCP(item) {
+  const price = resolveUnitPrice(item);
+  return price ? toCopper(price.value, price.denomination) : 0;
 }

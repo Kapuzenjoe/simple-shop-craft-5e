@@ -8,13 +8,6 @@ import BaseShopConfig from "./base-shop-config.mjs";
  * Dialog to edit a lodging entry's tier, name, price, icon, and description. Autosaves on every change.
  */
 export default class LodgingConfig extends BaseShopConfig {
-  constructor(options={}) {
-    super(options);
-    this.#tier = this.entry.lodging.tier;
-  }
-
-  /* -------------------------------------------- */
-
   /** @override */
   static DEFAULT_OPTIONS = {
     id: "lodging-config-{id}",
@@ -32,14 +25,6 @@ export default class LodgingConfig extends BaseShopConfig {
 
   /* -------------------------------------------- */
 
-  /**
-   * Currently selected tier, toggled live to drive the Name placeholder and Price default.
-   * @type {string}
-   */
-  #tier;
-
-  /* -------------------------------------------- */
-
   /** @inheritDoc */
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
@@ -47,10 +32,10 @@ export default class LodgingConfig extends BaseShopConfig {
     context.imgField = LodgingBlueprint.schema.fields.img;
     context.img = entry.lodging.img;
     context.description = entry.lodging.description;
-    const tierConfig = LODGING_TIERS[this.#tier];
+    const tierConfig = LODGING_TIERS[entry.lodging.tier];
     context.fields = [
       {
-        field: LodgingBlueprint.schema.fields.tier, name: "tier", value: this.#tier,
+        field: LodgingBlueprint.schema.fields.tier, name: "tier", value: entry.lodging.tier,
         label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.LodgingTier"),
         options: Object.entries(LODGING_TIERS).map(([value, { label }]) => ({ value, label: _loc(label) }))
       },
@@ -69,21 +54,6 @@ export default class LodgingConfig extends BaseShopConfig {
 
   /* -------------------------------------------- */
 
-  /** @inheritDoc */
-  _onChangeForm(formConfig, event) {
-    super._onChangeForm(formConfig, event);
-    if ( event.target.name === "img" ) {
-      const preview = this.element.querySelector(".icon-picker-preview");
-      if ( preview ) preview.src = event.target.value || "icons/svg/house.svg";
-      return;
-    }
-    if ( event.target.name !== "tier" ) return;
-    this.#tier = event.target.value;
-    this.render({ parts: ["content"] });
-  }
-
-  /* -------------------------------------------- */
-
   /**
    * Handle persisting the edited lodging entry.
    * @this {LodgingConfig}
@@ -94,18 +64,20 @@ export default class LodgingConfig extends BaseShopConfig {
    */
   static async #onSubmit(event, form, formData) {
     const data = foundry.utils.expandObject(formData.object);
-    const tierConfig = LODGING_TIERS[data.tier];
+    const tier = data.tier || this.entry.lodging.tier;
+    const tierConfig = LODGING_TIERS[tier];
     const items = this.shopSheet.shop.items.map(i => {
-      if ( ShopItemEntry.key(i) !== this.entryKey ) return i.toObject();
+      if ( i._id !== this.entryKey ) return i.toObject();
       return {
         ...i.toObject(),
         lodging: {
-          tier: data.tier, name: data.name || "", description: data.description || "",
+          tier, name: data.name || "", description: data.description || "",
           img: data.img || "icons/svg/house.svg"
         },
         price: { value: data.value ?? null, denomination: data.denomination ?? tierConfig.price.denomination }
       };
     });
     await this.onUpdate({ items });
+    if ( ["tier", "img"].includes(event.target?.name) ) this.render({ parts: ["content"] });
   }
 }

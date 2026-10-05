@@ -1,6 +1,9 @@
+import { ANY_VALUE } from "../../config.mjs";
 import GeneratorProfile from "../../data/generator-profile.mjs";
 import { ShopItemEntry } from "../../data/shop-data.mjs";
-import { breakdownCopper, itemRarity, resolveItemPrice, subtypeOptions, toCopper } from "../../utils.mjs";
+import {
+  breakdownCopper, itemRarity, parseTypeFilter, resolveItemPrice, toCopper, typeFilterFields
+} from "../../utils.mjs";
 
 const { Dialog5e } = game.dnd5e.applications.api;
 
@@ -8,12 +11,6 @@ const { Dialog5e } = game.dnd5e.applications.api;
  * @import { GeneratorPool, ShopItemEntryData } from "../../_types.mjs";
  * @import ShopSheet from "./shop-sheet.mjs";
  */
-
-/**
- * Sentinel value meaning "no restriction on this axis" in a multi-select field.
- * @type {string}
- */
-const ANY_VALUE = "any";
 
 /**
  * GM-facing dialog to roll random shop item entries: multi-select item types, each with its own
@@ -143,6 +140,14 @@ export default class GenerateItemDialog extends Dialog5e {
   /* -------------------------------------------- */
 
   /**
+   * The keys of the shop's entries, kept for the entries they were built from.
+   * @type {{ items: ShopItemEntryData[], keys: Promise<Set<string>> }|null}
+   */
+  #shopKeys = null;
+
+  /* -------------------------------------------- */
+
+  /**
    * The function to invoke when the pool needs to be rebuilt.
    * @type {Function}
    */
@@ -182,45 +187,24 @@ export default class GenerateItemDialog extends Dialog5e {
    * @protected
    */
   async _prepareFiltersContext(context, options) {
-    const typeOptions = Object.keys(CONFIG.Item.dataModels)
-      .filter(type => CONFIG.Item.dataModels[type]?.inventorySection)
-      .map(type => ({ value: type, label: _loc(`TYPES.Item.${type}Pl`) }));
-
-    context.typeFields = [{
-      field: new foundry.data.fields.SetField(new foundry.data.fields.StringField()), name: "types",
-      label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemType"), value: Object.keys(this.#profile.types),
-      options: typeOptions
-    }];
-
-    context.typeFieldsets = await Promise.all(Object.keys(this.#profile.types)
-      .toSorted((a, b) => (CONFIG.Item.dataModels[a]?.inventorySection?.order ?? Infinity)
-        - (CONFIG.Item.dataModels[b]?.inventorySection?.order ?? Infinity))
-      .map(async type => {
-        const selected = this.#profile.types[type];
-        const fields = [{
-          field: new foundry.data.fields.SetField(new foundry.data.fields.StringField()), name: `subtypes.${type}`,
-          label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemSubtype"),
-          value: selected.size ? Array.from(selected) : [ANY_VALUE],
+    const { typeFields, typeFieldsets } = typeFilterFields(this.#profile.types);
+    context.typeFields = typeFields;
+    context.typeFieldsets = await Promise.all(typeFieldsets.map(async ({ type, label, fields }) => {
+      const baseItemOptions = await this.#profile.getBaseItemOptions(type);
+      if ( baseItemOptions.length ) {
+        const selectedBaseItems = this.#profile.getBaseItems(type);
+        fields.push({
+          field: new foundry.data.fields.SetField(new foundry.data.fields.StringField()), name: `baseItems.${type}`,
+          label: _loc(`DND5E.Item${type.capitalize()}Base`),
+          value: selectedBaseItems ? Array.from(selectedBaseItems) : [ANY_VALUE],
           options: [
             { value: ANY_VALUE, label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemAny") },
-            ...subtypeOptions([type])
+            ...baseItemOptions
           ]
-        }];
-        const baseItemOptions = await this.#profile.getBaseItemOptions(type);
-        if ( baseItemOptions.length ) {
-          const selectedBaseItems = this.#profile.getBaseItems(type);
-          fields.push({
-            field: new foundry.data.fields.SetField(new foundry.data.fields.StringField()), name: `baseItems.${type}`,
-            label: _loc(`DND5E.Item${type.capitalize()}Base`),
-            value: selectedBaseItems ? Array.from(selectedBaseItems) : [ANY_VALUE],
-            options: [
-              { value: ANY_VALUE, label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemAny") },
-              ...baseItemOptions
-            ]
-          });
-        }
-        return { label: _loc(`TYPES.Item.${type}Pl`), fields };
-      }));
+        });
+      }
+      return { label, fields };
+    }));
 
     context.globalFields = [
       {
@@ -407,12 +391,8 @@ export default class GenerateItemDialog extends Dialog5e {
   static async #onSubmit(event, form, formData) {
     const data = foundry.utils.expandObject(formData.object);
     const profile = new GeneratorProfile({
-      types: Object.fromEntries(
-        (data.types ?? []).map(type => [type, parseMultiSelect(data.subtypes ?? {}, type)])
-      ),
-      baseItems: Object.fromEntries(
-        (data.types ?? []).map(type => [type, parseMultiSelect(data.baseItems ?? {}, type)])
-      ),
+      types: parseTypeFilter(data),
+      baseItems: parseTypeFilter(data, "baseItems"),
       rarities: parseMultiSelect(data, "rarities").map(r => r === "mundane" ? "" : r),
       magic: data.magic || ANY_VALUE,
       weighting: data.weighting,
@@ -436,12 +416,18 @@ export default class GenerateItemDialog extends Dialog5e {
   /* -------------------------------------------- */
 
   /**
-   * Get the keys of the entries in the shop, along with those of any extra entries.
-   * @param {ShopItemEntryData[]} [extra]
-   * @returns {Set<string>}
+   * Get the keys of the entries in the shop, along with those of any listed results.
+   * @param {{ entry: ShopItemEntryData, item: Item5e }[]} [listed]
+   * @returns {Promise<Set<string>>}
    */
-  #entryKeys(extra=[]) {
-    return new Set([...this.shopSheet.shop.items, ...extra].map(entry => ShopItemEntry.key(entry)));
+  async #entryKeys(listed=[]) {
+    const { items } = this.shopSheet.shop;
+    if ( this.#shopKeys?.items !== items ) {
+      this.#shopKeys = { items, keys: ShopItemEntry.byKey(items).then(byKey => new Set(byKey.keys())) };
+    }
+    const keys = new Set(await this.#shopKeys.keys);
+    for ( const { entry, item } of listed ) keys.add(ShopItemEntry.key(entry, item));
+    return keys;
   }
 
   /* -------------------------------------------- */
@@ -454,9 +440,9 @@ export default class GenerateItemDialog extends Dialog5e {
     if ( this.#pool ) return this.#pool;
     const profile = this.#profile;
     if ( this.#pendingPool?.profile !== profile ) {
-      const promise = profile.buildPool({
-        settlementCap: this.shopSheet.shop.settlementCap, existingKeys: this.#entryKeys()
-      }).then(pool => {
+      const promise = this.#entryKeys().then(existingKeys => profile.buildPool({
+        settlementCap: this.shopSheet.shop.settlementCap, existingKeys
+      })).then(pool => {
         if ( this.#pendingPool?.profile === profile ) this.#pendingPool = null;
         if ( profile === this.#profile ) this.#pool = pool;
         return pool;
@@ -470,15 +456,16 @@ export default class GenerateItemDialog extends Dialog5e {
 
   /**
    * Roll items that are neither in the shop nor in the result list, and resolve them.
-   * @param {ShopItemEntryData[]} [listed]  Entries of the result list that must not come up again.
-   * @param {number} [count]                How many items to roll. Defaults to the count of the settings.
+   * @param {{ entry: ShopItemEntryData, item: Item5e }[]} [listed]  Results of the result list that must not come
+   *   up again.
+   * @param {number} [count]  How many items to roll. Defaults to the count of the settings.
    * @returns {Promise<{ entry: ShopItemEntryData, item: Item5e }[]>}
    */
   async #rollResults(listed=[], count=this.#profile.count) {
     const { settlementCap, stockDefaults } = this.shopSheet.shop;
     const pool = await this.#buildPool();
     const rolled = await this.#profile.roll({
-      existingKeys: this.#entryKeys(listed), settlementCap, stockDefaults, pool, count
+      existingKeys: await this.#entryKeys(listed), settlementCap, stockDefaults, pool, count
     });
     return (await ShopItemEntry.resolveMany(rolled.map(r => r.entry))).filter(({ item }) => item);
   }
@@ -525,7 +512,7 @@ export default class GenerateItemDialog extends Dialog5e {
     if ( !previous ) return;
     target.disabled = true;
     try {
-      const [result] = await this.#rollResults(this.#results.map(({ entry }) => entry), 1);
+      const [result] = await this.#rollResults(this.#results, 1);
       if ( !result ) {
         ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemNone", { localize: true });
         return;

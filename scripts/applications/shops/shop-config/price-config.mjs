@@ -1,5 +1,5 @@
 import { ShopItemEntry } from "../../../data/shop-data.mjs";
-import { currencyValueField } from "../../../utils.mjs";
+import { currencyValueField, resolveBundleSize } from "../../../utils.mjs";
 import BaseShopConfig from "./base-shop-config.mjs";
 
 /**
@@ -35,7 +35,7 @@ export default class PriceConfig extends BaseShopConfig {
         field: bundleSizeField, name: "bundleSize", value: entry.bundleSize,
         label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.BundleSize"),
         hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.BundleSizeHint"),
-        placeholder: (item?.system?.quantity > 1) ? item.system.quantity : 1
+        placeholder: resolveBundleSize(item)
       });
     }
     return context;
@@ -53,7 +53,7 @@ export default class PriceConfig extends BaseShopConfig {
    */
   static async #onSubmit(event, form, formData) {
     const data = foundry.utils.expandObject(formData.object);
-    const items = this.shopSheet.shop.items.map(i => ShopItemEntry.key(i) !== this.entryKey ? i.toObject() : {
+    const items = this.shopSheet.shop.items.map(i => (i._id !== this.entryKey) ? i.toObject() : {
       ...i.toObject(),
       price: { value: data.value ?? null, denomination: data.denomination },
       bundleSize: data.bundleSize ?? null

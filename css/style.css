@@ -388,6 +388,10 @@
     font-size: var(--font-size-11);
   }
 
+  .shop-summary-info .value i.currency {
+    font-size: var(--font-size-11);
+  }
+
   .player-area {
     flex: 0 0 200px;
     display: flex;

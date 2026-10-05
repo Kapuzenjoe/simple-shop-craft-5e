@@ -60,7 +60,7 @@ export default class DiscountConfig extends BaseShopConfig {
    */
   static async #onSubmit(event, form, formData) {
     const data = foundry.utils.expandObject(formData.object);
-    const items = this.shopSheet.shop.items.map(i => ShopItemEntry.key(i) !== this.entryKey ? i.toObject() : {
+    const items = this.shopSheet.shop.items.map(i => (i._id !== this.entryKey) ? i.toObject() : {
       ...i.toObject(),
       discount: data.discount ?? null
     });

@@ -30,10 +30,60 @@ export const SETTING_KEYS = {
 export const EXCLUDED_PACKS = new Set(["dnd5e.monsterfeatures", "dnd5e.monsterfeatures24", "dnd-monster-manual.features"]);
 
 /**
- * Package types, in priority order, searched when resolving an identifier-based entry.
- * @type {string[]}
+ * Number of units covered by the price of a bundle, such as 20 arrows, by item identifier.
+ * @type {Record<string, number>}
  */
-export const PACKAGE_TYPE_ORDER = ["module", "system", "world"];
+export const BUNDLE_SIZES = {
+  arrows: 20,
+  bolts: 20,
+  "bullets-firearm": 10,
+  "bullets-sling": 20,
+  needles: 50,
+  "spikes-iron": 10
+};
+
+/**
+ * Compendium packs, in priority order, that supply the items of a starter pack for each rules version.
+ * @type {Record<"modern"|"legacy", string[]>}
+ */
+export const STARTER_SOURCES = {
+  modern: ["dnd-players-handbook.equipment", "dnd5e.equipment24"],
+  legacy: ["dnd5e.items", "dnd5e.tradegoods"]
+};
+
+/**
+ * Identifiers of starter pack items that the legacy rules spell differently.
+ * @type {Record<string, string>}
+ */
+export const LEGACY_IDENTIFIERS = {
+  acid: "acid-vial",
+  arrows: "arrow",
+  bolts: "crossbow-bolt",
+  "bottle-glass": "glass-bottle",
+  "bullets-sling": "sling-bullet",
+  "case-crossbow-bolt": "crossbow-bolt-case",
+  "case-map-or-scroll": "map-or-scroll-case",
+  chain: "chain-10-feet",
+  "clothes-fine": "fine-clothes",
+  "clothes-travelers": "travelers-clothes",
+  costume: "costume-clothes",
+  dice: "dice-set",
+  "holy-water": "flask-of-holy-water",
+  ink: "ink-bottle",
+  ladder: "ladder-10-foot",
+  "lantern-bullseye": "bullseye-lantern",
+  "lantern-hooded": "hooded-lantern",
+  mirror: "steel-mirror",
+  oil: "oil-flask",
+  "playing-cards": "playing-cards-set",
+  "poison-basic": "basic-poison",
+  "pot-iron": "iron-pot",
+  "ram-portable": "portable-ram",
+  robe: "robes",
+  rope: "hempen-rope-50-ft",
+  "spikes-iron": "iron-spike",
+  tent: "two-person-tent"
+};
 
 /**
  * Settlement cap guideline values per DMG 2024 "Settlements by Size".
@@ -44,13 +94,6 @@ export const SETTLEMENT_CAPS = {
   town: { label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Town", value: 2000 },
   city: { label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.City", value: 200000 }
 };
-
-/**
- * Default effective gold pool (in GP) used when a shop has neither an explicit gold pool
- * nor "unlimited" enabled.
- * @type {number}
- */
-export const GOLD_POOL_DEFAULT = 100;
 
 /**
  * Suggested default max stock per item type for newly created shops, editable per shop afterward.
@@ -149,6 +192,16 @@ export const CALENDAR_MODES = {
 };
 
 /**
+ * Statuses of a purchase or craft chat card awaiting GM confirmation.
+ * @type {Record<string, { label: string }>}
+ */
+export const CARD_STATUSES = {
+  pending: { label: "SIMPLE_SHOP_CRAFT_5E.Status.Pending" },
+  accepted: { label: "SIMPLE_SHOP_CRAFT_5E.Status.Accepted" },
+  rejected: { label: "SIMPLE_SHOP_CRAFT_5E.Status.Rejected" }
+};
+
+/**
  * Unlock behaviors for a recipe.
  * @type {Record<string, { label: string }>}
  */
@@ -177,6 +230,12 @@ export const SPELL_SCROLL_SOURCES = {
   owned: { label: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.SpellScrollSourceOwned" },
   compendium: { label: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.SpellScrollSourceCompendium" }
 };
+
+/**
+ * Multi-select value representing no restriction.
+ * @type {string}
+ */
+export const ANY_VALUE = "any";
 
 /**
  * Hours of progress granted per use of the "Progress Craft" activity (one downtime workday), per DMG
@@ -218,7 +277,7 @@ export const ENSPELLED_ITEMS = {
 
 /**
  * Starter packs a GM can pick from when creating a new shop, to pre-fill its item list.
- * @type {Record<string, { label: string, items: (string|{ identifier: string, bundleSize: number })[] }>}
+ * @type {Record<string, { label: string, items: string[] }>}
  */
 export const STARTER_PACKS = {
   blacksmith: {

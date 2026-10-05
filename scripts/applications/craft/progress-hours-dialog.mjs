@@ -51,6 +51,8 @@ export default class ProgressHoursDialog extends Dialog5e {
     content: { template: "modules/simple-shop-craft-5e/templates/craft/progress-hours-dialog/content.hbs" }
   };
 
+  /* -------------------------------------------- */
+
   /**
    * The activity being used.
    * @type {Activity}
@@ -111,7 +113,11 @@ export default class ProgressHoursDialog extends Dialog5e {
    * Whether the dialog was confirmed rather than dismissed.
    * @type {boolean}
    */
-  used = false;
+  #used = false;
+
+  get used() {
+    return this.#used;
+  }
 
   /* -------------------------------------------- */
 
@@ -142,7 +148,6 @@ export default class ProgressHoursDialog extends Dialog5e {
    * @this {ProgressHoursDialog}
    * @param {Event} event         Triggering click event.
    * @param {HTMLElement} target  Button that was clicked.
-   * @returns {void}
    */
   static #stepAmount(event, target) {
     const maxMinutes = Math.round(this.max * 60);
@@ -178,7 +183,7 @@ export default class ProgressHoursDialog extends Dialog5e {
       return;
     }
     this.config.simpleShopCraft5e = { hoursThisUse };
-    this.used = true;
+    this.#used = true;
     await this.close();
   }
 

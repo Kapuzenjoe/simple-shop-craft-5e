@@ -1,4 +1,4 @@
-import { MODULE_ID } from "../config.mjs";
+import { CARD_STATUSES, MODULE_ID } from "../config.mjs";
 import { EnchantedItemBlueprint } from "./enchanted-item-blueprint.mjs";
 import { Shop } from "./shop-data.mjs";
 import { SpellScrollBlueprint } from "./spell-scroll-blueprint.mjs";
@@ -19,16 +19,6 @@ const {
 const TEMPLATE = "modules/simple-shop-craft-5e/templates/chat/purchase-card.hbs";
 
 /**
- * Localization keys for each pending-transaction status.
- * @type {Record<string, string>}
- */
-const STATUS_LABELS = {
-  pending: "SIMPLE_SHOP_CRAFT_5E.Status.Pending",
-  accepted: "SIMPLE_SHOP_CRAFT_5E.Status.Accepted",
-  rejected: "SIMPLE_SHOP_CRAFT_5E.Status.Rejected"
-};
-
-/**
  * A data model that represents a purchase chat card's own flag data.
  * @extends {foundry.abstract.DataModel<PurchaseMessageCardData>}
  * @mixes PurchaseMessageCardData
@@ -38,7 +28,7 @@ export class PurchaseMessageData extends foundry.abstract.DataModel {
   /** @override */
   static defineSchema() {
     return {
-      status: new StringField({ initial: "pending", choices: ["pending", "accepted", "rejected"] }),
+      status: new StringField({ initial: "pending", choices: Object.keys(CARD_STATUSES) }),
       shopId: new StringField({ blank: true }),
       shopName: new StringField(),
       shopImg: new FilePathField({ categories: ["IMAGE"] }),
@@ -56,7 +46,7 @@ export class PurchaseMessageData extends foundry.abstract.DataModel {
         subtotal: currencyPartsField()
       })),
       sellLines: new ArrayField(new SchemaField({
-        itemId: new StringField(), identifier: new StringField({ blank: true }),
+        itemId: new StringField(),
         name: new StringField(), img: new FilePathField({ categories: ["IMAGE"] }),
         quantity: new NumberField(), priceCP: new NumberField(), subtotal: currencyPartsField()
       })),
@@ -90,7 +80,7 @@ export class PurchaseMessageData extends foundry.abstract.DataModel {
         bundleSize: row.bundleSize ?? 1, subtotal: row.subtotal
       })),
       sellLines: sellLines.map(row => ({
-        itemId: row.item.id, identifier: row.item.system.identifier,
+        itemId: row.item.id,
         name: row.item.name, img: row.item.img, quantity: row.sellQuantity, priceCP: row.priceCP,
         subtotal: row.subtotal
       })),
@@ -133,7 +123,7 @@ export class PurchaseMessageData extends foundry.abstract.DataModel {
    */
   async renderContent() {
     return foundry.applications.handlebars.renderTemplate(TEMPLATE, {
-      ...this.toObject(), pending: this.status === "pending", statusLabel: _loc(STATUS_LABELS[this.status]),
+      ...this.toObject(), pending: this.status === "pending", statusLabel: _loc(CARD_STATUSES[this.status].label),
       buyLines: this.buyLines.filter(l => !l.isService), serviceLines: this.buyLines.filter(l => l.isService)
     });
   }

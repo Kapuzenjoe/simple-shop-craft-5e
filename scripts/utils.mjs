@@ -1,4 +1,4 @@
-import { EXCLUDED_PACKS, MODULE_ID, PACKAGE_TYPE_ORDER, RARITY_DEFAULT_PRICES, SETTING_KEYS } from "./config.mjs";
+import { ANY_VALUE, BUNDLE_SIZES, EXCLUDED_PACKS, MODULE_ID, RARITY_DEFAULT_PRICES, SETTING_KEYS } from "./config.mjs";
 import { isCalendariaActive } from "./integrations/calendaria.mjs";
 import { isEmberActive } from "./integrations/ember.mjs";
 
@@ -59,8 +59,7 @@ export function resolveTotalHours(recipe, craftCost, targetItem) {
   if ( recipe.durationOverride.value != null ) {
     return recipe.durationOverride.value * hoursPerUnit[recipe.durationOverride.units];
   }
-  const targetBundleSize = (targetItem?.system?.quantity > 1) ? targetItem.system.quantity : 1;
-  const scale = recipe.targetQuantity / targetBundleSize;
+  const scale = recipe.targetQuantity / resolveBundleSize(targetItem);
   return (craftCost?.days ?? 0) * scale * maxHoursPerWorkday();
 }
 
@@ -73,7 +72,7 @@ export function resolveTotalHours(recipe, craftCost, targetItem) {
  * @param {Item5e} item
  * @returns {Promise<{ days: number, gold: number }>}
  */
-export async function effectiveCraftCost(item) {
+async function effectiveCraftCost(item) {
   const { scrolls, exceptions } = CONFIG.DND5E.crafting;
   if ( exceptions[item.system.identifier] ) return exceptions[item.system.identifier];
   if ( item.system.type?.value === "scroll" ) {
@@ -130,7 +129,7 @@ export async function createSpellScroll(spell, values) {
   const scroll = await Item.implementation.createScrollFromSpell(spell, {}, config);
   if ( !scroll ) return null;
   const level = scroll.system.activities?.find(a => a.type === "cast")?.spell?.level ?? 0;
-  scroll.updateSource({ "system.identifier": `spell-scroll-${level}-${spell.system.identifier ?? spell.id}` });
+  scroll.updateSource({ "system.identifier": `spell-scroll-${level}-${spell.identifier}` });
   return scroll;
 }
 
@@ -208,7 +207,7 @@ export async function deductActorCurrencyChecked(actor, amountCP) {
  * @param {boolean} [options.abbreviated]  Use short symbols (e.g. "gp") instead of full names (e.g. "Gold").
  * @returns {{ value: string, label: string }[]}
  */
-export function getCurrencyOptions({ abbreviated=false }={}) {
+function getCurrencyOptions({ abbreviated=false }={}) {
   return Object.entries(CONFIG.DND5E.currencies).map(([value, cfg]) => ({
     value, label: abbreviated ? cfg.abbreviation : cfg.label
   }));
@@ -258,6 +257,8 @@ export function goldPoolCurrencies() {
 
 /**
  * Convert a value in a given denomination to a whole number of copper pieces, rounded down.
+ * Uses the system's `roundCurrency` if it is available.
+ * @see dnd5e — roundCurrency()
  * @param {number} value
  * @param {string} [denomination="gp"]
  * @returns {number}
@@ -275,13 +276,12 @@ export function toCopper(value, denomination="gp") {
  * Return whether dnd5e's daily recovery is currently being handled manually rather than by the calendar.
  * @returns {boolean}
  */
-export function isManualRecoveryActive() {
+function isManualRecoveryActive() {
   if ( !game.settings.settings.has("dnd5e.calendarConfig") ) return true;
   const cfg = game.settings.get("dnd5e", "calendarConfig");
   if ( !("dailyRecovery" in cfg) ) return true;
   return !cfg.enabled || cfg.manualRecovery;
 }
-
 
 /* -------------------------------------------- */
 
@@ -407,14 +407,16 @@ export async function preloadHandlebarsTemplates() {
   return foundry.applications.handlebars.loadTemplates([
     "modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs",
     "modules/simple-shop-craft-5e/templates/shared/currency-inputs.hbs",
+    "modules/simple-shop-craft-5e/templates/shared/fieldlist.hbs",
     "modules/simple-shop-craft-5e/templates/shared/item-table.hbs",
     "modules/simple-shop-craft-5e/templates/shared/rich-tooltip.hbs",
     "modules/simple-shop-craft-5e/templates/shared/material-row.hbs",
+    "modules/simple-shop-craft-5e/templates/shared/type-filter.hbs",
     "modules/simple-shop-craft-5e/templates/shop-manager/recipe-row.hbs",
     "modules/simple-shop-craft-5e/templates/shop-manager/shop-row.hbs",
     "modules/simple-shop-craft-5e/templates/shops/shop-sheet/buy-row.hbs",
     "modules/simple-shop-craft-5e/templates/shops/shop-sheet/sell-row.hbs",
-    "modules/simple-shop-craft-5e/templates/shops/shop-sheet/players-dialog-row.hbs"
+    "modules/simple-shop-craft-5e/templates/shops/shop-config/players-config/row.hbs"
   ]);
 }
 
@@ -461,57 +463,78 @@ export function itemRarity(item) {
 /* -------------------------------------------- */
 
 /**
- * Stable key identifying an identifier/uuid/criteria-based entry — `uuid` when present, otherwise `identifier`,
- * otherwise a composite of the type/subtype criteria.
- * @param {{ identifier?: string, uuid?: string, criteria?: object }} entry
+ * Get the identifier used to match an entry against owned items.
+ * An identifier stored on the entry takes precedence over the identifier of its item.
+ * The default identifier of an item is ignored.
+ * @param {{ identifier?: string }} entry  The entry to match.
+ * @param {Item5e|object|null} item        The item the entry resolves to.
  * @returns {string}
  */
-export function itemRefKey(entry) {
+export function matchIdentifier(entry, item) {
+  if ( entry.identifier ) return entry.identifier;
+  return (item && !isDefaultIdentifier(item)) ? item.system.identifier : "";
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Find the owned item that an item stacks onto.
+ * Items stack by identifier and type, except containers and items that still have the default identifier.
+ * @param {Actor5e} actor
+ * @param {Item5e|object|null} item  The item being added.
+ * @returns {Item5e|null}
+ */
+export function findStack(actor, item) {
+  if ( !item || (item.type === "container") || isDefaultIdentifier(item) ) return null;
+  return actor.identifiedItems.get(item.system.identifier, { type: item.type })?.first() ?? null;
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Stable key identifying the item of an entry — its matching identifier, otherwise its `uuid`, or a composite
+ * of the type/subtype criteria for criteria-based entries.
+ * @param {{ identifier?: string, uuid?: string, criteria?: object }} entry  The entry to identify.
+ * @param {Item5e|object|null} [item]                                         The item the entry resolves to.
+ * @returns {string}
+ */
+export function itemRefKey(entry, item) {
   if ( entry.criteria?.type ) {
     return `criteria:${entry.criteria.type}:${entry.criteria.subtype || ""}`;
   }
-  return entry.uuid || entry.identifier;
+  return matchIdentifier(entry, item) || entry.uuid;
 }
 
 /* -------------------------------------------- */
 
 /**
- * Build an identifier/uuid reference for a resolved item, preferring its `system.identifier` when it isn't
- * just the unedited default.
- * @param {Item5e|object} item  An item or its compendium index entry.
- * @returns {{ identifier: string }|{ uuid: string }}
+ * Create a reference to an item from its UUID.
+ * @param {Item5e|object} item  An item or compendium index entry.
+ * @returns {{ uuid: string }}
  */
 export function itemRef(item) {
-  return isDefaultIdentifier(item) ? { uuid: item.uuid } : { identifier: item.system.identifier };
+  return { uuid: item.uuid };
 }
 
 /* -------------------------------------------- */
 
 /**
- * Warn about duplicated world or actor items that keep the identifier of the item they were copied from, since a
- * reference by that identifier resolves to the original instead.
- * @param {Item5e[]} items  Items about to be referenced by {@link itemRef}.
+ * Get the warning for an entry whose identifier can't be relied on.
+ * @param {object} resolved
+ * @param {object} resolved.entry      The entry that was resolved.
+ * @param {Item5e|null} resolved.item  The item the entry resolved to.
+ * @param {object} labels
+ * @param {string} labels.missing      Localization key used if the entry has no distinct identifier.
+ * @param {string} labels.shared       Localization key used if the entry shares the identifier of its original.
+ * @returns {string|null}
  */
-export function warnSharedIdentifiers(items) {
-  const names = Array.from(new Set(items))
-    .filter(i => !i.pack && i._stats?.duplicateSource && !isDefaultIdentifier(i))
-    .map(i => i.name);
-  if ( !names.length ) return;
-  ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SharedIdentifierWarning", {
-    format: { names: names.join(", ") }
-  });
-}
-
-/* -------------------------------------------- */
-
-/**
- * Whether an item's own price is unset, meaning a rarity-based fallback price is being shown for it
- * instead.
- * @param {Item5e|null} item
- * @returns {boolean}
- */
-export function needsDefaultPrice(item) {
-  return !!item && !item.system.price?.value;
+export function identifierWarning({ entry, item }, { missing, shared }) {
+  if ( !item ) return null;
+  const identifier = matchIdentifier(entry, item);
+  if ( !identifier ) return _loc(missing);
+  const { duplicateSource } = item._stats ?? {};
+  const source = duplicateSource ? fromUuidSync(duplicateSource, { strict: false }) : null;
+  return (source?.system?.identifier === identifier) ? _loc(shared, { name: source.name }) : null;
 }
 
 /* -------------------------------------------- */
@@ -563,103 +586,92 @@ export async function spotlightShop(shopId) {
 /* -------------------------------------------- */
 
 /**
- * Resolve the canonical bundle size (stack quantity, e.g. 20 for a stack of arrows) for a batch of owned
- * items, via their `system.identifier` matched against the catalog. Items without a resolvable identifier,
- * or whose catalog match isn't itself a multi-unit stack, resolve to 1.
- * @param {Item5e[]} items
- * @returns {Promise<Map<string, number>>}  Bundle size per item id.
+ * Determine how many units the price of an item covers.
+ * @param {Item5e|object|null} item  Item to check.
+ * @returns {number}                 The size of the bundle, or 1 if the item is not a mundane bundle.
  */
-export async function resolveBundleSizes(items) {
-  const identifiers = new Set(items.map(i => i.system.identifier).filter(Boolean));
-  const byIdentifier = await resolveIdentifierIndex(identifiers);
-  return new Map(items.map(i => {
-    const catalogEntry = byIdentifier.get(i.system.identifier);
-    return [i.id, (catalogEntry?.system?.quantity > 1) ? catalogEntry.system.quantity : 1];
-  }));
+export function resolveBundleSize(item) {
+  const identifier = item?.system.identifier;
+  return Object.hasOwn(BUNDLE_SIZES, identifier) ? BUNDLE_SIZES[identifier] : 1;
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Bulk version of `fromUuid` that performs only a single fetch per compendium.
+ * Uses the system's version if it is available. Documents outside a compendium are not retrieved.
+ * @see dnd5e — bulkFromUuid()
+ * @param {string[]} uuids                    UUIDs of documents to retrieve.
+ * @returns {Promise<Map<string, Document>>}  Documents mapped to the provided UUID.
+ */
+export async function bulkFromUuid(uuids) {
+  const requests = uuids.map(uuid => ({ source: uuid, ...foundry.utils.parseUuid(uuid) }))
+    .filter(({ collection, embedded }) => {
+      return (collection instanceof foundry.documents.collections.CompendiumCollection) && !embedded.length;
+    });
+  if ( game.dnd5e.utils.bulkFromUuid ) return game.dnd5e.utils.bulkFromUuid(requests.map(({ source }) => source));
+
+  const fetches = Array.from(Map.groupBy(requests, ({ collection }) => collection), ([collection, group]) => {
+    return collection.getDocuments({ _id__in: group.map(({ id }) => id) });
+  });
+  const sources = new Map(requests.map(({ source, uuid }) => [uuid, source]));
+  return new Map((await Promise.all(fetches)).flat().map(document => [sources.get(document.uuid), document]));
 }
 
 /* -------------------------------------------- */
 
 /**
  * Resolve a batch of identifier/uuid-based entries to their referenced items.
- * Tries `uuid` first, falling back to a batched `identifier` lookup for the rest.
+ * Entries with a `uuid` are resolved by it, the others by a batched `identifier` lookup. The passed entries of the
+ * latter are given the `uuid` of their item, without changing their source data.
  * @param {{ identifier?: string, uuid?: string }[]} entries
  * @returns {Promise<{ entry: object, item: object|null }[]>}
  */
 export async function resolveEntries(entries) {
-  const identifiers = new Set(entries.filter(e => !e.uuid && e.identifier).map(e => e.identifier));
-  const byIdentifier = await resolveIdentifierIndex(identifiers);
-
+  const unresolved = entries.filter(({ uuid, identifier }) => !uuid && identifier);
+  const uuids = await resolveIdentifiers(new Set(unresolved.map(({ identifier }) => identifier)));
+  for ( const entry of unresolved ) {
+    if ( uuids.has(entry.identifier) ) Object.assign(entry, { uuid: uuids.get(entry.identifier), identifier: "" });
+  }
+  const fetched = await bulkFromUuid(entries.map(({ uuid }) => uuid).filter(_ => _));
   return Promise.all(entries.map(async entry => {
-    let byUuid = null;
-    if ( entry.uuid ) {
-      try {
-        byUuid = await fromUuid(entry.uuid);
-      } catch ( err ) {
-        console.warn(`${MODULE_ID} | Failed to resolve ${entry.uuid}:`, err);
-      }
+    if ( !entry.uuid ) return { entry, item: null };
+    if ( fetched.has(entry.uuid) ) return { entry, item: fetched.get(entry.uuid) };
+    try {
+      return { entry, item: await fromUuid(entry.uuid) };
+    } catch ( err ) {
+      console.warn(`${MODULE_ID} | Failed to resolve ${entry.uuid}:`, err);
+      return { entry, item: null };
     }
-    const item = byUuid ?? (entry.identifier ? byIdentifier.get(entry.identifier) ?? null : null);
-    return { entry, item };
   }));
 }
 
 /* -------------------------------------------- */
 
 /**
- * Resolve a batch of `system.identifier`s against all currently active compendium sources, falling back to
- * the world's Items directory. Tries `module` sources first, then `system`, then `world` compendiums, then
- * the world's Items directory.
+ * Resolve a batch of `system.identifier`s to the UUID of an item. Items of the current rules version are
+ * preferred, and compendium items over items of the world's Items directory.
  * @param {Set<string>} identifiers
- * @returns {Promise<Map<string, object>>}  Matching index entry per identifier, when found.
+ * @returns {Promise<Map<string, string>>}  UUID of the matching item per identifier, when found.
  */
-export async function resolveIdentifierIndex(identifiers) {
-  const byIdentifier = new Map();
-  if ( !identifiers.size ) return byIdentifier;
-
-  const rules = game.dnd5e.settings.rulesVersion === "modern" ? "2024" : "2014";
+async function resolveIdentifiers(identifiers) {
+  const uuids = new Map();
+  if ( !identifiers.size ) return uuids;
+  const rules = (game.dnd5e.settings.rulesVersion === "modern") ? "2024" : "2014";
   const index = await game.dnd5e.applications.CompendiumBrowser.fetch(Item, {
     filters: [{ k: "system.identifier", o: "in", v: identifiers }],
-    indexFields: new Set([
-      "system.source", "system.price.value", "system.price.denomination",
-      "system.weight.value", "system.weight.units", "system.quantity", "system.type.value",
-      "system.rarity", "system.rarities",
-      "system.properties"
-    ]),
+    indexFields: new Set(["system.source"]),
     sort: false
   });
-  const entriesByPackageType = Map.groupBy(index, entry => {
-    return foundry.utils.parseUuid(entry.uuid).collection.metadata.packageType;
+  const rank = ({ system }) => ((system.source?.rules ?? rules) === rules) ? 0 : 1;
+  const candidates = [...index, ...game.items].filter(item => {
+    return identifiers.has(item.system.identifier) && !item.system.container
+      && CONFIG.Item.dataModels[item.type]?.inventorySection;
   });
-  const remaining = new Set(identifiers);
-
-  const considerEntry = entry => {
-    const identifier = entry.system?.identifier;
-    if ( !identifier || !remaining.has(identifier) ) return;
-    if ( entry.system?.container ) return;
-    if ( !CONFIG.Item.dataModels[entry.type]?.inventorySection ) return;
-
-    const existing = byIdentifier.get(identifier);
-    if ( !existing ) {
-      byIdentifier.set(identifier, entry);
-      return;
-    }
-    const entryMatches = (entry.system?.source?.rules ?? rules) === rules;
-    const existingMatches = (existing.system?.source?.rules ?? rules) === rules;
-    if ( entryMatches && !existingMatches ) byIdentifier.set(identifier, entry);
-    else if ( entryMatches === existingMatches ) {
-      console.debug(`${MODULE_ID} | Multiple items share identifier "${identifier}":`, existing, entry);
-    }
-  };
-
-  for ( const packageType of PACKAGE_TYPE_ORDER ) {
-    if ( !remaining.size ) break;
-    for ( const entry of entriesByPackageType.get(packageType) ?? [] ) considerEntry(entry);
-    for ( const identifier of byIdentifier.keys() ) remaining.delete(identifier);
+  for ( const item of candidates.sort((a, b) => rank(a) - rank(b)) ) {
+    if ( !uuids.has(item.system.identifier) ) uuids.set(item.system.identifier, item.uuid);
   }
-  if ( remaining.size ) for ( const item of game.items ) considerEntry(item);
-
-  return byIdentifier;
+  return uuids;
 }
 
 /* -------------------------------------------- */
@@ -686,6 +698,18 @@ export function resolveItemPrice(item, { rarity, isAmmo, isConsumable }={}) {
 /* -------------------------------------------- */
 
 /**
+ * Resolve the price of a single unit of an item.
+ * @param {Item5e} item  The item being priced.
+ * @returns {{ value: number, denomination: string }|null}  Price per unit, or `null` if the item has none.
+ */
+export function resolveUnitPrice(item) {
+  const price = resolveItemPrice(item);
+  return price?.value ? { value: price.value / resolveBundleSize(item), denomination: price.denomination } : null;
+}
+
+/* -------------------------------------------- */
+
+/**
  * Resolve the rarity-tier default price for a given rarity. Ammunition is priced per single piece, a
  * tenth of the consumable default, per the DMG 2024 guidance that ten pieces equal one potion of the
  * same rarity in value.
@@ -695,7 +719,7 @@ export function resolveItemPrice(item, { rarity, isAmmo, isConsumable }={}) {
  * @param {boolean} [options.isConsumable]
  * @returns {{ value: number, denomination: string }|null}  Null if the rarity has no resolvable tier.
  */
-export function resolveRarityPrice(rarity, { isAmmo=false, isConsumable=false }={}) {
+function resolveRarityPrice(rarity, { isAmmo=false, isConsumable=false }={}) {
   const row = RARITY_DEFAULT_PRICES[rarity];
   if ( !row ) return null;
   const value = isAmmo ? (row.consumable / 10) : (isConsumable ? row.consumable : row.durable);
@@ -725,6 +749,77 @@ export function subtypeOptions(types) {
 }
 
 /* -------------------------------------------- */
+
+/**
+ * List the item types that appear in an inventory as select options.
+ * @returns {{ value: string, label: string }[]}
+ */
+export function itemTypeOptions() {
+  return Object.keys(CONFIG.Item.dataModels)
+    .filter(type => CONFIG.Item.dataModels[type]?.inventorySection)
+    .map(type => ({ value: type, label: _loc(`TYPES.Item.${type}Pl`) }));
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Build the fields to filter by item type and subtype: a multi-select of item types and, for each selected type,
+ * one of its subtypes, ordered like an inventory.
+ * @param {Record<string, Set<string>>} types  Selected subtypes by selected item type, empty to allow any subtype.
+ * @returns {{ typeFields: object[], typeFieldsets: { type: string, label: string, fields: object[] }[] }}
+ */
+export function typeFilterFields(types) {
+  const order = type => CONFIG.Item.dataModels[type]?.inventorySection?.order ?? Infinity;
+  return {
+    typeFields: [{
+      field: new foundry.data.fields.SetField(new foundry.data.fields.StringField()), name: "types",
+      label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemType"), value: Object.keys(types),
+      options: itemTypeOptions()
+    }],
+    typeFieldsets: Object.keys(types).toSorted((a, b) => order(a) - order(b)).map(type => ({
+      type, label: _loc(`TYPES.Item.${type}Pl`),
+      fields: [{
+        field: new foundry.data.fields.SetField(new foundry.data.fields.StringField()), name: `subtypes.${type}`,
+        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemSubtype"),
+        value: types[type].size ? Array.from(types[type]) : [ANY_VALUE],
+        options: [
+          { value: ANY_VALUE, label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemAny") },
+          ...subtypeOptions([type])
+        ]
+      }]
+    }))
+  };
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Read the item types and subtypes submitted from the fields of `typeFilterFields`.
+ * @param {object} data                Expanded form data.
+ * @param {string} [group="subtypes"]  Name of the submitted object that holds the values by item type.
+ * @returns {Record<string, string[]>}  Submitted values by selected item type, without the "Any" value.
+ */
+export function parseTypeFilter(data, group="subtypes") {
+  return Object.fromEntries((data.types ?? []).map(type => [
+    type, (data[group]?.[type] ?? []).filter(value => value !== ANY_VALUE)
+  ]));
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Check an item's type and subtype against a filter of item types with their subtypes.
+ * @param {Record<string, Set<string>>} types  Subtypes by item type, empty to allow any subtype.
+ * @param {string} type                        Item type to check.
+ * @param {string} [subtype]                   Item subtype to check.
+ * @returns {boolean}
+ */
+export function matchesTypeFilter(types, type, subtype) {
+  const subtypes = types[type];
+  return !!subtypes && (!subtypes.size || subtypes.has(subtype));
+}
+
+/* -------------------------------------------- */
 /*  Rendering                                   */
 /* -------------------------------------------- */
 
@@ -735,7 +830,7 @@ export function subtypeOptions(types) {
  * @param {string} typeFilter  Selected type, or "" for no filter.
  * @param {HTMLElement} content
  */
-export function applyItemFilters(rgx, typeFilter, content) {
+function applyItemFilters(rgx, typeFilter, content) {
   for ( const section of content.querySelectorAll(".items-section") ) {
     const typeMatches = !typeFilter || (section.dataset.type === typeFilter);
     let matched = false;
@@ -858,7 +953,7 @@ export function applyDropArea(element, onDrop) {
  * @param {string} uuid  UUID of the document whose rich tooltip should be displayed.
  * @returns {string}
  */
-export function loadingTooltip(uuid) {
+function loadingTooltip(uuid) {
   if ( game.dnd5e.utils.loadingTooltip ) return game.dnd5e.utils.loadingTooltip({ uuid });
   return `<section class="loading" data-uuid="${uuid}"><i class="fas fa-spinner fa-spin-pulse" inert></i></section>`;
 }

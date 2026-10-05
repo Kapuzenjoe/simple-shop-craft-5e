@@ -1,14 +1,38 @@
 # Changelog
 
-## 0.6.1
+## 1.0.0
 
-- Added a warning to shop entries and recipe target items without a distinct identifier, and when adding a duplicated item that shares its original's identifier.
-- Changed items added to shops and recipes to prefer a distinct identifier and fall back to the UUID.
+- Added opening a recipe's target item and materials by clicking their name.
+- Added choosing how many times to craft in the Craft Start dialog, which multiplies the materials and cost while each run takes its own crafting time (#26).
+- Added an Accepted Item Types setting to a shop's Vendor Settings, limiting which item types, and optionally subtypes, it buys from players (#20).
+- Changed the Recipe Editor's material drop hint to always point to the add and material-rule buttons.
+- Changed a shop's Settlement Cap to show as a formatted amount with a currency icon, and its presets to use the localized currency abbreviation.
+- Changed fixed materials in the Craft Start dialog to list the matching items of the character, like material rules.
 - Fixed a spell-scroll recipe's Proficiency Mode defaulting to "Tool & Skill" instead of "Tool or Skill".
 - Fixed the Crafter feat's discount applying to services.
-- Fixed "By UUID" and a recipe's UUID field storing the item by its identifier.
-- Fixed a bought item from a UUID or spell-scroll entry not stacking onto the same item already owned.
-- Fixed adding an item already in a shop overwriting its price, discount, and stock.
+- Fixed Vendor Settings resetting the shop name, Magical Items rule, and default stock after toggling Purchase Only or Unlimited.
+- Fixed the Lodging and Hireling editors breaking after selecting the empty Tier or Type option.
+- Fixed Ball Bearings and the Bead of Force being treated as bundles.
+- Fixed the price and currency fields of the Edit Price, Settlement Cap, Hireling, and material dialogs not showing on dnd5e 5.3.
+- Fixed shop entries and recipe materials whose item can't be found showing no name.
+- Fixed a player added in a shop's Players dialog not being saved.
+- Fixed editing a Settlement Cap that matches a preset's amount in another currency, such as 20 pp, turning it into gold.
+- Reworked how shops and recipes recognize items:
+  - Added warnings to shop entries and recipe items that have the default identifier or share the identifier of the item they were copied from, and to shop entries listed more than once.
+  - Added an item type check when recognizing a recipe's materials among a character's items.
+  - Changed items with the default identifier, the item type's name that new items receive such as "weapon", to never stack and to not count as recipe materials.
+  - Changed shops and recipes to use the current identifier of their items instead of a copy stored when the item was added.
+  - Changed a recipe material's Change Identifier to override only the identifier used to recognize items and keep its item, marked with an info icon.
+  - Changed spell scrolls and enchantable items dropped on a shop or added by UUID to open the template configuration, like items picked from the compendium browser.
+  - Changed bought and crafted items to only stack onto items of the same type.
+  - Changed starter shops to take their items from the Player's Handbook if it is active and otherwise from the SRD, and only from SRD 5.1 for the 2014 rules.
+  - Changed shops, Fill from Table, the Item Generator, and recipe materials to detect an item that is already present by its identifier, so the same item from two compendiums counts once.
+  - Changed shops and recipes to load compendium items in bulk instead of one by one.
+  - Fixed a bought item from a UUID or spell-scroll entry not stacking onto the same item already owned.
+  - Fixed adding an item already in a shop overwriting its price, discount, and stock.
+  - Fixed Fill from Table raising the stock of a service entry instead of adding the item to the Buy tab.
+  - Fixed spell scrolls of spells without an identifier stacking with other spell scrolls of the same level.
+  - Fixed buying and selling items of the same stack in one transaction losing quantity.
 
 ## 0.6.0
 

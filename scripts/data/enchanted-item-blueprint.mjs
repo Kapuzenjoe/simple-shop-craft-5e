@@ -151,7 +151,7 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
     const baseItemUuids = (registry && ((itemType !== "equipment") || categoryFilters.length))
       ? new Set(Object.values(registry())) : null;
     const eligible = baseItemUuids ? fromShopPack.filter(index => baseItemUuids.has(index.uuid)) : fromShopPack;
-    return Array.from(new Map(eligible.map(index => [itemRefKey(itemRef(index)), index.uuid])).values());
+    return Array.from(new Map(eligible.map(index => [itemRefKey(itemRef(index), index), index.uuid])).values());
   }
 
   /* -------------------------------------------- */
