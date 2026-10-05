@@ -215,7 +215,37 @@
           "On": "Always On",
           "Off": "Always Off"
         }
+      },
+      "Transactions": {
+        "Name": "Transaction Log",
+        "Hint": "View the completed purchases and sales of all shops.",
+        "Log": {
+          "Name": "Log Transactions",
+          "Hint": "Record every completed purchase and sale in the Transaction Log."
+        },
+        "Limit": {
+          "Name": "Maximum Log Entries",
+          "Hint": "Number of transactions the Transaction Log keeps. The oldest entries are removed first. Higher values use more storage and are synced to all clients with every new entry."
+        }
       }
+    },
+    "TransactionLog": {
+      "Title": "Transaction Log",
+      "Open": "Open Transaction Log",
+      "Search": "Search",
+      "Empty": "No transactions logged yet.",
+      "Bought": "bought {items}",
+      "Sold": "sold {items}",
+      "Net": "net {amount}",
+      "Clear": "Clear Log",
+      "ClearConfirmShop": "Delete all logged transactions of this shop? This can't be undone.",
+      "ClearConfirmAll": "Delete all logged transactions of all shops? This can't be undone.",
+      "Export": "Export Log",
+      "Import": "Import Log",
+      "ImportHint": "Select a JSON file exported from a Transaction Log. Its transactions are added to this shop's log, and ones the log already contains are skipped.",
+      "ImportDone": "Transactions imported: {count}.",
+      "ImportNone": "All transactions of the file are already in the log.",
+      "ImportFailed": "The file is not a valid Transaction Log export — nothing was imported."
     },
     "ShopEditor": {
       "Title": "Edit Shop",

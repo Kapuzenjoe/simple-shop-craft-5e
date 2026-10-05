@@ -1,6 +1,7 @@
 import { STOCK_MAGIC_RULES } from "../../../config.mjs";
 import { Shop } from "../../../data/shop-data.mjs";
 import { currencyRows, goldPoolCurrencies, parseTypeFilter, typeFilterFields } from "../../../utils.mjs";
+import TransactionLog from "../../transaction-log.mjs";
 import BaseShopConfig from "./base-shop-config.mjs";
 
 /**
@@ -20,7 +21,8 @@ export default class VendorConfig extends BaseShopConfig {
   static DEFAULT_OPTIONS = {
     id: "vendor-config-{id}",
     window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.VendorSettings" },
-    form: { handler: VendorConfig.#onSubmit }
+    form: { handler: VendorConfig.#onSubmit },
+    actions: { openTransactionLog: VendorConfig.#openTransactionLog }
   };
 
   /* -------------------------------------------- */
@@ -74,8 +76,14 @@ export default class VendorConfig extends BaseShopConfig {
         hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GoldPoolMaxHint")
       });
       if ( !goldPool.unlimited ) context.currencyRows = currencyRows(goldPool.max);
-      context.typeFilter = typeFilterFields(this.shop.sellTypes);
-      context.typeFilter.typeFields[0].hint = _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SellTypesHint");
+      const { typeFields, typeFieldsets } = typeFilterFields(this.shop.sellTypes);
+      typeFields[0].hint = _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SellTypesHint");
+      context.typeFilter = {
+        typeFields: [
+          ...typeFields, ...typeFieldsets.flatMap(({ label, fields }) => fields.map(field => ({ ...field, label })))
+        ],
+        typeFieldsets: []
+      };
     }
 
     const byTypeField = Shop.schema.fields.stockDefaults.fields.byType.element;
@@ -93,6 +101,16 @@ export default class VendorConfig extends BaseShopConfig {
     ];
 
     return context;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle opening the transaction log of this shop.
+   * @this {VendorConfig}
+   */
+  static #openTransactionLog() {
+    new TransactionLog({ shopId: this.shop._id }).render({ force: true });
   }
 
   /* -------------------------------------------- */
@@ -129,6 +147,9 @@ export default class VendorConfig extends BaseShopConfig {
       stockDefaults: { byType, magicRule: data.magicRule ?? "gear" },
       ...(sellDisabled ? {} : { sellTypes: parseTypeFilter(data) })
     });
-    if ( ["sellDisabled", "unlimited", "types"].includes(event.target?.name) ) this.render({ parts: ["content"] });
+    const name = event.target?.name;
+    if ( ["sellDisabled", "unlimited", "types"].includes(name) || name?.startsWith("subtypes.") ) {
+      this.render({ parts: ["content"] });
+    }
   }
 }

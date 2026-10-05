@@ -94,6 +94,31 @@
 /* -------------------------------------------- */
 
 /**
+ * @typedef TransactionData
+ * @property {string} _id           Unique id of this log entry.
+ * @property {number} timestamp     Real-world time the transaction was completed, in milliseconds since the epoch.
+ * @property {number} worldTime     World time (`game.time.worldTime`) the transaction was completed.
+ * @property {string} shopId        Id of the shop the transaction took place in.
+ * @property {string} shopName      Name of that shop when the transaction was completed.
+ * @property {string} actorName     Name of the acting character.
+ * @property {number} netCP         Combined total in copper; negative = the actor owes, positive = the actor is owed.
+ * @property {TransactionLineData[]} buyLines   Items and services the actor bought.
+ * @property {TransactionLineData[]} sellLines  Items the actor sold.
+ */
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef TransactionLineData
+ * @property {string} name        Name of the item or service.
+ * @property {number} quantity    Quantity bought or sold.
+ * @property {number} priceCP     Price of one unit in copper.
+ * @property {boolean} isService  Whether the line is a service.
+ */
+
+/* -------------------------------------------- */
+
+/**
  * @typedef RecipeMaterialData
  * @property {string} [identifier]  Stable `system.identifier` of the referenced material item.
  * @property {string} [uuid]        Direct UUID reference, used when no `system.identifier` match exists.

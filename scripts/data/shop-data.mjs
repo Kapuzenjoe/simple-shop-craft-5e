@@ -1,5 +1,5 @@
 import {
-  DEFAULT_STOCK_BY_TYPE, MAGIC_EXEMPT_TYPES, RESTOCK_MODES, SETTING_KEYS, STOCK_MAGIC_RULES
+  DEFAULT_STOCK_BY_TYPE, MAGIC_EXEMPT_TYPES, MODULE_ID, RESTOCK_MODES, SETTING_KEYS, STOCK_MAGIC_RULES
 } from "../config.mjs";
 import { calendariaDayOfWeek, isCalendariaActive } from "../integrations/calendaria.mjs";
 import {
@@ -11,6 +11,7 @@ import { HirelingBlueprint } from "./hireling-blueprint.mjs";
 import { LodgingBlueprint } from "./lodging-blueprint.mjs";
 import SettingCollectionMixin from "./setting-collection-mixin.mjs";
 import { SpellScrollBlueprint } from "./spell-scroll-blueprint.mjs";
+import Transaction from "./transaction-data.mjs";
 
 const {
   ArrayField, BooleanField, DocumentIdField, DocumentUUIDField, EmbeddedDataField, FilePathField, HTMLField,
@@ -252,6 +253,21 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
     delete clone._id;
     clone.name = _loc("DOCUMENT.CopyOf", { name: shop.name });
     return Shop.create(clone);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Delete a shop along with its transaction log entries.
+   * @inheritDoc
+   */
+  static async delete(id) {
+    await super.delete(id);
+    try {
+      await Transaction.deleteWhere(entry => entry.shopId === id);
+    } catch ( err ) {
+      console.warn(`${MODULE_ID} | Failed to remove the transaction log entries of shop ${id}:`, err);
+    }
   }
 
   /* -------------------------------------------- */

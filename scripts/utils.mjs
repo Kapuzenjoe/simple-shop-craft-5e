@@ -569,6 +569,42 @@ export async function confirmDeleteShop() {
 /* -------------------------------------------- */
 
 /**
+ * Prompt for JSON files to import and return them.
+ * @see Core — ClientDocument#importFromJSONDialog()
+ * @param {object} options
+ * @param {string} options.title              Localization key of the dialog title.
+ * @param {string} options.hint               Localization key of the hint text.
+ * @param {boolean} [options.multiple=false]  Whether several files can be selected.
+ * @returns {Promise<File[]|null>}            The selected files, or `null` if the dialog was cancelled.
+ */
+export async function promptImportFiles({ title, hint, multiple=false }) {
+  return foundry.applications.api.DialogV2.prompt({
+    window: { title },
+    content: `<form autocomplete="off">
+      <p class="hint">${_loc(hint)}</p>
+      <div class="form-group">
+        <label for="data">${_loc("DOCUMENT.ImportSource")}</label>
+        <div class="form-fields">
+          <input type="file" name="data" accept=".json"${multiple ? " multiple" : ""}>
+        </div>
+      </div>
+    </form>`,
+    ok: {
+      action: "import", label: "DOCUMENT.ImportData", icon: "fa-solid fa-file-import",
+      callback: (event, button) => {
+        const files = Array.from(button.form.elements.data.files);
+        if ( files.length ) return files;
+        ui.notifications.error("DOCUMENT.ImportDataError", { localize: true });
+        return null;
+      }
+    },
+    buttons: [{ action: "no", label: "COMMON.Cancel", icon: "fa-solid fa-xmark", callback: () => null }]
+  });
+}
+
+/* -------------------------------------------- */
+
+/**
  * Broadcast a shop to every connected client, opening it in their Shop Editor.
  * @param {string} shopId
  * @returns {Promise<void>}

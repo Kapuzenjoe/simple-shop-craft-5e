@@ -3,8 +3,8 @@ import { Recipe } from "../data/recipe-data.mjs";
 import { Shop } from "../data/shop-data.mjs";
 import {
   applyItemSort, applyListControls, applyLoadingTooltip, breakdownCopper, buildItemTableSections,
-  confirmDeleteShop, finalizeGroups, formatDuration, recipeCraftCost, resolveEntries, resolveTotalHours,
-  spotlightShop, toCopper
+  confirmDeleteShop, finalizeGroups, formatDuration, promptImportFiles, recipeCraftCost, resolveEntries,
+  resolveTotalHours, spotlightShop, toCopper
 } from "../utils.mjs";
 import CraftStartDialog from "./craft/craft-start-dialog.mjs";
 import RecipeSheet from "./craft/recipe-sheet.mjs";
@@ -314,65 +314,46 @@ export default class ShopManager extends Application5e {
   /**
    * Handle importing one or more recipes, each from its own exported JSON file.
    * @this {ShopManager}
-   * @see Core — ClientDocument#importFromJSONDialog()
    * @returns {Promise<void>}
    */
   static async #importRecipes() {
-    await foundry.applications.api.DialogV2.wait({
-      window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Import" },
-      position: { width: 400 },
-      content: `<form autocomplete="off">
-        <p class="hint">${_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.ImportHint")}</p>
-        <div class="form-group">
-          <label for="data">${_loc("DOCUMENT.ImportSource")}</label>
-          <div class="form-fields">
-            <input type="file" name="data" accept=".json" multiple>
-          </div>
-        </div>
-      </form>`,
-      buttons: [
-        {
-          action: "import", label: "DOCUMENT.ImportData", icon: "fa-solid fa-file-import", default: true,
-          callback: async (event, button) => {
-            const files = button.form.elements.data.files;
-            if ( !files.length ) return ui.notifications.error("DOCUMENT.ImportDataError", { localize: true });
-            const created = [];
-            const updated = [];
-            const failed = [];
-            for ( const file of files ) {
-              try {
-                const data = JSON.parse(await foundry.utils.readTextFromFile(file));
-                const name = data.name || data.targetItem?.identifier || data.targetItem?.uuid
-                  || _loc("SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder");
-                if ( Recipe.get(data._id) ) {
-                  await Recipe.update(data._id, data);
-                  updated.push(name);
-                } else {
-                  await Recipe.create(data);
-                  created.push(name);
-                }
-              } catch ( err ) {
-                console.error(err);
-                failed.push(file.name);
-              }
-            }
-            const parts = [];
-            if ( created.length ) {
-              parts.push(_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.ImportCreated", { names: created.join(", ") }));
-            }
-            if ( updated.length ) {
-              parts.push(_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.ImportUpdated", { names: updated.join(", ") }));
-            }
-            if ( parts.length ) ui.notifications.info(parts.join(" "));
-            else ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.ImportNone", { localize: true });
-            if ( failed.length ) {
-              ui.notifications.warn(_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.ImportFailed", { names: failed.join(", ") }));
-            }
-          }
-        },
-        { action: "no", label: "COMMON.Cancel", icon: "fa-solid fa-xmark" }
-      ]
+    const files = await promptImportFiles({
+      title: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Import",
+      hint: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.ImportHint", multiple: true
     });
+    if ( !files ) return;
+    const created = [];
+    const updated = [];
+    const failed = [];
+    for ( const file of files ) {
+      try {
+        const data = JSON.parse(await foundry.utils.readTextFromFile(file));
+        const name = data.name || data.targetItem?.identifier || data.targetItem?.uuid
+          || _loc("SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder");
+        if ( Recipe.get(data._id) ) {
+          await Recipe.update(data._id, data);
+          updated.push(name);
+        } else {
+          await Recipe.create(data);
+          created.push(name);
+        }
+      } catch ( err ) {
+        console.error(err);
+        failed.push(file.name);
+      }
+    }
+    const parts = [];
+    if ( created.length ) {
+      parts.push(_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.ImportCreated", { names: created.join(", ") }));
+    }
+    if ( updated.length ) {
+      parts.push(_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.ImportUpdated", { names: updated.join(", ") }));
+    }
+    if ( parts.length ) ui.notifications.info(parts.join(" "));
+    else ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.ImportNone", { localize: true });
+    if ( failed.length ) {
+      ui.notifications.warn(_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.ImportFailed", { names: failed.join(", ") }));
+    }
     this.render();
   }
 

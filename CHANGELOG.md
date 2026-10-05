@@ -5,6 +5,8 @@
 - Added opening a recipe's target item and materials by clicking their name.
 - Added choosing how many times to craft in the Craft Start dialog, which multiplies the materials and cost while each run takes its own crafting time (#26).
 - Added an Accepted Item Types setting to a shop's Vendor Settings, limiting which item types, and optionally subtypes, it buys from players (#20).
+- Added a Transaction Log that lists a shop's completed purchases and sales, opened from its Vendor Settings or the module settings.
+- Added exporting and importing a shop's Transaction Log.
 - Changed the Recipe Editor's material drop hint to always point to the add and material-rule buttons.
 - Changed a shop's Settlement Cap to show as a formatted amount with a currency icon, and its presets to use the localized currency abbreviation.
 - Changed fixed materials in the Craft Start dialog to list the matching items of the character, like material rules.

@@ -1,12 +1,14 @@
 import DefaultsConfig from "./applications/settings/defaults-config.mjs";
 import HomebrewConfig from "./applications/settings/homebrew-config.mjs";
+import TransactionLog from "./applications/transaction-log.mjs";
 import {
   CALENDAR_MODES, DEFAULT_STOCK_BY_TYPE, defaultStockKey, HOURS_PER_USE, MODULE_ID, SETTING_KEYS, STOCK_MAGIC_RULES
 } from "./config.mjs";
 import { Recipe } from "./data/recipe-data.mjs";
 import { Shop } from "./data/shop-data.mjs";
+import Transaction from "./data/transaction-data.mjs";
 
-const { ArrayField, EmbeddedDataField, NumberField, StringField } = foundry.data.fields;
+const { ArrayField, BooleanField, EmbeddedDataField, NumberField, StringField } = foundry.data.fields;
 
 /**
  * Settings definitions for Simple Shop & Craft 5e.
@@ -26,6 +28,29 @@ const SETTINGS = [
     scope: "world",
     type: new ArrayField(new EmbeddedDataField(Recipe)),
     onChange: refreshShopApplications
+  },
+  {
+    config: false,
+    key: SETTING_KEYS.TRANSACTIONS,
+    scope: "world",
+    type: new ArrayField(new EmbeddedDataField(Transaction)),
+    onChange: refreshShopApplications
+  },
+  {
+    config: true,
+    name: "SIMPLE_SHOP_CRAFT_5E.Settings.Transactions.Log.Name",
+    hint: "SIMPLE_SHOP_CRAFT_5E.Settings.Transactions.Log.Hint",
+    key: SETTING_KEYS.LOG_TRANSACTIONS,
+    scope: "world",
+    type: new BooleanField({ initial: true })
+  },
+  {
+    config: true,
+    name: "SIMPLE_SHOP_CRAFT_5E.Settings.Transactions.Limit.Name",
+    hint: "SIMPLE_SHOP_CRAFT_5E.Settings.Transactions.Limit.Hint",
+    key: SETTING_KEYS.TRANSACTION_LIMIT,
+    scope: "world",
+    type: new NumberField({ required: true, nullable: false, initial: 1000, integer: true, min: 100, max: 5000 })
   },
   {
     config: false,
@@ -118,6 +143,15 @@ export function registerSettings() {
     type: HomebrewConfig
   });
 
+  game.settings.registerMenu(MODULE_ID, "transactionLogMenu", {
+    hint: "SIMPLE_SHOP_CRAFT_5E.Settings.Transactions.Hint",
+    icon: "fa-solid fa-scroll",
+    label: "SIMPLE_SHOP_CRAFT_5E.TransactionLog.Open",
+    name: "SIMPLE_SHOP_CRAFT_5E.Settings.Transactions.Name",
+    restricted: true,
+    type: TransactionLog
+  });
+
   CONFIG.queries[`${MODULE_ID}.updatePlayerDiscount`] = async ({ shopId, actorUuid, updateData }, { user }) => {
     if ( !game.user.isGM ) return;
     const actor = fromUuidSync(actorUuid);
@@ -135,7 +169,7 @@ export function registerSettings() {
 /* -------------------------------------------- */
 
 /**
- * Re-render any open shop management applications after settings change elsewhere.
+ * Re-render any open shop management and transaction log applications after settings change elsewhere.
  * @returns {Promise<void>}
  */
 async function refreshShopApplications() {
@@ -143,6 +177,7 @@ async function refreshShopApplications() {
   const { default: ShopSheet } = await import("./applications/shops/shop-sheet.mjs");
   foundry.applications.instances.forEach(app => {
     if ( app instanceof ShopManager ) app.render();
+    if ( app instanceof TransactionLog ) app.render();
     if ( app instanceof ShopSheet ) {
       if ( app.shop ) app.render();
       else app.close();

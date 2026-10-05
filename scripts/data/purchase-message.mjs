@@ -2,6 +2,7 @@ import { CARD_STATUSES, MODULE_ID } from "../config.mjs";
 import { EnchantedItemBlueprint } from "./enchanted-item-blueprint.mjs";
 import { Shop } from "./shop-data.mjs";
 import { SpellScrollBlueprint } from "./spell-scroll-blueprint.mjs";
+import Transaction from "./transaction-data.mjs";
 
 const {
   ArrayField, BooleanField, DocumentUUIDField, EmbeddedDataField, FilePathField, NumberField, SchemaField, StringField
@@ -142,6 +143,11 @@ export class PurchaseMessageData extends foundry.abstract.DataModel {
       if ( !result.ok ) {
         ui.notifications.error(result.error, { localize: true });
         return;
+      }
+      try {
+        await Transaction.log(this.toObject());
+      } catch ( err ) {
+        console.warn(`${MODULE_ID} | Failed to log the transaction:`, err);
       }
     }
 

@@ -468,3 +468,47 @@
     color: var(--color-text-primary);
   }
 }
+
+.simple-shop-craft-5e.transaction-log {
+  .log-content {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .log-search {
+    margin-bottom: 8px;
+  }
+
+  .log-entries {
+    flex: 1;
+    overflow-y: auto;
+    font-family: var(--font-monospace);
+    font-size: var(--font-size-12);
+  }
+
+  .log-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .log-entry {
+    padding: 2px 0;
+    border-bottom: 1px solid var(--color-border-light-tertiary);
+    overflow-wrap: anywhere;
+  }
+
+  .log-time, .log-shop {
+    color: var(--color-text-secondary);
+  }
+
+  .log-bought {
+    color: var(--color-level-success);
+  }
+
+  .log-sold {
+    color: var(--color-level-error);
+  }
+}
