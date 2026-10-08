@@ -635,7 +635,8 @@ export function resolveBundleSize(item) {
 
 /**
  * Bulk version of `fromUuid` that performs only a single fetch per compendium.
- * Uses the system's version if it is available. Documents outside a compendium are not retrieved.
+ * Documents already cached by their compendium are not fetched again. Uses the system's version for the remaining
+ * ones if it is available. Documents outside a compendium are not retrieved.
  * @see dnd5e — bulkFromUuid()
  * @param {string[]} uuids                    UUIDs of documents to retrieve.
  * @returns {Promise<Map<string, Document>>}  Documents mapped to the provided UUID.
@@ -645,13 +646,24 @@ export async function bulkFromUuid(uuids) {
     .filter(({ collection, embedded }) => {
       return (collection instanceof foundry.documents.collections.CompendiumCollection) && !embedded.length;
     });
-  if ( game.dnd5e.utils.bulkFromUuid ) return game.dnd5e.utils.bulkFromUuid(requests.map(({ source }) => source));
+  const documents = new Map();
+  const missing = [];
+  for ( const request of requests ) {
+    const cached = request.collection.get(request.id);
+    if ( cached instanceof foundry.abstract.Document ) documents.set(request.source, cached);
+    else missing.push(request);
+  }
+  if ( game.dnd5e.utils.bulkFromUuid ) {
+    const fetched = await game.dnd5e.utils.bulkFromUuid(missing.map(({ source }) => source));
+    return new Map([...documents, ...fetched]);
+  }
 
-  const fetches = Array.from(Map.groupBy(requests, ({ collection }) => collection), ([collection, group]) => {
+  const fetches = Array.from(Map.groupBy(missing, ({ collection }) => collection), ([collection, group]) => {
     return collection.getDocuments({ _id__in: group.map(({ id }) => id) });
   });
-  const sources = new Map(requests.map(({ source, uuid }) => [uuid, source]));
-  return new Map((await Promise.all(fetches)).flat().map(document => [sources.get(document.uuid), document]));
+  const sources = new Map(missing.map(({ source, uuid }) => [uuid, source]));
+  for ( const document of (await Promise.all(fetches)).flat() ) documents.set(sources.get(document.uuid), document);
+  return documents;
 }
 
 /* -------------------------------------------- */
@@ -740,7 +752,9 @@ export function resolveItemPrice(item, { rarity, isAmmo, isConsumable }={}) {
  */
 export function resolveUnitPrice(item) {
   const price = resolveItemPrice(item);
-  return price?.value ? { value: price.value / resolveBundleSize(item), denomination: price.denomination } : null;
+  if ( !price?.value ) return null;
+  const value = item.system.price?.value ? (price.value / resolveBundleSize(item)) : price.value;
+  return { value, denomination: price.denomination };
 }
 
 /* -------------------------------------------- */

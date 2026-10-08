@@ -423,7 +423,10 @@ export default class GenerateItemDialog extends Dialog5e {
   async #entryKeys(listed=[]) {
     const { items } = this.shopSheet.shop;
     if ( this.#shopKeys?.items !== items ) {
-      this.#shopKeys = { items, keys: ShopItemEntry.byKey(items).then(byKey => new Set(byKey.keys())) };
+      this.#shopKeys = {
+        items,
+        keys: ShopItemEntry.byKey(items.filter(i => !i.isService)).then(byKey => new Set(byKey.keys()))
+      };
     }
     const keys = new Set(await this.#shopKeys.keys);
     for ( const { entry, item } of listed ) keys.add(ShopItemEntry.key(entry, item));

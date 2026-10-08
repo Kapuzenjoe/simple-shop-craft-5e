@@ -99,7 +99,7 @@ export default class ShopCreateDialog extends Dialog5e {
     const modern = game.dnd5e.settings.rulesVersion === "modern";
     const identifiers = (STARTER_PACKS[data.starterPack]?.items ?? [])
       .map(identifier => modern ? identifier : (LEGACY_IDENTIFIERS[identifier] ?? identifier));
-    const byIdentifier = await getStarterUuids();
+    const byIdentifier = identifiers.length ? await getStarterUuids(modern) : new Map();
     const uuids = identifiers.map(identifier => byIdentifier.get(identifier)).filter(_ => _);
     const documents = await bulkFromUuid(uuids);
     const items = uuids.map(uuid => documents.get(uuid)).filter(_ => _);
@@ -129,20 +129,21 @@ export default class ShopCreateDialog extends Dialog5e {
 
 /**
  * Get the UUIDs of the items offered to starter packs, from the first compendium that has them.
- * @returns {Promise<Map<string, string>>}  UUID of the item mapped to its identifier.
+ * @param {boolean} modern  Whether the world uses the modern rules.
+ * @returns {Promise<Map<string, string>>}  Identifier of the item mapped to its UUID.
  */
-async function getStarterUuids() {
-  const rules = (game.dnd5e.settings.rulesVersion === "modern") ? "modern" : "legacy";
+async function getStarterUuids(modern) {
+  const rules = modern ? "modern" : "legacy";
   const packs = STARTER_SOURCES[rules].map(name => game.packs.get(name)).filter(_ => _);
-  const uuids = new Map();
+  const byIdentifier = new Map();
   for ( const pack of packs ) {
     for ( const entry of await pack.getIndex({ fields: ["system.container", "system.identifier"] }) ) {
       if ( entry.system?.container || !CONFIG.Item.dataModels[entry.type]?.inventorySection ) continue;
       const identifier = entry.system?.identifier || game.dnd5e.utils.formatIdentifier(entry.name);
-      if ( !uuids.has(identifier) ) uuids.set(identifier, entry.uuid);
+      if ( !byIdentifier.has(identifier) ) byIdentifier.set(identifier, entry.uuid);
     }
   }
-  return uuids;
+  return byIdentifier;
 }
 
 /* -------------------------------------------- */

@@ -244,7 +244,7 @@
       "Import": "Import Log",
       "ImportHint": "Select a JSON file exported from a Transaction Log. Its transactions are added to this shop's log, and ones the log already contains are skipped.",
       "ImportDone": "Transactions imported: {count}.",
-      "ImportNone": "All transactions of the file are already in the log.",
+      "ImportNone": "No transactions were imported: they are already in the log or exceed its limit.",
       "ImportFailed": "The file is not a valid Transaction Log export — nothing was imported."
     },
     "ShopEditor": {
@@ -487,7 +487,8 @@
     "CraftCard": {
       "Crafter": "Crafter",
       "MissingActor": "The crafting character could no longer be found.",
-      "MissingMaterial": "One of the contributed materials could no longer be found — craft not started."
+      "MissingMaterial": "One of the contributed materials could no longer be found — craft not started.",
+      "MissingItem": "The crafted item could no longer be resolved — craft not completed."
     },
     "Craft": {
       "InProgressName": "Crafting: {name}",

@@ -60,15 +60,20 @@ export default class Transaction extends SettingCollectionMixin(foundry.abstract
   /**
    * Add transactions that are not yet in the log, keeping it in chronological order and within the limit.
    * @param {object[]} entries  Plain transaction data.
-   * @returns {Promise<number>}  The number of transactions added.
+   * @returns {Promise<number>}  The number of transactions added that remain within the limit.
    */
   static async merge(entries) {
     let added = 0;
     await this.updateAll(all => {
       const known = new Set(all.map(entry => entry._id));
-      const fresh = entries.filter(entry => !known.has(entry._id));
-      added = fresh.length;
-      return [...all, ...fresh].sort((a, b) => a.timestamp - b.timestamp).slice(-this.limit);
+      const fresh = entries.filter(entry => {
+        if ( known.has(entry._id) ) return false;
+        known.add(entry._id);
+        return true;
+      });
+      const merged = [...all, ...fresh].sort((a, b) => a.timestamp - b.timestamp).slice(-this.limit);
+      added = fresh.filter(entry => merged.includes(entry)).length;
+      return merged;
     });
     return added;
   }

@@ -145,7 +145,7 @@ export default class VendorConfig extends BaseShopConfig {
       name: data.name || this.shop.name,
       goldPool: { ...currentGoldPool, max, unlimited, sellDisabled },
       stockDefaults: { byType, magicRule: data.magicRule ?? "gear" },
-      ...(sellDisabled ? {} : { sellTypes: parseTypeFilter(data) })
+      ...(("types" in data) ? { sellTypes: parseTypeFilter(data) } : {})
     });
     const name = event.target?.name;
     if ( ["sellDisabled", "unlimited", "types"].includes(name) || name?.startsWith("subtypes.") ) {

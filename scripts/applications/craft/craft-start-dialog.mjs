@@ -559,12 +559,13 @@ export default class CraftStartDialog extends Dialog5e {
         .map(i => {
           const valueCP = materialValueCP(i);
           const available = Math.max(0, i.system.quantity - (allocated.get(i.id) ?? 0));
+          const max = Math.min(available, limit - suppliedUnits);
           const requested = this.#materialQuantities.get(`${index}:${i.id}`) ?? 0;
-          const selected = Math.min(requested, available, limit - suppliedUnits);
+          const selected = Math.min(requested, max);
           suppliedUnits += selected;
           allocated.set(i.id, (allocated.get(i.id) ?? 0) + selected);
           return {
-            id: i.id, name: i.name, img: i.img, uuid: i.uuid, available, selected, valueCP,
+            id: i.id, name: i.name, img: i.img, uuid: i.uuid, available, max, selected, valueCP,
             quantity: i.system.quantity,
             price: breakdownCopper(valueCP)
           };

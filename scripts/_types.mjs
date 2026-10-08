@@ -13,9 +13,8 @@
 
 /**
  * @typedef ShopItemEntryData
- * @property {string} [identifier]       Stable `system.identifier` of the referenced item.
- * @property {string} [uuid]             Direct UUID reference, used for one-off items with no `system.identifier`
- *                                       match.
+ * @property {string} [identifier]       Fallback `system.identifier` reference, used if there is no `uuid`.
+ * @property {string} [uuid]             UUID of the referenced item.
  * @property {object} stock
  * @property {number|null} stock.max      Maximum stock, or `null` for unlimited.
  * @property {number|null} stock.current  Current stock, or `null` for unlimited.
@@ -27,7 +26,8 @@
  * @property {number|null} price.value        Price override. `null` means use the compendium item's price.
  * @property {string} price.denomination      Currency denomination of the override.
  * @property {number|null} bundleSize    Override for how many individual items the listed price buys
- *                                       (e.g. 20 for a bundle of arrows). `null` = guess from the catalog item.
+ *                                       (e.g. 20 for a bundle of arrows). `null` = size from `BUNDLE_SIZES` for
+ *                                       the item's identifier.
  * @property {object|null} generated     Recipe for a generated magic item, `null` for normal entries.
  * @property {string} generated.baseItemUuid      UUID of the base item the enchantment is applied to.
  * @property {string} generated.enchantItemUuid   UUID of the item granting the enchantment.
@@ -120,8 +120,9 @@
 
 /**
  * @typedef RecipeMaterialData
- * @property {string} [identifier]  Stable `system.identifier` of the referenced material item.
- * @property {string} [uuid]        Direct UUID reference, used when no `system.identifier` match exists.
+ * @property {string} [identifier]  Identifier used to recognize owned items instead of the item's own, or the
+ *                                  fallback reference if there is no `uuid`.
+ * @property {string} [uuid]        UUID of the referenced material item.
  * @property {RecipeMaterialCriteria|null} [criteria]  Type/subtype/value rule instead of a fixed reference.
  * @property {boolean} required     Whether this slot must have a resolved match to start crafting.
  * @property {number} quantity      Number of matching units required to fully satisfy this slot.
@@ -148,8 +149,8 @@
  * @property {string} name                       Display name of this recipe.
  * @property {string} img                        Recipe image path.
  * @property {object} targetItem
- * @property {string} [targetItem.identifier]    Stable `system.identifier` of the item this recipe produces.
- * @property {string} [targetItem.uuid]          Direct UUID reference, used when no `system.identifier` match exists.
+ * @property {string} [targetItem.identifier]    Fallback `system.identifier` reference, used if there is no `uuid`.
+ * @property {string} [targetItem.uuid]          UUID of the item this recipe produces.
  * @property {number} targetQuantity              Units produced per craft (e.g. 20 for a stack of arrows).
  * @property {RecipeMaterialData[]} materials    Fixed materials required by this recipe.
  * @property {boolean} allowFreeformMaterials    Whether players may substitute any sufficiently valuable item.
@@ -183,8 +184,8 @@
  * @typedef InProgressCraftData
  * @property {string} recipeId                 Id of the recipe this craft was started from.
  * @property {object} targetItem
- * @property {string} [targetItem.identifier]  Stable `system.identifier` of the item this craft produces.
- * @property {string} [targetItem.uuid]        Direct UUID reference, used when no `system.identifier` match exists.
+ * @property {string} [targetItem.identifier]  Fallback `system.identifier` reference, used if there is no `uuid`.
+ * @property {string} [targetItem.uuid]        UUID of the item this craft produces.
  * @property {number} targetQuantity           Units to produce when this craft completes.
  * @property {number} remaining                Runs of this craft still to finish, including the current one.
  * @property {string} spellUuid                Chosen spell UUID for a spell-scroll craft, or blank.
@@ -260,8 +261,8 @@
  * @property {string} status                     Status of the pending craft: "pending", "accepted", or "rejected".
  * @property {string} recipeId                   Id of the recipe this craft was started from.
  * @property {object} targetItem
- * @property {string} [targetItem.identifier]     Stable `system.identifier` of the produced item.
- * @property {string} [targetItem.uuid]           Direct UUID reference, used when no `system.identifier` match exists.
+ * @property {string} [targetItem.identifier]     Fallback `system.identifier` reference, used if there is no `uuid`.
+ * @property {string} [targetItem.uuid]           UUID of the produced item.
  * @property {number} targetQuantity              Units to produce when this craft completes.
  * @property {number} count                       Runs of the recipe started by this craft.
  * @property {string} targetName                  Display name of the produced item.
@@ -309,9 +310,8 @@
 /**
  * @typedef PurchaseBuyLine
  * @property {string} [_id]                                 Stable id, used when neither identifier nor uuid is set.
- * @property {string} [identifier]                         Stable `system.identifier` of the referenced item.
- * @property {string} [uuid]                                Direct UUID reference, used when no `system.identifier`
- *                                                          match exists.
+ * @property {string} [identifier]                         Fallback `system.identifier` reference of the item.
+ * @property {string} [uuid]                                UUID of the referenced item.
  * @property {EnchantedItemBlueprintData|null} generated    Enchant-generation blueprint, `null` for normal items.
  * @property {SpellScrollBlueprintData|null} spellScroll    Spell-scroll blueprint, `null` for normal items.
  * @property {boolean} [isService]                          Whether this is a Services-tab entry — money-only,
