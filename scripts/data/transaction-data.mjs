@@ -72,7 +72,8 @@ export default class Transaction extends SettingCollectionMixin(foundry.abstract
         return true;
       });
       const merged = [...all, ...fresh].sort((a, b) => a.timestamp - b.timestamp).slice(-this.limit);
-      added = fresh.filter(entry => merged.includes(entry)).length;
+      const kept = new Set(merged);
+      added = fresh.filter(entry => kept.has(entry)).length;
       return merged;
     });
     return added;

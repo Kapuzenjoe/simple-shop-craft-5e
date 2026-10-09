@@ -116,6 +116,7 @@ export default class ShopCreateDialog extends Dialog5e {
       buyModifier: game.settings.get(MODULE_ID, SETTING_KEYS.DEFAULT_BUY_MODIFIER),
       sellModifier: game.settings.get(MODULE_ID, SETTING_KEYS.DEFAULT_SELL_MODIFIER),
       goldPool: { max: { gp: goldPool }, current: { gp: goldPool }, unlimited: false },
+      stockDefaults,
       items: items.map(item => ({ ...itemRef(item), ...newEntryStock(item, stockDefaults) }))
     };
     const created = await Shop.create(newShop);

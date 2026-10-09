@@ -48,7 +48,7 @@ export function maxHoursPerWorkday() {
 /**
  * Resolve a recipe's total crafting duration in hours: its explicit override if set, otherwise the
  * rules-based crafting time for the target item, scaled by the ratio of the recipe's target quantity to
- * the target item's own bundle size.
+ * the target item's own bundle size. The duration is at least one minute.
  * @param {Recipe} recipe
  * @param {{ days: number, gold: number }|null} craftCost
  * @param {Item5e} [targetItem]
@@ -57,10 +57,10 @@ export function maxHoursPerWorkday() {
 export function resolveTotalHours(recipe, craftCost, targetItem) {
   const hoursPerUnit = { minute: 1 / 60, hour: 1, day: maxHoursPerWorkday() };
   if ( recipe.durationOverride.value != null ) {
-    return recipe.durationOverride.value * hoursPerUnit[recipe.durationOverride.units];
+    return Math.max(hoursPerUnit.minute, recipe.durationOverride.value * hoursPerUnit[recipe.durationOverride.units]);
   }
   const scale = recipe.targetQuantity / resolveBundleSize(targetItem);
-  return (craftCost?.days ?? 0) * scale * maxHoursPerWorkday();
+  return Math.max(hoursPerUnit.minute, (craftCost?.days ?? 0) * scale * maxHoursPerWorkday());
 }
 
 /* -------------------------------------------- */
@@ -256,7 +256,8 @@ export function goldPoolCurrencies() {
 /* -------------------------------------------- */
 
 /**
- * Convert a value in a given denomination to a whole number of copper pieces, rounded down.
+ * Convert a value in a given denomination to a whole number of copper pieces, rounded down after removing
+ * floating-point error.
  * Uses the system's `roundCurrency` if it is available.
  * @see dnd5e — roundCurrency()
  * @param {number} value
@@ -265,7 +266,8 @@ export function goldPoolCurrencies() {
  */
 export function toCopper(value, denomination="gp") {
   const cpPerUnit = CONFIG.DND5E.currencies.cp.conversion / (CONFIG.DND5E.currencies[denomination]?.conversion ?? 1);
-  return Math.floor(game.dnd5e.utils.roundCurrency?.(value * cpPerUnit, "cp") ?? (value * cpPerUnit));
+  const copper = Number((value * cpPerUnit).toFixed(6));
+  return Math.floor(game.dnd5e.utils.roundCurrency?.(copper, "cp") ?? copper);
 }
 
 /* -------------------------------------------- */
@@ -338,13 +340,11 @@ export function selectableActors({ includeParty=false }={}) {
  */
 export function formatDuration(totalHours, { days=true }={}) {
   const hoursPerWorkday = maxHoursPerWorkday();
-  const dayCount = days ? Math.floor(totalHours / hoursPerWorkday) : 0;
-  let hours = Math.floor(days ? totalHours % hoursPerWorkday : totalHours);
-  let minutes = Math.round((totalHours % 1) * 60);
-  if ( minutes === 60 ) {
-    minutes = 0;
-    hours += 1;
-  }
+  const totalMinutes = Math.round(totalHours * 60);
+  const dayCount = days ? Math.floor(totalMinutes / (hoursPerWorkday * 60)) : 0;
+  const remainder = totalMinutes - (dayCount * hoursPerWorkday * 60);
+  const hours = Math.floor(remainder / 60);
+  const minutes = remainder % 60;
   const parts = [];
   if ( dayCount ) parts.push(`${dayCount}d`);
   if ( hours ) parts.push(`${hours}h`);
@@ -653,16 +653,19 @@ export async function bulkFromUuid(uuids) {
     if ( cached instanceof foundry.abstract.Document ) documents.set(request.source, cached);
     else missing.push(request);
   }
-  if ( game.dnd5e.utils.bulkFromUuid ) {
-    const fetched = await game.dnd5e.utils.bulkFromUuid(missing.map(({ source }) => source));
-    return new Map([...documents, ...fetched]);
-  }
+  if ( !missing.length ) return documents;
 
-  const fetches = Array.from(Map.groupBy(missing, ({ collection }) => collection), ([collection, group]) => {
-    return collection.getDocuments({ _id__in: group.map(({ id }) => id) });
-  });
-  const sources = new Map(missing.map(({ source, uuid }) => [uuid, source]));
-  for ( const document of (await Promise.all(fetches)).flat() ) documents.set(sources.get(document.uuid), document);
+  let fetched;
+  if ( game.dnd5e.utils.bulkFromUuid ) {
+    fetched = await game.dnd5e.utils.bulkFromUuid(missing.map(({ source }) => source));
+  } else {
+    const fetches = Array.from(Map.groupBy(missing, ({ collection }) => collection), ([collection, group]) => {
+      return collection.getDocuments({ _id__in: group.map(({ id }) => id) });
+    });
+    const sources = new Map(missing.map(({ source, uuid }) => [uuid, source]));
+    fetched = new Map((await Promise.all(fetches)).flat().map(document => [sources.get(document.uuid), document]));
+  }
+  for ( const [source, document] of fetched ) documents.set(source, document);
   return documents;
 }
 
@@ -746,15 +749,18 @@ export function resolveItemPrice(item, { rarity, isAmmo, isConsumable }={}) {
 /* -------------------------------------------- */
 
 /**
- * Resolve the price of a single unit of an item.
- * @param {Item5e} item  The item being priced.
+ * Resolve the price of a single unit of an item: its own price divided by its bundle size, otherwise the
+ * rarity-based fallback, which is already priced per piece.
+ * @param {Item5e} item                    The item being priced.
+ * @param {object} [options]
+ * @param {boolean} [options.fallback=true]  Fall back to the rarity-based price if the item has no price.
  * @returns {{ value: number, denomination: string }|null}  Price per unit, or `null` if the item has none.
  */
-export function resolveUnitPrice(item) {
-  const price = resolveItemPrice(item);
-  if ( !price?.value ) return null;
-  const value = item.system.price?.value ? (price.value / resolveBundleSize(item)) : price.value;
-  return { value, denomination: price.denomination };
+export function resolveUnitPrice(item, { fallback=true }={}) {
+  const { value, denomination } = item?.system.price ?? {};
+  if ( value ) return { value: value / resolveBundleSize(item), denomination };
+  const price = fallback ? resolveItemPrice(item) : null;
+  return price?.value ? price : null;
 }
 
 /* -------------------------------------------- */

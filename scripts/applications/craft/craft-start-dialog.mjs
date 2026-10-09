@@ -2,8 +2,8 @@ import { CraftMessageData } from "../../data/craft-message.mjs";
 import { Recipe } from "../../data/recipe-data.mjs";
 import {
   applyDropArea, applyLoadingTooltip, breakdownCopper, buildItemTableSections, matchIdentifier, maxHoursPerWorkday,
-  openItemSheet, recipeCraftCost, resolveEntries, resolveTotalHours, resolveUnitPrice, selectableActors,
-  subtypeOptions, toCopper
+  openItemSheet, recipeCraftCost, resolveBundleSize, resolveEntries, resolveTotalHours, resolveUnitPrice,
+  selectableActors, subtypeOptions, toCopper
 } from "../../utils.mjs";
 
 const { Dialog5e } = game.dnd5e.applications.api;
@@ -396,9 +396,8 @@ export default class CraftStartDialog extends Dialog5e {
     const key = `${target.dataset.index}:${target.dataset.itemId}`;
     const step = Number(target.dataset.step);
     const max = Number(target.dataset.max ?? Infinity);
-    const physicalMax = Number(target.dataset.physicalMax ?? max);
     const current = Math.min(this.#materialQuantities.get(key) ?? 0, max);
-    this.#materialQuantities.set(key, Math.min(physicalMax, Math.max(0, current + step)));
+    this.#materialQuantities.set(key, Math.clamp(current + step, 0, max));
     this.render({ parts: ["content", "footer"] });
   }
 
@@ -493,15 +492,16 @@ export default class CraftStartDialog extends Dialog5e {
     const [targetResolved] = await resolveEntries([recipe.targetItem]);
     const targetItem = targetResolved.item;
     const count = (targetItem?.type === "container") ? 1 : this.#count;
+    const units = (targetItem?.type === "container") ? 1 : count * recipe.targetQuantity;
     const craftCost = await recipeCraftCost(recipe, targetItem);
     let weight = null;
     let halfPrice = null;
     if ( !recipe.spellScroll && targetItem?.uuid ) {
       const fullTargetItem = await fromUuid(targetItem.uuid);
       if ( fullTargetItem ) {
-        weight = { ...fullTargetItem.system.weight, value: fullTargetItem.system.weight.value * count };
+        weight = { ...fullTargetItem.system.weight, value: fullTargetItem.system.weight.value * units };
         halfPrice = {
-          value: Math.floor(fullTargetItem.system.price.value / 2) * count,
+          value: (fullTargetItem.system.price.value * units) / (resolveBundleSize(fullTargetItem) * 2),
           denomination: fullTargetItem.system.price.denomination
         };
       }
@@ -566,7 +566,6 @@ export default class CraftStartDialog extends Dialog5e {
           allocated.set(i.id, (allocated.get(i.id) ?? 0) + selected);
           return {
             id: i.id, name: i.name, img: i.img, uuid: i.uuid, available, max, selected, valueCP,
-            quantity: i.system.quantity,
             price: breakdownCopper(valueCP)
           };
         });

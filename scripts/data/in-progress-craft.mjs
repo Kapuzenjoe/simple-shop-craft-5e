@@ -65,12 +65,20 @@ export class InProgressCraft extends foundry.abstract.DataModel {
   }
 
   /* -------------------------------------------- */
+
+  /**
+   * UUIDs of the in-progress craft items whose pending session is being resolved on this client.
+   * @type {Set<string>}
+   */
+  static #resolving = new Set();
+
+  /* -------------------------------------------- */
   /*  Methods                                     */
   /* -------------------------------------------- */
 
   /**
-   * Validate and apply an accepted craft start: consume the contributed materials and gold, then create
-   * the in-progress craft item on the actor.
+   * Validate and apply an accepted craft start: create the in-progress craft item on the actor, then consume
+   * the contributed gold and materials. The item is removed again if consuming them fails.
    * @param {object} craft  Pending craft-card flag data.
    * @returns {Promise<{ ok: true }|{ ok: false, error: string }>}
    */
@@ -93,14 +101,6 @@ export class InProgressCraft extends foundry.abstract.DataModel {
       else itemsToDelete.push(itemId);
     }
 
-    if ( craft.goldCP > 0 ) {
-      const result = await deductActorCurrencyChecked(actor, craft.goldCP);
-      if ( !result.ok ) return result;
-    }
-
-    if ( itemUpdates.length ) await actor.updateEmbeddedDocuments("Item", itemUpdates);
-    if ( itemsToDelete.length ) await actor.deleteEmbeddedDocuments("Item", itemsToDelete);
-
     const inProgress = new InProgressCraft({
       recipeId: craft.recipeId, targetItem: craft.targetItem, targetQuantity: craft.targetQuantity,
       remaining: craft.count, spellUuid: craft.spellUuid || "", scrollValues: craft.scrollValues ?? null,
@@ -117,7 +117,19 @@ export class InProgressCraft extends foundry.abstract.DataModel {
       },
       flags: { [MODULE_ID]: { craft: inProgress.toObject() } }
     }]);
-    await inProgress.createActivity(item);
+    let started = false;
+    try {
+      await inProgress.createActivity(item);
+      if ( craft.goldCP > 0 ) {
+        const result = await deductActorCurrencyChecked(actor, craft.goldCP);
+        if ( !result.ok ) return result;
+      }
+      if ( itemUpdates.length ) await actor.updateEmbeddedDocuments("Item", itemUpdates);
+      if ( itemsToDelete.length ) await actor.deleteEmbeddedDocuments("Item", itemsToDelete);
+      started = true;
+    } finally {
+      if ( !started ) await item.delete();
+    }
 
     return { ok: true };
   }
@@ -169,6 +181,8 @@ export class InProgressCraft extends foundry.abstract.DataModel {
     const requested = usageConfig.simpleShopCraft5e?.hoursThisUse ?? craft.hoursPerUse ?? maxHoursPerWorkday();
     const hoursThisUse = Math.min(requested, craft.#remainingBudget(item.actor).max);
     if ( hoursThisUse <= 0 ) return;
+
+    if ( ((craft.progress + hoursThisUse) >= craft.totalHours) && !(await craft.#resolveTarget()) ) return;
 
     if ( isCalendarModeActive() ) {
       const { ProgressSessionMessageData } = await import("./progress-session-message.mjs");
@@ -232,14 +246,20 @@ export class InProgressCraft extends foundry.abstract.DataModel {
    * @returns {Promise<void>}
    */
   async resolvePendingSession(item, { early=false }={}) {
-    if ( this.pendingStart == null ) return;
-    const elapsedHours = Math.max(0, (game.time.worldTime - this.pendingStart) / 3600);
-    const hours = early ? Math.min(this.pendingHours, elapsedHours) : this.pendingHours;
-    const messageId = this.pendingMessageId;
-    this.updateSource({ pendingStart: null, pendingHours: null, pendingMessageId: "" });
-    await this.creditProgress(item, hours);
-    const { ProgressSessionMessageData } = await import("./progress-session-message.mjs");
-    await ProgressSessionMessageData.resolve(messageId);
+    const resolving = InProgressCraft.#resolving;
+    if ( (this.pendingStart == null) || resolving.has(item.uuid) ) return;
+    resolving.add(item.uuid);
+    try {
+      const elapsedHours = Math.max(0, (game.time.worldTime - this.pendingStart) / 3600);
+      const hours = early ? Math.min(this.pendingHours, elapsedHours) : this.pendingHours;
+      const messageId = this.pendingMessageId;
+      this.updateSource({ pendingStart: null, pendingHours: null, pendingMessageId: "" });
+      await this.creditProgress(item, hours);
+      const { ProgressSessionMessageData } = await import("./progress-session-message.mjs");
+      await ProgressSessionMessageData.resolve(messageId);
+    } finally {
+      resolving.delete(item.uuid);
+    }
   }
 
   /* -------------------------------------------- */
@@ -267,7 +287,7 @@ export class InProgressCraft extends foundry.abstract.DataModel {
   /* -------------------------------------------- */
 
   /**
-   * Self-healing: on every character sheet render, recreate a deleted "Progress Craft" activity and
+   * Self-healing: on every render of an owned character sheet, recreate a deleted "Progress Craft" activity and
    * reconcile it to the current activity definition, and refresh a missing or stale progress block in
    * the description of any in-progress craft item.
    * @param {Application5e} app
@@ -275,7 +295,7 @@ export class InProgressCraft extends foundry.abstract.DataModel {
    */
   static async onRenderCharacterActorSheet(app) {
     const actor = app.actor;
-    if ( !actor ) return;
+    if ( !actor?.isOwner ) return;
 
     for ( const item of actor.items ) {
       const flag = item.getFlag(MODULE_ID, "craft");
@@ -350,18 +370,8 @@ export class InProgressCraft extends foundry.abstract.DataModel {
     const actor = item.actor;
     if ( !actor ) return;
 
-    let fullItem;
-    if ( this.spellUuid ) {
-      const spell = await fromUuid(this.spellUuid);
-      fullItem = spell ? await createSpellScroll(spell, this.scrollValues) : null;
-    } else {
-      const [resolved] = await resolveEntries([this.targetItem]);
-      fullItem = resolved.item?.uuid ? await fromUuid(resolved.item.uuid) : null;
-    }
-    if ( !fullItem ) {
-      ui.notifications.error("SIMPLE_SHOP_CRAFT_5E.CraftCard.MissingItem", { localize: true });
-      return;
-    }
+    const fullItem = await this.#resolveTarget();
+    if ( !fullItem ) return;
 
     const itemData = fullItem.toObject();
     delete itemData._id;
@@ -383,7 +393,9 @@ export class InProgressCraft extends foundry.abstract.DataModel {
     }
 
     await ChatMessage.create({
-      content: `<p>${_loc("SIMPLE_SHOP_CRAFT_5E.Craft.CompleteMessage", { name: fullItem.name, actor: actor.name })}</p>`,
+      content: `<p>${_loc("SIMPLE_SHOP_CRAFT_5E.Craft.CompleteMessage", {
+        name: foundry.utils.escapeHTML(fullItem.name), actor: foundry.utils.escapeHTML(actor.name)
+      })}</p>`,
       speaker: ChatMessage.getSpeaker({ actor }),
       whisper: game.users.filter(u => actor.testUserPermission(u, "OWNER"))
     });
@@ -410,15 +422,36 @@ export class InProgressCraft extends foundry.abstract.DataModel {
   /* -------------------------------------------- */
 
   /**
-   * Resolve the actor's remaining crafting hours for today, capped by this craft's own remaining progress.
+   * Resolve the actor's remaining crafting hours for today, counting the hours of pending sessions on all of
+   * its items and capped by this craft's own remaining progress.
    * @param {Actor5e|null} actor
    * @returns {{ dailyMax: number, workedToday: number, remainingToday: number, max: number }}
    */
   #remainingBudget(actor) {
     const dailyMax = maxHoursPerWorkday();
-    const workedToday = actor?.getFlag(MODULE_ID, "hoursWorkedToday") ?? 0;
+    const pendingHours = actor?.items.reduce((sum, i) => sum + (i.getFlag(MODULE_ID, "craft")?.pendingHours ?? 0), 0) ?? 0;
+    const workedToday = (actor?.getFlag(MODULE_ID, "hoursWorkedToday") ?? 0) + pendingHours;
     const remainingToday = Math.max(0, dailyMax - workedToday);
     return { dailyMax, workedToday, remainingToday, max: Math.min(remainingToday, this.totalHours - this.progress) };
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Resolve the item this craft produces, notifying the user if it can't be found.
+   * @returns {Promise<Item5e|null>}  The target item, or a scroll of the chosen spell.
+   */
+  async #resolveTarget() {
+    let item;
+    if ( this.spellUuid ) {
+      const spell = await fromUuid(this.spellUuid);
+      item = spell ? await createSpellScroll(spell, this.scrollValues) : null;
+    } else {
+      const [resolved] = await resolveEntries([this.targetItem]);
+      item = resolved.item?.uuid ? await fromUuid(resolved.item.uuid) : null;
+    }
+    if ( !item ) ui.notifications.error("SIMPLE_SHOP_CRAFT_5E.CraftCard.MissingItem", { localize: true });
+    return item;
   }
 
   /* -------------------------------------------- */

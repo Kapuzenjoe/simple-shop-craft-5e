@@ -46,6 +46,14 @@ export default class ShopCart extends Dialog5e {
   /* -------------------------------------------- */
 
   /**
+   * Whether the cart is currently being turned into a purchase card.
+   * @type {boolean}
+   */
+  #submitting = false;
+
+  /* -------------------------------------------- */
+
+  /**
    * Compute the current buy/sell lines, net total, and confirm-eligibility for this cart.
    * @returns {object}
    */
@@ -119,14 +127,21 @@ export default class ShopCart extends Dialog5e {
    * @returns {Promise<void>}
    */
   static async #onSubmit(event, form, formData) {
+    if ( this.#submitting ) return;
     const state = this.#computeState();
-    await PurchaseMessageData.create({
-      shopSheet: this.shopSheet, actor: state.actor, buyLines: state.lines, sellLines: state.sellLines,
-      totalParts: state.total.parts, netCP: state.netCP
-    });
-    ui.notifications.info("SIMPLE_SHOP_CRAFT_5E.ShopCart.PurchaseRequested", { localize: true });
-    this.shopSheet.cart.clear();
-    this.shopSheet.sellCart.clear();
+    if ( state.confirmDisabled ) return;
+    this.#submitting = true;
+    try {
+      await PurchaseMessageData.create({
+        shopSheet: this.shopSheet, actor: state.actor, buyLines: state.lines, sellLines: state.sellLines,
+        totalParts: state.total.parts, netCP: state.netCP
+      });
+      ui.notifications.info("SIMPLE_SHOP_CRAFT_5E.ShopCart.PurchaseRequested", { localize: true });
+      this.shopSheet.cart.clear();
+      this.shopSheet.sellCart.clear();
+    } finally {
+      this.#submitting = false;
+    }
     await this.shopSheet.render();
     this.render();
   }

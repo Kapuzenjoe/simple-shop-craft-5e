@@ -34,6 +34,7 @@ export class SpellScrollBlueprint extends foundry.abstract.DataModel {
     const spell = await fromUuid(this.spellUuid);
     if ( !spell ) return null;
     const scroll = await createSpellScroll(spell);
+    if ( !scroll ) return null;
     if ( this.img ) scroll.updateSource({ img: this.img });
     if ( this.identifier ) scroll.updateSource({ "system.identifier": this.identifier });
     return scroll;

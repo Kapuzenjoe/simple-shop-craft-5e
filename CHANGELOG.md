@@ -20,6 +20,15 @@
 - Fixed a player added in a shop's Players dialog not being saved.
 - Fixed editing a Settlement Cap that matches a preset's amount in another currency, such as 20 pp, turning it into gold.
 - Fixed completing a craft whose target item can't be found showing a raw message key instead of an error.
+- Fixed double-clicking Accept on a purchase or craft card applying it twice.
+- Fixed confirming the shopping cart twice in a row creating two purchase cards, and confirming an empty or unaffordable cart creating one.
+- Fixed character and item names containing HTML being rendered as markup in the craft completion message.
+- Fixed the plus button of a material in the Craft Start dialog selecting an item later by itself after the amount of another item was lowered.
+- Fixed accepting two purchase cards in quick succession selling a shop's last item twice or overwriting its gold.
+- Fixed a craft that fails to start still using up the materials and gold.
+- Fixed combined price modifiers below -100% making items cost a negative amount.
+- Fixed a crafting session being credited twice when the game time advances again while it is being resolved.
+- Fixed new shops ignoring the default stock settings when restocking and when adding items.
 - Reworked how shops and recipes recognize items:
   - Added warnings to shop entries and recipe items that have the default identifier or share the identifier of the item they were copied from, and to shop entries listed more than once.
   - Added an item type check when recognizing a recipe's materials among a character's items.

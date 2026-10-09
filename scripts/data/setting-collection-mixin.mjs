@@ -105,7 +105,7 @@ export default function SettingCollectionMixin(Base, settingKey) {
     /* -------------------------------------------- */
 
     /**
-     * Merge a partial update into a single instance.
+     * Merge a partial update into a single instance. Does nothing if no instance has the id.
      * @param {string} id
      * @param {object|function(Base): object} updateData  Fields to merge, or a function computing them
      *                                                     from the freshest persisted instance.
@@ -114,7 +114,9 @@ export default function SettingCollectionMixin(Base, settingKey) {
     static async update(id, updateData) {
       await semaphore.add(async () => {
         const all = this.getAll();
-        const data = (typeof updateData === "function") ? updateData(all.find(e => e._id === id)) : updateData;
+        const entry = all.find(e => e._id === id);
+        if ( !entry ) return;
+        const data = (typeof updateData === "function") ? updateData(entry) : updateData;
         await this.setAll(all.map(e => e._id === id ? { ...e.toObject(), ...data } : e.toObject()));
       });
     }

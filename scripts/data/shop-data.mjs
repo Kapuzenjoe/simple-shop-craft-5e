@@ -172,6 +172,14 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
 
   /* -------------------------------------------- */
 
+  /**
+   * Queue serializing the application of accepted purchases on this client.
+   * @type {foundry.utils.Semaphore}
+   */
+  static #purchases = new foundry.utils.Semaphore(1);
+
+  /* -------------------------------------------- */
+
   /** @override */
   static LOCALIZATION_PREFIXES = ["SIMPLE_SHOP_CRAFT_5E.SHOP"];
 
@@ -324,7 +332,9 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
    * @returns {boolean}
    */
   isHagglingLocked(actorUuid, skill) {
-    return !!(actorUuid && this.playerDiscounts.find(pd => pd.actor === actorUuid)?.hagglingLocks?.[skill]);
+    const locks = actorUuid ? this.playerDiscounts.find(pd => pd.actor === actorUuid)?.hagglingLocks : null;
+    const lock = locks?.[skill];
+    return (lock != null) && ((game.time.worldTime - lock) < secondsPerDay());
   }
 
   /* -------------------------------------------- */
@@ -335,8 +345,8 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
    * @returns {boolean}
    */
   hasHagglingLocks(actorUuid) {
-    const locks = actorUuid && this.playerDiscounts.find(pd => pd.actor === actorUuid)?.hagglingLocks;
-    return !!locks && (Object.keys(locks).length > 0);
+    const locks = actorUuid ? this.playerDiscounts.find(pd => pd.actor === actorUuid)?.hagglingLocks : null;
+    return Object.keys(locks ?? {}).some(skill => this.isHagglingLocked(actorUuid, skill));
   }
 
   /* -------------------------------------------- */
@@ -440,6 +450,17 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
    * @returns {Promise<{ ok: true }|{ ok: false, error: string }>}
    */
   static async applyPurchase(purchase) {
+    return Shop.#purchases.add(() => Shop.#applyPurchase(purchase));
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Apply a purchase once all earlier ones have been applied.
+   * @param {object} purchase  Purchase flag data.
+   * @returns {Promise<{ ok: true }|{ ok: false, error: string }>}
+   */
+  static async #applyPurchase(purchase) {
     const actor = fromUuidSync(purchase.actorUuid);
     if ( !actor ) return { ok: false, error: "SIMPLE_SHOP_CRAFT_5E.PurchaseCard.MissingActor" };
 
@@ -543,8 +564,9 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
       });
 
       const goldPool = { ...freshShop.goldPool };
-      if ( effectiveGoldCurrent !== null ) {
-        const parts = breakdownCopper(effectiveGoldCurrent - purchase.netCP);
+      const effectiveGold = freshShop.effectiveGoldPool();
+      if ( effectiveGold !== null ) {
+        const parts = breakdownCopper(effectiveGold - purchase.netCP);
         goldPool.current = Object.fromEntries(parts.map(p => [p.denomination, p.value]));
       }
 
@@ -557,44 +579,26 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
   /* -------------------------------------------- */
 
   /**
-   * Restock due shops and clear expired haggling locks.
-   * @param {number} worldTime
+   * Restock due shops.
    * @param {number[]|null} weekdaysPassed  Weekday indices crossed since the last check, or `null` for a
    *   full week or more.
    * @returns {Promise<void>}
    */
-  static async handleDayChange(worldTime, weekdaysPassed) {
+  static async handleDayChange(weekdaysPassed) {
     if ( !game.user.isActiveGM ) return;
 
-    const perDay = secondsPerDay();
     for ( const shop of Shop.getAll() ) {
-      const updateData = {};
-
       const restockDue = weekdaysPassed === null
         ? (shop.restockWeekdays.size > 0)
         : weekdaysPassed.some(d => shop.restockWeekdays.has(d));
-      if ( restockDue ) Object.assign(updateData, await shop.restockUpdates());
-
-      let hagglingChanged = false;
-      const playerDiscounts = shop.playerDiscounts.map(pd => {
-        const locks = pd.hagglingLocks ?? {};
-        const remaining = Object.fromEntries(
-          Object.entries(locks).filter(([, timestamp]) => Math.floor((worldTime - timestamp) / perDay) < 1)
-        );
-        if ( Object.keys(remaining).length === Object.keys(locks).length ) return pd.toObject();
-        hagglingChanged = true;
-        return { ...pd.toObject(), hagglingLocks: remaining };
-      });
-      if ( hagglingChanged ) updateData.playerDiscounts = playerDiscounts;
-
-      if ( Object.keys(updateData).length ) await Shop.update(shop._id, updateData);
+      if ( restockDue ) await Shop.update(shop._id, await shop.restockUpdates());
     }
   }
 
   /* -------------------------------------------- */
 
   /**
-   * Handle Foundry's `updateWorldTime` hook, restocking due shops and clearing expired haggling locks.
+   * Handle Foundry's `updateWorldTime` hook, restocking due shops.
    * @param {number} worldTime
    * @param {number} dt
    * @returns {Promise<void>}
@@ -611,7 +615,7 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
     const weekdaysPassed = (midnights >= weekLength)
       ? null
       : Array.from({ length: midnights }, (_, i) => (dayOfWeek - i + weekLength) % weekLength);
-    await Shop.handleDayChange(worldTime, weekdaysPassed);
+    await Shop.handleDayChange(weekdaysPassed);
   }
 }
 

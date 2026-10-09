@@ -6,7 +6,7 @@ import { newEntryStock, Shop, ShopItemEntry } from "../../data/shop-data.mjs";
 import {
   applyItemSort, applyListControls, applyLoadingTooltip, applyRichTooltip, breakdownCopper, buildItemTableSections,
   confirmDeleteShop, finalizeGroups, identifierWarning, isCalendarModeActive, isSpellScrollItem, itemRef,
-  openItemSheet, resolveBundleSize, resolveItemPrice, selectableActors, spotlightShop, toCopper
+  openItemSheet, resolveBundleSize, resolveItemPrice, resolveUnitPrice, selectableActors, spotlightShop, toCopper
 } from "../../utils.mjs";
 import AddEntryDialog from "./add-entry-dialog.mjs";
 import ConfigureTemplatesDialog from "./configure-templates-dialog.mjs";
@@ -377,12 +377,12 @@ export default class ShopSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
-   * Rows currently selected in the shopping cart, resolved from the last render.
+   * Rows currently selected in the shopping cart, resolved from the last render. Suppressed rows are excluded.
    * @type {object[]}
    */
   get cartLines() {
     return [...(this.#lastGroups ?? []), ...(this.#lastServiceGroups ?? [])]
-      .flatMap(group => group.items).filter(row => row.cartQuantity > 0);
+      .flatMap(group => group.items).filter(row => (row.cartQuantity > 0) && !row.suppressed);
   }
 
   /* -------------------------------------------- */
@@ -1637,8 +1637,9 @@ async function groupSellItems({
   const sellable = Array.from(items).filter(item => CONFIG.Item.dataModels[item.type]?.inventorySection);
   const groups = new Map();
   for ( const item of sellable ) {
-    const basePrice = (item.system.price?.value ?? 0) / resolveBundleSize(item);
-    const denomination = item.system.price?.denomination ?? CONFIG.DND5E.defaultCurrency;
+    const price = resolveUnitPrice(item, { fallback: false });
+    const basePrice = price?.value ?? 0;
+    const denomination = price?.denomination ?? CONFIG.DND5E.defaultCurrency;
     const rowIsFixedValue = isFixedValue(item, fixedValueLootTypes);
     const { percent: discountPercent, sources } = resolveDiscountSources({
       itemOverride: null, isFixedValue: rowIsFixedValue, shopModifier: sellModifier,
@@ -1695,8 +1696,8 @@ async function renderAttribution(sources, total) {
 
 /**
  * Resolve a row's effective discount percent and the attribution sources behind it: item override, else
- * fixed-value (0%), else shop default + player modifier. Rendering the sources into a tooltip is left to
- * the caller.
+ * fixed-value (0%), else shop default + player modifier, limited to -100%. Rendering the sources into a
+ * tooltip is left to the caller.
  * @param {object} options
  * @param {number|null} options.itemOverride    The item entry's own discount override, if any (buy-side only).
  * @param {boolean} options.isFixedValue        Whether the item is a fixed-value loot subtype (always 0%).
@@ -1727,7 +1728,7 @@ function resolveDiscountSources({
     sources.push(additiveSource(_loc("SIMPLE_SHOP_CRAFT_5E.CrafterFeat"), -20));
     percent -= 20;
   }
-  return { percent, sources };
+  return { percent: Math.max(-100, percent), sources };
 }
 
 /* -------------------------------------------- */

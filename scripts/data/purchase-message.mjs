@@ -59,6 +59,14 @@ export class PurchaseMessageData extends foundry.abstract.DataModel {
   /* -------------------------------------------- */
 
   /**
+   * IDs of the messages whose decision is currently being applied on this client.
+   * @type {Set<string>}
+   */
+  static #processing = new Set();
+
+  /* -------------------------------------------- */
+
+  /**
    * Create a chat message requesting GM confirmation for a pending buy/sell transaction.
    * @param {object} options
    * @param {ShopSheet} options.shopSheet  The shop editor the transaction originates from.
@@ -112,8 +120,8 @@ export class PurchaseMessageData extends foundry.abstract.DataModel {
     }
 
     const purchase = new PurchaseMessageData(flag);
-    html.querySelector('[data-action="acceptPurchase"]')?.addEventListener("click", () => purchase.#handleDecision(message, "accepted"));
-    html.querySelector('[data-action="rejectPurchase"]')?.addEventListener("click", () => purchase.#handleDecision(message, "rejected"));
+    html.querySelector('[data-action="acceptPurchase"]')?.addEventListener("click", event => purchase.#handleDecision(message, "accepted", event.currentTarget));
+    html.querySelector('[data-action="rejectPurchase"]')?.addEventListener("click", event => purchase.#handleDecision(message, "rejected", event.currentTarget));
   }
 
   /* -------------------------------------------- */
@@ -135,27 +143,37 @@ export class PurchaseMessageData extends foundry.abstract.DataModel {
    * Record the GM's decision on this pending transaction.
    * @param {ChatMessage} message              The purchase chat message.
    * @param {"accepted"|"rejected"} decision
+   * @param {HTMLButtonElement} button         The clicked button, disabled while the decision is applied.
    * @returns {Promise<void>}
    */
-  async #handleDecision(message, decision) {
-    if ( decision === "accepted" ) {
-      const result = await Shop.applyPurchase(this.toObject());
-      if ( !result.ok ) {
-        ui.notifications.error(result.error, { localize: true });
-        return;
+  async #handleDecision(message, decision, button) {
+    const processing = PurchaseMessageData.#processing;
+    if ( processing.has(message.id) || (message.getFlag(MODULE_ID, "purchase")?.status !== "pending") ) return;
+    processing.add(message.id);
+    button.disabled = true;
+    try {
+      if ( decision === "accepted" ) {
+        const result = await Shop.applyPurchase(this.toObject());
+        if ( !result.ok ) {
+          ui.notifications.error(result.error, { localize: true });
+          return;
+        }
+        try {
+          await Transaction.log(this.toObject());
+        } catch ( err ) {
+          console.warn(`${MODULE_ID} | Failed to log the transaction:`, err);
+        }
       }
-      try {
-        await Transaction.log(this.toObject());
-      } catch ( err ) {
-        console.warn(`${MODULE_ID} | Failed to log the transaction:`, err);
-      }
-    }
 
-    this.updateSource({ status: decision });
-    await message.update({
-      content: await this.renderContent(),
-      [`flags.${MODULE_ID}.purchase`]: this.toObject()
-    });
+      this.updateSource({ status: decision });
+      await message.update({
+        content: await this.renderContent(),
+        [`flags.${MODULE_ID}.purchase`]: this.toObject()
+      });
+    } finally {
+      processing.delete(message.id);
+      button.disabled = false;
+    }
   }
 }
 

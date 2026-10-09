@@ -64,6 +64,14 @@ export class CraftMessageData extends foundry.abstract.DataModel {
   /* -------------------------------------------- */
 
   /**
+   * IDs of the messages whose decision is currently being applied on this client.
+   * @type {Set<string>}
+   */
+  static #processing = new Set();
+
+  /* -------------------------------------------- */
+
+  /**
    * Copper amount filled in from the actor's own currency, broken down for display.
    * @type {{ denomination: string, value: number }[]}
    */
@@ -133,8 +141,8 @@ export class CraftMessageData extends foundry.abstract.DataModel {
     }
 
     const craft = new CraftMessageData(flag);
-    html.querySelector('[data-action="acceptCraft"]')?.addEventListener("click", () => craft.#handleDecision(message, "accepted"));
-    html.querySelector('[data-action="rejectCraft"]')?.addEventListener("click", () => craft.#handleDecision(message, "rejected"));
+    html.querySelector('[data-action="acceptCraft"]')?.addEventListener("click", event => craft.#handleDecision(message, "accepted", event.currentTarget));
+    html.querySelector('[data-action="rejectCraft"]')?.addEventListener("click", event => craft.#handleDecision(message, "rejected", event.currentTarget));
   }
 
   /* -------------------------------------------- */
@@ -156,21 +164,31 @@ export class CraftMessageData extends foundry.abstract.DataModel {
    * Record the GM's decision on this pending craft start.
    * @param {ChatMessage} message              The craft chat message.
    * @param {"accepted"|"rejected"} decision
+   * @param {HTMLButtonElement} button         The clicked button, disabled while the decision is applied.
    * @returns {Promise<void>}
    */
-  async #handleDecision(message, decision) {
-    if ( decision === "accepted" ) {
-      const result = await InProgressCraft.start(this.toObject());
-      if ( !result.ok ) {
-        ui.notifications.error(result.error, { localize: true });
-        return;
+  async #handleDecision(message, decision, button) {
+    const processing = CraftMessageData.#processing;
+    if ( processing.has(message.id) || (message.getFlag(MODULE_ID, "craft")?.status !== "pending") ) return;
+    processing.add(message.id);
+    button.disabled = true;
+    try {
+      if ( decision === "accepted" ) {
+        const result = await InProgressCraft.start(this.toObject());
+        if ( !result.ok ) {
+          ui.notifications.error(result.error, { localize: true });
+          return;
+        }
       }
-    }
 
-    this.updateSource({ status: decision });
-    await message.update({
-      content: await this.renderContent(),
-      [`flags.${MODULE_ID}.craft`]: this.toObject()
-    });
+      this.updateSource({ status: decision });
+      await message.update({
+        content: await this.renderContent(),
+        [`flags.${MODULE_ID}.craft`]: this.toObject()
+      });
+    } finally {
+      processing.delete(message.id);
+      button.disabled = false;
+    }
   }
 }

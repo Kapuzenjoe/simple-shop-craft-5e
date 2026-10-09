@@ -154,10 +154,10 @@ export default class ProgressHoursDialog extends Dialog5e {
     const maxHours = Math.floor(maxMinutes / 60);
     const step = Number(target.dataset.step);
     if ( target.dataset.field === "hours" ) {
-      this.hours = Math.min(maxHours, Math.max(0, this.hours + step));
+      this.hours = Math.clamp(this.hours + step, 0, maxHours);
     } else {
       const minutesCap = (this.hours >= maxHours) ? (maxMinutes % 60) : 59;
-      this.minutes = Math.min(minutesCap, Math.max(0, this.minutes + step));
+      this.minutes = Math.clamp(this.minutes + step, 0, minutesCap);
     }
     this.render();
   }

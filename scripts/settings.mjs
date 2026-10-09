@@ -82,7 +82,7 @@ const SETTINGS = [
     hint: "SIMPLE_SHOP_CRAFT_5E.Settings.Homebrew.MaxHoursPerWorkday.Hint",
     key: SETTING_KEYS.MAX_HOURS_PER_WORKDAY,
     scope: "world",
-    type: new NumberField({ required: true, initial: HOURS_PER_USE, integer: true, min: 1 })
+    type: new NumberField({ required: true, nullable: false, initial: HOURS_PER_USE, integer: true, min: 1 })
   },
   {
     config: false,
