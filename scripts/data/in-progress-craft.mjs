@@ -201,14 +201,20 @@ export class InProgressCraft extends foundry.abstract.DataModel {
 
   /**
    * Credit progress hours toward this craft, post a progress-update chat message (or complete the craft
-   * once its total is reached), and persist the result.
+   * once its total is reached), and persist the result. Nothing is credited if the craft would complete
+   * but its target item can't be found.
    * @param {Item5e} item   The in-progress craft item.
    * @param {number} hours  Hours of progress to credit.
    * @returns {Promise<void>}
    */
   async creditProgress(item, hours) {
     const roundToMinute = value => Math.round(value * 60) / 60;
-    this.updateSource({ progress: roundToMinute(this.progress + hours) });
+    const progress = roundToMinute(this.progress + hours);
+    if ( (progress >= this.totalHours) && !(await this.#resolveTarget()) ) {
+      await this.#saveProgress(item);
+      return;
+    }
+    this.updateSource({ progress });
 
     const actor = item.actor;
     if ( actor ) {
@@ -382,6 +388,9 @@ export class InProgressCraft extends foundry.abstract.DataModel {
       await actor.updateEmbeddedDocuments("Item", [
         { _id: existing.id, "system.quantity": existing.system.quantity + itemData.system.quantity }
       ]);
+    } else if ( fullItem.type === "container" ) {
+      const copies = Array.from({ length: this.targetQuantity }, () => foundry.utils.deepClone(itemData));
+      await actor.createEmbeddedDocuments("Item", copies);
     } else {
       await actor.createEmbeddedDocuments("Item", [itemData]);
     }

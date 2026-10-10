@@ -162,7 +162,8 @@ export function registerSettings() {
   CONFIG.queries[`${MODULE_ID}.spotlight`] = async ({ shopId }) => {
     if ( !shopId ) return;
     const { default: ShopSheet } = await import("./applications/shops/shop-sheet.mjs");
-    new ShopSheet({ shopId }).render({ force: true });
+    const sheet = Array.from(ShopSheet.instances()).find(app => app.shopId === shopId) ?? new ShopSheet({ shopId });
+    sheet.render({ force: true });
   };
 }
 

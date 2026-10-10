@@ -55,7 +55,7 @@
         {{#if baseItemOptions}}
         <select name="baseItem-{{ index }}">
             {{#each baseItemOptions}}
-            <option value="{{ value }}">{{ label }}</option>
+            <option value="{{ value }}" {{#if this.selected}}selected{{/if}}>{{ label }}</option>
             {{/each}}
         </select>
         {{else}}

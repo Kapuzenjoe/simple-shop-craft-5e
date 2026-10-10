@@ -11,6 +11,8 @@
 
 {{#if noActor}}
 <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.NoActor" }}</p>
+{{else if locked}}
+<p class="hint warning">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Locked" }}</p>
 {{else}}
 
 <fieldset class="card-tray">

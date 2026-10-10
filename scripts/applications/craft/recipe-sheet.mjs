@@ -165,12 +165,12 @@ export default class RecipeSheet extends Application5e {
         missing: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.NoIdentifierWarning",
         shared: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.SharedIdentifierWarning"
       });
-      const { identifier } = r.entry;
       return {
         ...shared, img: r.item.img, name: r.item.name, uuid: r.item.uuid,
         subtitle: matchIdentifier(r.entry, r.item) || null, price, valueCP, warning: !!warningTooltip, warningTooltip,
-        info: (r.entry.uuid && identifier)
-          ? _loc("SIMPLE_SHOP_CRAFT_5E.RecipeEditor.IdentifierOverrideInfo", { identifier }) : null
+        info: r.entry.identifierOverride
+          ? _loc("SIMPLE_SHOP_CRAFT_5E.RecipeEditor.IdentifierOverrideInfo", { identifier: r.entry.identifierOverride })
+          : null
       };
     });
     const requiredSumCP = materialRows.filter(r => r.required)
@@ -511,7 +511,8 @@ export default class RecipeSheet extends Application5e {
       window: { title: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.ChangeIdentifier" },
       fields: [
         {
-          field: RecipeMaterial.schema.fields.identifier, name: "identifier", value: entry.uuid ? entry.identifier : "",
+          field: RecipeMaterial.schema.fields.identifierOverride, name: "identifierOverride",
+          value: entry.identifierOverride,
           placeholder: item.system.identifier, label: _loc("DND5E.Identifier"),
           hint: _loc("SIMPLE_SHOP_CRAFT_5E.RecipeEditor.ChangeIdentifierHint")
         }
@@ -519,9 +520,9 @@ export default class RecipeSheet extends Application5e {
       form: {
         handler: async (event, form, formData) => {
           const data = foundry.utils.expandObject(formData.object);
-          const identifier = game.dnd5e.utils.formatIdentifier(data.identifier ?? "");
+          const identifierOverride = game.dnd5e.utils.formatIdentifier(data.identifierOverride ?? "");
           const materials = this.recipe.materials.map((m, i) => (i !== index)
-            ? m.toObject() : { ...m.toObject(), uuid: item.uuid, identifier });
+            ? m.toObject() : { ...m.toObject(), uuid: item.uuid, identifierOverride });
           await Recipe.update(this.recipeId, { materials });
           this.render();
         }

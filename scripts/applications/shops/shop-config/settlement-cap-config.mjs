@@ -124,7 +124,7 @@ export default class SettlementCapConfig extends BaseShopConfig {
     const value = data.settlementCapPreset === "custom" ? (data.settlementCapValue ?? null)
       : (data.settlementCapPreset === "" ? null : SETTLEMENT_CAPS[data.settlementCapPreset].value);
     const denomination = (data.settlementCapPreset === "custom")
-      ? (data.settlementCapDenomination || CONFIG.DND5E.defaultCurrency) : CONFIG.DND5E.defaultCurrency;
+      ? (data.settlementCapDenomination || CONFIG.DND5E.defaultCurrency) : "gp";
     await this.onUpdate({ settlementCap: { value, denomination, appliesToSell: !!data.appliesToSell } });
   }
 }

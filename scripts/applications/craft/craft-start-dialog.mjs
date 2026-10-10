@@ -203,6 +203,7 @@ export default class CraftStartDialog extends Dialog5e {
     context.targetItem = state.targetItem;
     context.displayName = this.#targetItemName;
     context.noActor = !state.actor;
+    context.locked = !state.unlocked;
 
     context.countField = (state.targetItem?.type === "container") ? null : [{
       field: new foundry.data.fields.NumberField({ integer: true, min: 1 }), name: "count", value: state.count,
@@ -492,7 +493,7 @@ export default class CraftStartDialog extends Dialog5e {
     const [targetResolved] = await resolveEntries([recipe.targetItem]);
     const targetItem = targetResolved.item;
     const count = (targetItem?.type === "container") ? 1 : this.#count;
-    const units = (targetItem?.type === "container") ? 1 : count * recipe.targetQuantity;
+    const units = count * recipe.targetQuantity;
     const craftCost = await recipeCraftCost(recipe, targetItem);
     let weight = null;
     let halfPrice = null;
@@ -638,7 +639,8 @@ export default class CraftStartDialog extends Dialog5e {
     }
 
     const spellChosen = !recipe.spellScroll || !!chosenSpell;
-    const canStart = !!actor && !!targetItem && spellChosen && proficiencyEligible && requiredMet
+    const unlocked = game.user.isGM || recipe.canCraft(actor);
+    const canStart = !!actor && unlocked && !!targetItem && spellChosen && proficiencyEligible && requiredMet
       && (materialsMet || (this.#fillWithGold && !goldInsufficient));
 
     const totalHours = resolveTotalHours(recipe, craftCost, targetItem);
@@ -648,7 +650,7 @@ export default class CraftStartDialog extends Dialog5e {
       recipe, actor, targetItem, craftCost, fixedLines, freeformItems,
       suppliedCP, thresholdCP, shortfallCP, materialsMet, goldCP, goldInsufficient,
       toolKeys, chosenToolKey, proficient, toolOwned, toolEligible, skillProficient,
-      skillRequired: skillKeys.length > 0, toolStatuses, skillStatuses, canStart, totalHours,
+      skillRequired: skillKeys.length > 0, toolStatuses, skillStatuses, canStart, unlocked, totalHours,
       hoursPerUse, weight, halfPrice, count, requiredMet, requiredAvailable, spellOptions, chosenSpell,
       scrollValues
     };

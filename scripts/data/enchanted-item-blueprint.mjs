@@ -249,7 +249,7 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
       const activityData = riderActivity?.toObject();
       if ( !activityData ) continue;
       activityData._id = foundry.utils.randomID();
-      if ( spell ) activityData.spell.uuid = spell.uuid;
+      if ( spell && activityData.spell ) activityData.spell.uuid = spell.uuid;
       itemData.system.activities[activityData._id] = activityData;
       for ( const riderProfile of riderActivity.effects ?? [] ) {
         if ( itemData.effects.some(e => e._id === riderProfile._id) ) continue;

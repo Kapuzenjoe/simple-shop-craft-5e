@@ -155,7 +155,7 @@
       "ChangeValue": "Change Value",
       "MaterialValueHint": "Override this material's crafting value.",
       "ChangeIdentifier": "Change Identifier",
-      "ChangeIdentifierHint": "Items of the same type that have this identifier count as this material. Leave empty to use the identifier of the material's item.",
+      "ChangeIdentifierHint": "Overrides the identifier used to recognize owned items: items of the same type with this identifier count as this material. Leave empty to use the identifier of the material's item.",
       "IdentifierOverrideInfo": "Identifier overridden: items with the identifier {identifier} count as this material.",
       "NoIdentifierWarning": "This item still has the default Identifier, so no owned item counts as this material. Change its Identifier or override it with Change Identifier.",
       "TargetNoIdentifierWarning": "This item still has the default Identifier, so crafted copies never stack onto owned items. Change its Identifier to allow stacking.",

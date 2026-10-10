@@ -29,16 +29,18 @@
 - Fixed combined price modifiers below -100% making items cost a negative amount.
 - Fixed a crafting session being credited twice when the game time advances again while it is being resolved.
 - Fixed new shops ignoring the default stock settings when restocking and when adding items.
+- Fixed the Configure Templates dialog showing the first base item again after another one was chosen from a list.
+- Fixed crafting a container whose recipe makes more than one producing only a single container.
 - Reworked how shops and recipes recognize items:
-  - Added warnings to shop entries and recipe items that have the default identifier or share the identifier of the item they were copied from, and to shop entries listed more than once.
+  - Added warnings for items with the default identifier (the item type, such as "weapon"), shared identifiers, and duplicate shop entries.
   - Added an item type check when recognizing a recipe's materials among a character's items.
-  - Changed items with the default identifier, the item type's name that new items receive such as "weapon", to never stack and to not count as recipe materials.
-  - Changed shops and recipes to use the current identifier of their items instead of a copy stored when the item was added.
-  - Changed a recipe material's Change Identifier to override only the identifier used to recognize items and keep its item, marked with an info icon.
-  - Changed spell scrolls and enchantable items dropped on a shop or added by UUID to open the template configuration, like items picked from the compendium browser.
+  - Changed items with the default identifier to never stack and to not count as recipe materials, unless overridden.
+  - Changed shops and recipes to reference items by UUID, with the identifier as a fallback.
+  - Changed a material's Change Identifier to override only how items are recognized and keep its item.
+  - Changed spell scrolls and enchantable items dropped on a shop or added by UUID to open the template configuration.
   - Changed bought and crafted items to only stack onto items of the same type.
-  - Changed starter shops to take their items from the Player's Handbook if it is active and otherwise from the SRD, and only from SRD 5.1 for the 2014 rules.
-  - Changed shops, Fill from Table, the Item Generator, and recipe materials to detect an item that is already present by its identifier, so the same item from two compendiums counts once.
+  - Changed starter shops to use the Player's Handbook if active, otherwise the SRD (SRD 5.1 for the 2014 rules).
+  - Changed duplicate detection to use the identifier, so the same item from two compendiums counts once.
   - Changed shops and recipes to load compendium items in bulk instead of one by one.
   - Fixed a bought item from a UUID or spell-scroll entry not stacking onto the same item already owned.
   - Fixed adding an item already in a shop overwriting its price, discount, and stock.

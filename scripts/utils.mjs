@@ -138,7 +138,7 @@ export async function createSpellScroll(spell, values) {
 /* -------------------------------------------- */
 
 /**
- * Break a copper amount down into whole-unit denominations, largest to smallest.
+ * Break a copper amount down into whole-unit denominations, largest to smallest, skipping electrum.
  * @param {number} valueCP
  * @param {object} [options]
  * @param {boolean} [options.negative]  Negate the most significant part, so it renders as e.g. "-10gp 5sp"
@@ -150,7 +150,7 @@ export async function createSpellScroll(spell, values) {
 export function breakdownCopper(valueCP, { negative=false, capAt=CONFIG.DND5E.defaultCurrency }={}) {
   const capConversion = CONFIG.DND5E.currencies[capAt]?.conversion;
   const ladder = Object.entries(CONFIG.DND5E.currencies)
-    .filter(([, { conversion }]) => !capConversion || (conversion >= capConversion))
+    .filter(([denom, { conversion }]) => (denom !== "ep") && (!capConversion || (conversion >= capConversion)))
     .sort(([, a], [, b]) => a.conversion - b.conversion);
   let remaining = valueCP;
   const parts = [];
@@ -259,7 +259,6 @@ export function goldPoolCurrencies() {
  * Convert a value in a given denomination to a whole number of copper pieces, rounded down after removing
  * floating-point error.
  * Uses the system's `roundCurrency` if it is available.
- * @see dnd5e — roundCurrency()
  * @param {number} value
  * @param {string} [denomination="gp"]
  * @returns {number}
@@ -464,15 +463,16 @@ export function itemRarity(item) {
 
 /**
  * Get the identifier used to match an entry against owned items.
- * An identifier stored on the entry takes precedence over the identifier of its item.
- * The default identifier of an item is ignored.
- * @param {{ identifier?: string }} entry  The entry to match.
+ * An identifier override of the entry takes precedence over the identifier of its item, whose default
+ * identifier is ignored. The identifier stored on the entry is only used if its item can't be resolved.
+ * @param {{ identifier?: string, identifierOverride?: string }} entry  The entry to match.
  * @param {Item5e|object|null} item        The item the entry resolves to.
  * @returns {string}
  */
 export function matchIdentifier(entry, item) {
-  if ( entry.identifier ) return entry.identifier;
-  return (item && !isDefaultIdentifier(item)) ? item.system.identifier : "";
+  if ( entry.identifierOverride ) return entry.identifierOverride;
+  if ( !item ) return entry.identifier ?? "";
+  return isDefaultIdentifier(item) ? "" : item.system.identifier;
 }
 
 /* -------------------------------------------- */
@@ -508,12 +508,13 @@ export function itemRefKey(entry, item) {
 /* -------------------------------------------- */
 
 /**
- * Create a reference to an item from its UUID.
+ * Create a reference to an item from its UUID, with its identifier as fallback unless it is the default one.
  * @param {Item5e|object} item  An item or compendium index entry.
- * @returns {{ uuid: string }}
+ * @returns {{ uuid: string, identifier?: string }}
  */
 export function itemRef(item) {
-  return { uuid: item.uuid };
+  return isDefaultIdentifier(item)
+    ? { uuid: item.uuid } : { uuid: item.uuid, identifier: item.system.identifier };
 }
 
 /* -------------------------------------------- */
@@ -570,7 +571,6 @@ export async function confirmDeleteShop() {
 
 /**
  * Prompt for JSON files to import and return them.
- * @see Core — ClientDocument#importFromJSONDialog()
  * @param {object} options
  * @param {string} options.title              Localization key of the dialog title.
  * @param {string} options.hint               Localization key of the hint text.
@@ -637,7 +637,6 @@ export function resolveBundleSize(item) {
  * Bulk version of `fromUuid` that performs only a single fetch per compendium.
  * Documents already cached by their compendium are not fetched again. Uses the system's version for the remaining
  * ones if it is available. Documents outside a compendium are not retrieved.
- * @see dnd5e — bulkFromUuid()
  * @param {string[]} uuids                    UUIDs of documents to retrieve.
  * @returns {Promise<Map<string, Document>>}  Documents mapped to the provided UUID.
  */
@@ -673,17 +672,34 @@ export async function bulkFromUuid(uuids) {
 
 /**
  * Resolve a batch of identifier/uuid-based entries to their referenced items.
- * Entries with a `uuid` are resolved by it, the others by a batched `identifier` lookup. The passed entries of the
- * latter are given the `uuid` of their item, without changing their source data.
+ * Entries with a `uuid` are resolved by it, the others and those whose `uuid` doesn't resolve by a batched
+ * `identifier` lookup. The passed entries of the latter are given the `uuid` of their item, without changing their
+ * source data.
  * @param {{ identifier?: string, uuid?: string }[]} entries
  * @returns {Promise<{ entry: object, item: object|null }[]>}
  */
 export async function resolveEntries(entries) {
-  const unresolved = entries.filter(({ uuid, identifier }) => !uuid && identifier);
-  const uuids = await resolveIdentifiers(new Set(unresolved.map(({ identifier }) => identifier)));
-  for ( const entry of unresolved ) {
-    if ( uuids.has(entry.identifier) ) Object.assign(entry, { uuid: uuids.get(entry.identifier), identifier: "" });
-  }
+  const resolved = await fetchEntries(entries);
+  const missing = resolved.filter(({ entry, item }) => !item && entry.identifier).map(({ entry }) => entry);
+  if ( !missing.length ) return resolved;
+
+  const uuids = await resolveIdentifiers(new Set(missing.map(({ identifier }) => identifier)));
+  const found = missing.filter(({ identifier }) => uuids.has(identifier));
+  for ( const entry of found ) entry.uuid = uuids.get(entry.identifier);
+  const retried = new Map((await fetchEntries(found)).map(({ entry, item }) => [entry, item]));
+  return resolved.map(result => {
+    return retried.has(result.entry) ? { entry: result.entry, item: retried.get(result.entry) } : result;
+  });
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Fetch the items of a batch of entries by their `uuid`.
+ * @param {{ uuid?: string }[]} entries
+ * @returns {Promise<{ entry: object, item: object|null }[]>}
+ */
+async function fetchEntries(entries) {
   const fetched = await bulkFromUuid(entries.map(({ uuid }) => uuid).filter(_ => _));
   return Promise.all(entries.map(async entry => {
     if ( !entry.uuid ) return { entry, item: null };

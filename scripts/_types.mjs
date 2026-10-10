@@ -120,8 +120,8 @@
 
 /**
  * @typedef RecipeMaterialData
- * @property {string} [identifier]  Identifier used to recognize owned items instead of the item's own, or the
- *                                  fallback reference if there is no `uuid`.
+ * @property {string} [identifier]  Fallback `system.identifier` reference, used if there is no `uuid`.
+ * @property {string} [identifierOverride]  Identifier used to recognize owned items instead of the item's own.
  * @property {string} [uuid]        UUID of the referenced material item.
  * @property {RecipeMaterialCriteria|null} [criteria]  Type/subtype/value rule instead of a fixed reference.
  * @property {boolean} required     Whether this slot must have a resolved match to start crafting.

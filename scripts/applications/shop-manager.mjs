@@ -481,7 +481,6 @@ export default class ShopManager extends Application5e {
 
   /**
    * Handle exporting a recipe to a JSON file.
-   * @see Core — ClientDocument#exportToJSON()
    * @param {Recipe} recipe
    */
   #exportRecipe(recipe) {

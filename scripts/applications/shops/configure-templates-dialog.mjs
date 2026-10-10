@@ -100,7 +100,9 @@ export default class ConfigureTemplatesDialog extends Dialog5e {
           ? row.profiles.map((p, i) => ({ value: i, label: p.effect.name })) : null,
         profileIndex: row.profileIndex,
         baseItemOptions: (row.kind === "enchant") && row.candidates?.explicit
-          ? row.candidates.explicit.map(item => ({ value: item.uuid, label: item.name })) : null,
+          ? row.candidates.explicit.map(item => ({
+            value: item.uuid, label: item.name, selected: item.uuid === row.baseItem?.uuid
+          })) : null,
         restrictionLabel: (row.kind === "enchant") ? row.candidates?.label : null,
         pick, imgOverride: row.imgOverride, identifierOverride: row.identifierOverride, identifierPreview
       };
@@ -124,9 +126,8 @@ export default class ConfigureTemplatesDialog extends Dialog5e {
   /** @inheritDoc */
   async _onFirstRender(context, options) {
     await super._onFirstRender(context, options);
-    for ( const row of this.#rows ) {
-      if ( row.kind === "enchant" ) await this.#resolveRowCandidates(row);
-    }
+    const enchantRows = this.#rows.filter(row => row.kind === "enchant");
+    await Promise.all(enchantRows.map(row => this.#resolveRowCandidates(row)));
     this.render({ parts: ["content", "footer"] });
   }
 

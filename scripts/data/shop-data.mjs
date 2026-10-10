@@ -374,8 +374,8 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
     const openMinutes = (this.openHour * 60) + this.openMinute;
     const closeMinutes = (this.closeHour * 60) + this.closeMinute;
     return (openMinutes > closeMinutes)
-      ? (minutesNow >= openMinutes) || (minutesNow <= closeMinutes)
-      : (minutesNow >= openMinutes) && (minutesNow <= closeMinutes);
+      ? (minutesNow >= openMinutes) || (minutesNow < closeMinutes)
+      : (minutesNow >= openMinutes) && (minutesNow < closeMinutes);
   }
 
   /* -------------------------------------------- */

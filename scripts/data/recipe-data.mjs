@@ -22,6 +22,7 @@ export class RecipeMaterial extends foundry.abstract.DataModel {
   static defineSchema() {
     return {
       ...itemRefSchema(),
+      identifierOverride: new StringField({ blank: true }),
       criteria: new SchemaField({
         type: new StringField({ blank: true }),
         subtype: new StringField({ blank: true })
