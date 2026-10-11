@@ -32,7 +32,7 @@ export default class LodgingConfig extends BaseShopConfig {
     context.imgField = LodgingBlueprint.schema.fields.img;
     context.img = entry.lodging.img;
     context.description = entry.lodging.description;
-    const tierConfig = LODGING_TIERS[entry.lodging.tier];
+    const tierConfig = LODGING_TIERS[entry.lodging.tier] ?? Object.values(LODGING_TIERS)[0];
     context.fields = [
       {
         field: LodgingBlueprint.schema.fields.tier, name: "tier", value: entry.lodging.tier,
@@ -65,7 +65,7 @@ export default class LodgingConfig extends BaseShopConfig {
   static async #onSubmit(event, form, formData) {
     const data = foundry.utils.expandObject(formData.object);
     const tier = data.tier || this.entry.lodging.tier;
-    const tierConfig = LODGING_TIERS[tier];
+    const tierConfig = LODGING_TIERS[tier] ?? Object.values(LODGING_TIERS)[0];
     const items = this.shopSheet.shop.items.map(i => {
       if ( i._id !== this.entryKey ) return i.toObject();
       return {

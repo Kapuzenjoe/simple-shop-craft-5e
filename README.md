@@ -32,8 +32,9 @@ Open the **Shop & Craft** window with its button at the top of the Items sidebar
 recipes here, and players come here to browse the shops and recipes available to them.
 
 A new shop needs only a name. Pick a Starter Pack to fill its shelves right away with the stock of a
-Blacksmith, Alchemist, Tavern, General Store, Magic Shop, or Blackmarket. Every new shop starts out
-Inactive and stays hidden from players until the GM opens it for business.
+Blacksmith, Alchemist, Tavern, General Store, Magic Shop, or Blackmarket. Starter Packs take their items
+from the Player's Handbook if it is active, otherwise from the SRD (SRD 5.1 for the 2014 rules). Every new
+shop starts out Inactive and stays hidden from players until the GM opens it for business.
 
 ---
 
@@ -66,8 +67,9 @@ Sell modifiers, and the coin in its till.
 - **Buy.** The GM adds items from the Compendium Browser, by UUID, or by dragging them in. Fill from Table
   draws stock from a RollTable, and Generate Item rolls up new wares (see
   [Random Item Generator](#random-item-generator)).
-- **Sell.** Lists the items of the buying character. Items bought as a bundle, such as arrows, are sold back
-  one piece at a time.
+- **Sell.** Lists the items of the buying character that the shop accepts (see
+  [Stock & Restock](#stock--restock)). Items bought as a bundle, such as arrows, are sold back one piece at
+  a time.
 - **Services.** Holds Lodging and Hirelings, along with any Buy item marked as a Service. A service costs
   coin but hands over no item.
 - **Description.** The shop's location, opening hours, restock days, and a description of the place.
@@ -75,8 +77,10 @@ Sell modifiers, and the coin in its till.
 - **Who buys.** Players shop with their own character or with the Party actor.
 - **Checkout.** Purchases and sales gather in a cart. On confirmation the order goes to the GM as a chat
   card, and items and coin change hands once the GM accepts.
-- **Stacking.** An item the character already owns gains quantity instead of arriving as a copy. Containers
-  are the exception.
+- **Stacking.** An item of the same type and identifier that the character already owns gains quantity
+  instead of arriving as a copy. Containers never stack, and neither do items that still have the default
+  identifier, which is the item type such as "weapon". The Buy tab shows the GM a warning icon for these
+  items, for copies sharing an identifier, and for duplicate entries.
 
 <table>
   <tr>
@@ -106,7 +110,8 @@ Sell modifiers, and the coin in its till.
 
 ### Stock & Restock
 
-Vendor Settings hold the shop's name, its money, and the default stock for new items.
+Vendor Settings hold the shop's name, its money, the item types it buys, and the default stock for new
+items.
 
 - **Stock modes.** Each item has Normal Stock, Unlimited Stock, or Exclude from Stock. Excluded items keep
   their count but never restock, for the one-of-a-kind piece.
@@ -114,6 +119,9 @@ Vendor Settings hold the shop's name, its money, and the default stock for new i
   which magic items skip that default and start excluded instead. Any item can still set its own stock.
 - **Shop money.** The till has a Current and a Max amount, or is Unlimited. Purchases by players can push
   Current past Max. With Purchase Only, the shop buys nothing from players.
+- **Accepted Item Types.** Limits which item types, and optionally subtypes, the shop buys from players. The
+  Sell tab then lists only matching items. Left empty, the shop buys anything. Not available with Purchase
+  Only.
 - **Restock.** Reset Stock & Shop Money refills every Normal item and returns the till to Max. On the chosen
   Restock Days this happens on its own at the next in-game day change, which also lifts failed haggling
   locks. This needs a calendar source (see [Settings](#settings)).
@@ -123,6 +131,29 @@ Vendor Settings hold the shop's name, its money, and the default stock for new i
     <td>
       <strong>Vendor Settings</strong><br>
       <img src="docs/example_vendor_setting.png" alt="Vendor Settings with shop name, shop money, and default stock per item type" width="320">
+    </td>
+  </tr>
+</table>
+
+### Transaction Log
+
+Every purchase and sale the GM accepts is written to the log.
+
+- **Opening.** Open a shop's log with the button in its Vendor Settings. The module settings open the log of
+  all shops (see [Settings](#settings)).
+- **Entries.** Each line shows the time, the character, the items bought and sold, and the net amount, which
+  is negative when the shop paid the character. The search field narrows the list.
+- **Sharing.** Export a shop's log to JSON and import it into a shop's log, in this or another world.
+  Entries the log already holds are skipped.
+- **Clearing.** Clear Log deletes the entries shown in the window. Deleting a shop deletes its log too.
+- **Limit.** Once the log is full, the oldest entries drop out. Logging is on by default, and it and the
+  limit are set in the module settings.
+
+<table>
+  <tr>
+    <td>
+      <strong>Transaction Log</strong><br>
+      <img src="docs/example_log.png" alt="Transaction Log of the Blacksmith shop listing purchases and sales with export, import, and clear buttons" width="600">
     </td>
   </tr>
 </table>
@@ -141,7 +172,8 @@ shows which modifiers applied.
   shop's.
 - **Fixed-Value items.** Gemstones and art objects keep their full value, bought or sold. The list of loot
   types is set per shop.
-- **Crafter.** A character with the Crafter feat pays 20% less for nonmagical items.
+- **Crafter.** With the 2024 rules, a character with the Crafter feat pays 20% less for nonmagical items,
+  but not for services.
 - **Settlement Cap.** A village, town, or city only deals in items up to 20, 2,000, or 200,000 GP, or up to a
   custom cap. Pricier items stay hidden from players, and the cap can apply to selling as well.
 
@@ -214,7 +246,8 @@ Generate Item rolls up new stock for a shop. The GM reviews every result before 
 ### Recipes
 
 The Craft tab lists every recipe by the type of item it makes, with its material value, duration, and
-required proficiencies. Click a recipe to start crafting it. The GM writes recipes in the Recipe Editor.
+required proficiencies. Click a recipe to start crafting it. The GM writes recipes in the Recipe Editor,
+where clicking the name of a target item or material opens it.
 
 - **Target item.** The item a recipe makes and how many per craft. Cost and duration follow the item's
   crafting value, or the GM sets a custom duration. A recipe can also skip the crafting value and rely on its
@@ -222,6 +255,9 @@ required proficiencies. Click a recipe to start crafting it. The GM writes recip
 - **Materials.** Each material is a fixed item or a rule, such as any gemstone worth 50 GP. The materials
   only need to reach the recipe's total value, unless the GM marks one as Required. With Freeform Materials,
   players may offer any item of enough value.
+- **Recognition.** A character's items count as a fixed material by identifier and item type. An item with
+  the default identifier doesn't count, unless the material uses Change Identifier to name the identifier
+  to look for.
 - **Proficiencies.** Tools and skills combine by Proficiency Mode: Tool & Skill, Tool or Skill, or Every
   Listed Tool & Skill. With Workshop Override, a character can work in a proper workshop instead of owning
   the tool.
@@ -252,6 +288,8 @@ downtime.
 - **Start Craft.** Choose the character and tool, then add owned materials. Any value still missing can be
   paid in gold. For a Spell Scroll, pick the spell and set its save DC and attack bonus, which default to
   the crafter's own.
+- **Quantity.** Craft the recipe several times in a row. Materials and cost multiply, and each run takes its
+  own crafting time. Quantity isn't offered for containers.
 - **Approval.** The order goes to the GM as a chat card. On acceptance, materials and gold are spent and an
   in-progress item appears in the character's inventory.
 - **Working.** Use the Progress Craft activity of the in-progress item and enter the hours to work. A
@@ -259,8 +297,8 @@ downtime.
   its progress to chat.
 - **Calendar time.** With a calendar source active, a session runs as in-game time passes. It completes on its
   own once the planned hours are done, or the GM ends it early and credits the time spent.
-- **Completion.** When the work is done, the in-progress item becomes the finished item. If the character
-  already owns one, it stacks.
+- **Completion.** When a run's work is done, the finished items go into the character's inventory and stack
+  onto a matching item the character already owns. The in-progress item is removed after the last run.
 
 <table>
   <tr>
@@ -285,7 +323,7 @@ downtime.
 
 ## Settings
 
-Two menus in the module settings hold world-wide options.
+Three menus and two settings in the module settings hold world-wide options.
 
 - **Configure Defaults.** The Buy and Sell modifiers, shop money, Magical Items rule, and default stock per
   item type that every new shop starts with.
@@ -294,6 +332,8 @@ Two menus in the module settings hold world-wide options.
   calendar. Calendar Mode turns on by itself when a world clearly keeps its calendar in use: Calendaria or
   Ember is active, or dnd5e's Daily Recovery Mode is set to Calendar Recovery. Set it to Always On or Always
   Off to decide by hand.
+- **Transaction Log.** Opens the log of all shops. Log Transactions turns logging on or off, and Maximum Log
+  Entries sets how many transactions the log keeps, 1,000 by default and between 100 and 5,000.
 
 ---
 

@@ -305,74 +305,15 @@ export default class ShopSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
-   * Current Buy-tab search query, kept live across re-renders.
-   * @type {string}
+   * Search query, type filter, and sort mode of each list tab, kept live across re-renders. An empty type filter
+   * means no filter.
+   * @type {Record<string, { search: string, typeFilter: string, sort: "name"|"price" }>}
    */
-  #buySearch = "";
-
-  /* -------------------------------------------- */
-
-  /**
-   * Current Sell-tab search query, kept live across re-renders.
-   * @type {string}
-   */
-  #sellSearch = "";
-
-  /* -------------------------------------------- */
-
-  /**
-   * Current Buy-tab type filter, kept live across re-renders. Empty string means no filter.
-   * @type {string}
-   */
-  #buyTypeFilter = "";
-
-  /* -------------------------------------------- */
-
-  /**
-   * Current Sell-tab type filter, kept live across re-renders. Empty string means no filter.
-   * @type {string}
-   */
-  #sellTypeFilter = "";
-
-  /* -------------------------------------------- */
-
-  /**
-   * Current Buy-tab sort mode, kept live across re-renders.
-   * @type {"name"|"price"}
-   */
-  #buySort = "name";
-
-  /* -------------------------------------------- */
-
-  /**
-   * Current Sell-tab sort mode, kept live across re-renders.
-   * @type {"name"|"price"}
-   */
-  #sellSort = "name";
-
-  /* -------------------------------------------- */
-
-  /**
-   * Current Services-tab search query, kept live across re-renders.
-   * @type {string}
-   */
-  #serviceSearch = "";
-
-  /* -------------------------------------------- */
-
-  /**
-   * Current Services-tab type filter, kept live across re-renders. Empty string means no filter.
-   * @type {string}
-   */
-  #serviceTypeFilter = "";
-
-  /* -------------------------------------------- */
-
-  /**
-   * Current Services-tab sort mode, kept live across re-renders.
-   * @type {"name"|"price"}
-   */
-  #serviceSort = "name";
+  #listState = {
+    buy: { search: "", typeFilter: "", sort: "name" },
+    sell: { search: "", typeFilter: "", sort: "name" },
+    services: { search: "", typeFilter: "", sort: "name" }
+  };
 
   /* -------------------------------------------- */
 
@@ -819,28 +760,16 @@ export default class ShopSheet extends Application5e {
       }
     }
 
-    if ( (partId === "buy") || (partId === "sell") || (partId === "services") ) {
-      const tabState = {
-        buy: {
-          sort: this.#buySort, setSort: v => this.#buySort = v,
-          typeFilter: this.#buyTypeFilter, setTypeFilter: v => this.#buyTypeFilter = v,
-          search: this.#buySearch, setSearch: v => this.#buySearch = v
-        },
-        sell: {
-          sort: this.#sellSort, setSort: v => this.#sellSort = v,
-          typeFilter: this.#sellTypeFilter, setTypeFilter: v => this.#sellTypeFilter = v,
-          search: this.#sellSearch, setSearch: v => this.#sellSearch = v
-        },
-        services: {
-          sort: this.#serviceSort, setSort: v => this.#serviceSort = v,
-          typeFilter: this.#serviceTypeFilter, setTypeFilter: v => this.#serviceTypeFilter = v,
-          search: this.#serviceSearch, setSearch: v => this.#serviceSearch = v
-        }
-      }[partId];
-      const content = applyListControls(
-        htmlElement, { sortModes: SORT_MODES, ...tabState, onSort: () => this.render() }
-      );
-      if ( content ) applyItemSort(tabState.sort, content);
+    const listState = this.#listState[partId];
+    if ( listState ) {
+      const content = applyListControls(htmlElement, {
+        sortModes: SORT_MODES,
+        sort: listState.sort, setSort: v => listState.sort = v,
+        typeFilter: listState.typeFilter, setTypeFilter: v => listState.typeFilter = v,
+        search: listState.search, setSearch: v => listState.search = v,
+        onSort: () => this.render()
+      });
+      if ( content ) applyItemSort(listState.sort, content);
     }
   }
 

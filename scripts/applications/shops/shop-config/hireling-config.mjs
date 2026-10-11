@@ -35,7 +35,7 @@ export default class HirelingConfig extends BaseShopConfig {
     context.img = entry.hireling.img;
     context.previewImg = entry.hireling.img || actor?.img || CONST.DEFAULT_TOKEN;
     context.description = entry.hireling.description;
-    const typeConfig = HIRELING_TYPES[entry.hireling.type];
+    const typeConfig = HIRELING_TYPES[entry.hireling.type] ?? Object.values(HIRELING_TYPES)[0];
     context.fields = [
       {
         field: HirelingBlueprint.schema.fields.type, name: "type", value: entry.hireling.type,
@@ -72,7 +72,7 @@ export default class HirelingConfig extends BaseShopConfig {
   static async #onSubmit(event, form, formData) {
     const data = foundry.utils.expandObject(formData.object);
     const type = data.type || this.entry.hireling.type;
-    const typeConfig = HIRELING_TYPES[type];
+    const typeConfig = HIRELING_TYPES[type] ?? Object.values(HIRELING_TYPES)[0];
     const items = this.shopSheet.shop.items.map(i => {
       if ( i._id !== this.entryKey ) return i.toObject();
       return {
