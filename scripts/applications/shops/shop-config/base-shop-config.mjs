@@ -1,6 +1,5 @@
-import { ShopItemEntry } from "../../../data/shop-data.mjs";
-
 /**
+ * @import { ShopItemEntry } from "../../../data/shop-data.mjs";
  * @import ShopSheet from "../shop-sheet.mjs";
  */
 
@@ -9,7 +8,7 @@ const { Application5e } = game.dnd5e.applications.api;
 /**
  * Base class for the module's autosave config dialogs.
  * @param {object} options
- * @param {string} [options.entryKey]  Entry key of the item being edited.
+ * @param {string} [options.entryKey]  `_id` of the item entry being edited.
  * @param {ShopSheet} [options.shopSheet]
  * @param {(updateData: object) => Promise<void>} options.onUpdate
  */
@@ -46,13 +45,13 @@ export default class BaseShopConfig extends Application5e {
    * @type {ShopItemEntry}
    */
   get entry() {
-    return this.shopSheet.shop.items.find(i => ShopItemEntry.key(i) === this.entryKey);
+    return this.shopSheet.shop.items.find(i => i._id === this.entryKey);
   }
 
   /* -------------------------------------------- */
 
   /**
-   * Entry key of the item being edited.
+   * `_id` of the item entry being edited.
    * @type {string}
    */
   get entryKey() {

@@ -1,5 +1,5 @@
 import { ShopItemEntry } from "../../data/shop-data.mjs";
-import { resolveItemPrice, toCopper } from "../../utils.mjs";
+import { itemRef, resolveItemPrice, toCopper } from "../../utils.mjs";
 
 const { Dialog5e } = game.dnd5e.applications.api;
 const { DocumentUUIDField, StringField } = foundry.data.fields;
@@ -85,7 +85,7 @@ export default class FillFromTableDialog extends Dialog5e {
   /**
    * Handle drawing from the selected table and adding the resolved items to the shop's stock. A new item
    * is excluded from restock with current stock set to how many times it was drawn; an item already in
-   * the shop just has its current stock increased by that count, restock mode and max left untouched.
+   * the shop's Buy tab just has its current stock increased by that count, restock mode and max left untouched.
    * @this {FillFromTableDialog}
    * @param {Event} event                Triggering submit event.
    * @param {HTMLFormElement} form       The submitted form.
@@ -121,11 +121,11 @@ export default class FillFromTableDialog extends Dialog5e {
           continue;
         }
       }
-      const entry = item.system.identifier ? { identifier: item.system.identifier } : { uuid: item.uuid };
-      const key = ShopItemEntry.key(entry);
+      const entry = itemRef(item);
+      const key = ShopItemEntry.key(entry, item);
       const existing = counted.get(key);
       if ( existing ) existing.count++;
-      else counted.set(key, { entry, label: item.name, count: 1 });
+      else counted.set(key, { key, entry, label: item.name, count: 1 });
     }
     const rolled = Array.from(counted.values());
 
@@ -134,9 +134,9 @@ export default class FillFromTableDialog extends Dialog5e {
       return;
     }
 
-    const existingByKey = new Map(this.shopSheet.shop.items.map(i => [ShopItemEntry.key(i), i]));
-    await this.onFilled(rolled.map(({ entry, count }) => {
-      const existing = existingByKey.get(ShopItemEntry.key(entry));
+    const inShop = await ShopItemEntry.byKey(this.shopSheet.shop.items.filter(i => !i.isService));
+    await this.onFilled(rolled.map(({ key, entry, count }) => {
+      const existing = inShop.get(key);
       if ( existing ) {
         return { ...existing.toObject(), stock: { ...existing.stock, current: (existing.stock.current ?? 0) + count } };
       }

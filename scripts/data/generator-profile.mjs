@@ -1,6 +1,7 @@
 import { ENSPELLED_ITEMS, SPELL_SCROLL_LEVELS } from "../config.mjs";
 import {
-  excludeFilter, isShopPackSource, itemRarity, itemRef, itemRefKey, resolveItemPrice, toCopper
+  bulkFromUuid, excludeFilter, isShopPackSource, itemRarity, itemRef, itemRefKey, matchesTypeFilter,
+  resolveItemPrice, toCopper
 } from "../utils.mjs";
 import { EnchantedItemBlueprint } from "./enchanted-item-blueprint.mjs";
 import { newEntryStock, ShopItemEntry } from "./shop-data.mjs";
@@ -135,7 +136,6 @@ export default class GeneratorProfile extends foundry.abstract.DataModel {
       const unused = candidatePool.filter(candidate => !usedTemplates.has(candidate.item?.uuid));
       const result = await this.#drawFromPool(unused, options) ?? await this.#drawFromPool(candidatePool, options);
       if ( !result ) break;
-      keys.add(ShopItemEntry.key(result.entry));
       if ( result.template ) usedTemplates.add(result.template);
       rolled.push(result);
     }
@@ -146,7 +146,6 @@ export default class GeneratorProfile extends foundry.abstract.DataModel {
 
   /**
    * Build the pool of candidates to draw from, along with the number of entries it holds per rarity.
-   * @see dnd5e — bulkFromUuid()
    * @param {object} [options]
    * @param {{ value: number|null, denomination: string }} [options.settlementCap]  Leave out entries priced above
    *   this.
@@ -188,14 +187,12 @@ export default class GeneratorProfile extends foundry.abstract.DataModel {
       }
     }
 
-    const candidates = Array.from(new Map(found.map(index => [itemRefKey(itemRef(index)), index])).values());
+    const candidates = Array.from(new Map(found.map(index => [itemRefKey(itemRef(index), index), index])).values());
     const uuids = candidates
       .filter(index => (index.system.identifier in ENSPELLED_ITEMS)
         || (EnchantedItemBlueprint.canBeTemplate(index) && !index.system.type?.baseItem))
       .map(index => index.uuid);
-    const documents = game.dnd5e.utils.bulkFromUuid
-      ? await game.dnd5e.utils.bulkFromUuid(uuids)
-      : new Map(await Promise.all(uuids.map(async uuid => [uuid, await fromUuid(uuid)])));
+    const documents = await bulkFromUuid(uuids);
 
     for ( const index of candidates ) {
       const { system } = index;
@@ -210,8 +207,7 @@ export default class GeneratorProfile extends foundry.abstract.DataModel {
       const rarity = itemRarity(index);
       if ( !system.price?.value && !(isMagic && rarity) ) continue;
       if ( rarities.size && !rarities.has(rarity) ) continue;
-      const wantedSubtypes = this.getSubtypes(index.type);
-      if ( wantedSubtypes && !wantedSubtypes.has(system.type?.value) ) continue;
+      if ( !matchesTypeFilter(this.types, index.type, system.type?.value) ) continue;
       const wantedBaseItems = this.getBaseItems(index.type);
       if ( wantedBaseItems && !wantedBaseItems.has(system.type?.baseItem) ) continue;
       if ( capCP != null ) {
@@ -221,7 +217,7 @@ export default class GeneratorProfile extends foundry.abstract.DataModel {
           continue;
         }
       }
-      const owned = existingKeys.has(ShopItemEntry.key(itemRef(index)));
+      const owned = existingKeys.has(ShopItemEntry.key(itemRef(index), index));
       GeneratorProfile.#tally(owned ? summary.owned : summary.included, rarity, 1);
       pool.push({ kind: "item", index, weight: 1 });
     }
@@ -328,6 +324,22 @@ export default class GeneratorProfile extends foundry.abstract.DataModel {
   /* -------------------------------------------- */
 
   /**
+   * Fetch the spells that can be bound into an Enspelled item at a spell level: those of the level and of the
+   * item's allowed schools that belong to the active rules version.
+   * @param {string} identifier  `system.identifier` of the Enspelled item.
+   * @param {number} level       Spell level of the chosen profile.
+   * @returns {Promise<object[]>}
+   */
+  static async fetchEnspelledSpells(identifier, level) {
+    const filters = [{ k: "system.level", v: level }];
+    const schools = ENSPELLED_ITEMS[identifier];
+    if ( schools ) filters.push({ k: "system.school", o: "in", v: schools });
+    return GeneratorProfile.#fetchSpells(filters);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
    * Fetch the spell index entries matching the given filters that belong to the active rules version.
    * @param {FilterDescription[]} filters
    * @returns {Promise<object[]>}
@@ -338,7 +350,7 @@ export default class GeneratorProfile extends foundry.abstract.DataModel {
       types: new Set(["spell"]), filters, indexFields: new Set(["system.source", "system.identifier"])
     });
     const spells = results.filter(index => [rules, null, undefined].includes(index.system?.source?.rules));
-    return Array.from(new Map(spells.map(index => [itemRefKey(itemRef(index)), index])).values());
+    return Array.from(new Map(spells.map(index => [itemRefKey(itemRef(index), index), index])).values());
   }
 
   /* -------------------------------------------- */
@@ -389,7 +401,7 @@ export default class GeneratorProfile extends foundry.abstract.DataModel {
    * item blueprint, or a spell scroll blueprint.
    * @param {GeneratorCandidate[]} candidatePool
    * @param {object} options
-   * @param {Set<string>} options.existingKeys
+   * @param {Set<string>} options.existingKeys  Entry keys to skip, extended with the key of the drawn entry.
    * @param {{ byType: Record<string, number|null>, magicRule: string }} options.stockDefaults  The shop's
    *   default stock configuration, applied to non-magic-exempt mundane candidates.
    * @returns {Promise<{ entry: ShopItemEntryData, template?: string }|null>}  The UUID of the
@@ -404,13 +416,17 @@ export default class GeneratorProfile extends foundry.abstract.DataModel {
         const entry = {
           spellScroll: { spellUuid: candidate.index.uuid }, stock: { max: null, current: 1 }, restockMode: "exclude"
         };
-        if ( existingKeys.has(ShopItemEntry.key(entry)) ) continue;
+        const key = ShopItemEntry.key(entry);
+        if ( existingKeys.has(key) ) continue;
+        existingKeys.add(key);
         return { entry };
       }
 
       if ( candidate.kind === "item" ) {
         const entry = itemRef(candidate.index);
-        if ( existingKeys.has(ShopItemEntry.key(entry)) ) continue;
+        const key = ShopItemEntry.key(entry, candidate.index);
+        if ( existingKeys.has(key) ) continue;
+        existingKeys.add(key);
         const candidateItem = await fromUuid(candidate.index.uuid);
         return { entry: { ...entry, ...newEntryStock(candidateItem, stockDefaults) } };
       }
@@ -428,14 +444,13 @@ export default class GeneratorProfile extends foundry.abstract.DataModel {
       if ( !baseItem ) continue;
       const generated = { baseItemUuid: baseItem.uuid, enchantItemUuid: item.uuid, effectId: chosen.effect.id };
       if ( item.system.identifier in ENSPELLED_ITEMS ) {
-        const filters = [{ k: "system.level", v: chosen.level }];
-        const schools = ENSPELLED_ITEMS[item.system.identifier];
-        if ( schools ) filters.push({ k: "system.school", o: "in", v: schools });
-        const spells = await GeneratorProfile.#fetchSpells(filters);
+        const spells = await GeneratorProfile.fetchEnspelledSpells(item.system.identifier, chosen.level);
         if ( !spells.length ) continue;
         generated.spellUuid = spells[Math.floor(Math.random() * spells.length)].uuid;
       }
-      if ( existingKeys.has(ShopItemEntry.key({ generated })) ) continue;
+      const key = ShopItemEntry.key({ generated });
+      if ( existingKeys.has(key) ) continue;
+      existingKeys.add(key);
       return {
         entry: { generated, stock: { max: null, current: 1 }, restockMode: "exclude" }, template: item.uuid
       };

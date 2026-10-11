@@ -142,11 +142,11 @@
       "SpellScrollSourcePrepared": "Prepared",
       "SpellScrollSourceOwned": "Owned",
       "SpellScrollSourceCompendium": "Any from Compendium",
-      "MaterialsNone": "No materials yet. Use the <i class=\"fas fa-plus\"></i> button above to add one.",
+      "MaterialsNone": "No materials yet.",
       "AddMaterial": "Add Material",
       "AddMaterialCriteria": "Add Material Rule",
       "MaterialRequired": "Toggle Required",
-      "DropMaterialHint": "Drop an item here to add it as a material.",
+      "DropMaterialHint": "Drop an item here, pick one with <i class=\"fas fa-plus\"></i>, or add a material rule with <i class=\"fas fa-filter\"></i>.",
       "MaterialCriteriaTitle": "Add Material Rule",
       "MaterialCriteriaType": "Item Type",
       "MaterialCriteriaChooseType": "Choose a type…",
@@ -155,10 +155,11 @@
       "ChangeValue": "Change Value",
       "MaterialValueHint": "Override this material's crafting value.",
       "ChangeIdentifier": "Change Identifier",
-      "ChangeIdentifierHint": "Must match an existing item's identifier.",
-      "IdentifierRequired": "Enter an identifier.",
-      "IdentifierNotFound": "No item with this identifier could be found.",
-      "NoIdentifierWarning": "This item has no distinct identifier — it may not be recognized as owned when crafting.",
+      "ChangeIdentifierHint": "Overrides the identifier used to recognize owned items: items of the same type with this identifier count as this material. Leave empty to use the identifier of the material's item.",
+      "IdentifierOverrideInfo": "Identifier overridden: items with the identifier {identifier} count as this material.",
+      "NoIdentifierWarning": "This item still has the default Identifier, so no owned item counts as this material. Change its Identifier or override it with Change Identifier.",
+      "TargetNoIdentifierWarning": "This item still has the default Identifier, so crafted copies never stack onto owned items. Change its Identifier to allow stacking.",
+      "SharedIdentifierWarning": "This item has the same Identifier as {name}, which it was copied from, so both may count as the same item. Change it in the item's Identifier field.",
       "UnresolvedWarning": "This material could no longer be resolved — remove it or fix its reference.",
       "RequiredMaterialsValue": "Required Materials Value",
       "CraftValueIgnored": "Crafting value is ignored for this recipe.",
@@ -214,7 +215,37 @@
           "On": "Always On",
           "Off": "Always Off"
         }
+      },
+      "Transactions": {
+        "Name": "Transaction Log",
+        "Hint": "View the completed purchases and sales of all shops.",
+        "Log": {
+          "Name": "Log Transactions",
+          "Hint": "Record every completed purchase and sale in the Transaction Log."
+        },
+        "Limit": {
+          "Name": "Maximum Log Entries",
+          "Hint": "Number of transactions the Transaction Log keeps. The oldest entries are removed first. Higher values use more storage and are synced to all clients with every new entry."
+        }
       }
+    },
+    "TransactionLog": {
+      "Title": "Transaction Log",
+      "Open": "Open Transaction Log",
+      "Search": "Search",
+      "Empty": "No transactions logged yet.",
+      "Bought": "bought {items}",
+      "Sold": "sold {items}",
+      "Net": "net {amount}",
+      "Clear": "Clear Log",
+      "ClearConfirmShop": "Delete all logged transactions of this shop? This can't be undone.",
+      "ClearConfirmAll": "Delete all logged transactions of all shops? This can't be undone.",
+      "Export": "Export Log",
+      "Import": "Import Log",
+      "ImportHint": "Select a JSON file exported from a Transaction Log. Its transactions are added to this shop's log, and ones the log already contains are skipped.",
+      "ImportDone": "Transactions imported: {count}.",
+      "ImportNone": "No transactions were imported: they are already in the log or exceed its limit.",
+      "ImportFailed": "The file is not a valid Transaction Log export — nothing was imported."
     },
     "ShopEditor": {
       "Title": "Edit Shop",
@@ -328,6 +359,8 @@
       "VendorSettings": "Vendor Settings",
       "GoldPoolMaxHint": "Restored to this amount when the shop is restocked.",
       "SellDisabledHint": "Players can't sell items back to this shop.",
+      "SellTypes": "Accepted Item Types",
+      "SellTypesHint": "Item types, and optionally subtypes, this shop buys from players. Leave empty to buy any item.",
       "PurchaseOnlyShop": "Purchase Only Shop",
       "PurchaseOnlyShopHint": "This shop won't buy anything.",
       "ResetRestock": "Reset Stock & Shop Money",
@@ -347,7 +380,7 @@
       "PriceTooltip": "Edit Price",
       "PriceOverrideHint": "Override this item's default price for this shop.",
       "BundleSize": "Bundle Size",
-      "BundleSizeHint": "How many individual items the listed price buys (e.g. 20 for a bundle of arrows). Leave blank to guess from the catalog item.",
+      "BundleSizeHint": "How many individual items the listed price buys (e.g. 20 for a bundle of arrows). Leave blank to use the default size of the item.",
       "PriceModifier": "Price Modifier",
       "Discount": "Discount",
       "DiscountTooltip": "Edit Price Modifier",
@@ -360,7 +393,7 @@
       "UnmarkService": "Unmark as Service",
       "MarkedAsService": "Moved to the Services tab.",
       "UnmarkedAsService": "Moved to the Buy tab.",
-      "AlreadyExistsOtherTab": "Already exists in the other tab — skipped to avoid overwriting it.",
+      "DuplicateEntryWarning": "This item is listed more than once in this shop — bought copies stack together.",
       "ConfigureTemplates": "Configure Templates",
       "PickSpell": "Pick Spell",
       "EnchantProfile": "Enchantment",
@@ -390,7 +423,8 @@
       "FromCompendium": "From Compendium",
       "ByUuid": "By UUID",
       "MissingUuid": "Enter an item UUID.",
-      "NoIdentifierWarning": "This item has no distinct identifier — it may not be matched correctly when bought or restocked.",
+      "NoIdentifierWarning": "This item still has the default Identifier, so bought copies never stack onto owned items. Change its Identifier to allow stacking.",
+      "SharedIdentifierWarning": "This item has the same Identifier as {name}, which it was copied from, so bought copies may stack with {name}. Change it in the item's Identifier field.",
       "ServiceIcon": "Icon",
       "StockMax": "Max Stock",
       "StockMaxHint": "Empty uses the shop's default for this item type.",
@@ -400,7 +434,7 @@
       "NoSellableItems": "Nothing to sell.",
       "SuppressedStock": "Out of Stock",
       "SuppressedCap": "Exceeds Settlement Cap",
-      "SuppressedNotFound": "Item not found in active compendiums — check the identifier or enabled rulebooks",
+      "SuppressedNotFound": "Item not found — check that the compendium or module it comes from is active",
       "None": "No items yet."
     },
     "ShopCart": {
@@ -419,6 +453,7 @@
       "InsufficientSellQuantity": "The seller no longer has enough of one or more items — sale not completed.",
       "InsufficientShopGold": "The shop doesn't have enough gold to buy these items — sale not completed.",
       "SellDisabled": "This shop doesn't buy items back — sale not completed.",
+      "SellTypeNotAccepted": "This shop doesn't buy one or more of these items — sale not completed.",
       "MissingActor": "The buying character could no longer be found.",
       "MissingShop": "The shop this purchase belongs to could no longer be found.",
       "MissingItem": "One of the purchased items could no longer be resolved."
@@ -452,12 +487,14 @@
     "CraftCard": {
       "Crafter": "Crafter",
       "MissingActor": "The crafting character could no longer be found.",
-      "MissingMaterial": "One of the contributed materials could no longer be found — craft not started."
+      "MissingMaterial": "One of the contributed materials could no longer be found — craft not started.",
+      "MissingItem": "The crafted item could no longer be resolved — craft not completed."
     },
     "Craft": {
       "InProgressName": "Crafting: {name}",
       "ProgressActivityName": "Progress Craft",
       "ProgressActivityFlavor": "The crafting progresses ({progress}/{total}).",
+      "ProgressActivityFlavorBatch": "The crafting progresses ({progress}/{total}), {remaining} left.",
       "CompleteMessage": "{name} is finished and has been added to {actor}'s inventory.",
       "NoWorkdayRemaining": "You have no workday hours remaining today for crafting.",
       "SessionPending": "A crafting session is already in progress for this item.",

@@ -151,7 +151,7 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
     const baseItemUuids = (registry && ((itemType !== "equipment") || categoryFilters.length))
       ? new Set(Object.values(registry())) : null;
     const eligible = baseItemUuids ? fromShopPack.filter(index => baseItemUuids.has(index.uuid)) : fromShopPack;
-    return Array.from(new Map(eligible.map(index => [itemRefKey(itemRef(index)), index.uuid])).values());
+    return Array.from(new Map(eligible.map(index => [itemRefKey(itemRef(index), index), index.uuid])).values());
   }
 
   /* -------------------------------------------- */
@@ -249,7 +249,7 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
       const activityData = riderActivity?.toObject();
       if ( !activityData ) continue;
       activityData._id = foundry.utils.randomID();
-      if ( spell ) activityData.spell.uuid = spell.uuid;
+      if ( spell && activityData.spell ) activityData.spell.uuid = spell.uuid;
       itemData.system.activities[activityData._id] = activityData;
       for ( const riderProfile of riderActivity.effects ?? [] ) {
         if ( itemData.effects.some(e => e._id === riderProfile._id) ) continue;

@@ -5,8 +5,8 @@ import { EnchantedItemBlueprint } from "../../data/enchanted-item-blueprint.mjs"
 import { newEntryStock, Shop, ShopItemEntry } from "../../data/shop-data.mjs";
 import {
   applyItemSort, applyListControls, applyLoadingTooltip, applyRichTooltip, breakdownCopper, buildItemTableSections,
-  confirmDeleteShop, finalizeGroups, isCalendarModeActive, isSpellScrollItem, itemRef, needsDefaultPrice,
-  openItemSheet, resolveItemPrice, selectableActors, spotlightShop, toCopper
+  confirmDeleteShop, finalizeGroups, identifierWarning, isCalendarModeActive, isSpellScrollItem, itemRef,
+  openItemSheet, resolveBundleSize, resolveItemPrice, resolveUnitPrice, selectableActors, spotlightShop, toCopper
 } from "../../utils.mjs";
 import AddEntryDialog from "./add-entry-dialog.mjs";
 import ConfigureTemplatesDialog from "./configure-templates-dialog.mjs";
@@ -249,7 +249,7 @@ export default class ShopSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
-   * Selected buy quantities, keyed by {@link ShopItemEntry.key}. Per-user, not persisted across sessions.
+   * Selected buy quantities, keyed by entry `_id`. Per-user, not persisted across sessions.
    * @type {Map<string, number>}
    */
   cart = new Map();
@@ -305,84 +305,25 @@ export default class ShopSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
-   * Current Buy-tab search query, kept live across re-renders.
-   * @type {string}
+   * Search query, type filter, and sort mode of each list tab, kept live across re-renders. An empty type filter
+   * means no filter.
+   * @type {Record<string, { search: string, typeFilter: string, sort: "name"|"price" }>}
    */
-  #buySearch = "";
+  #listState = {
+    buy: { search: "", typeFilter: "", sort: "name" },
+    sell: { search: "", typeFilter: "", sort: "name" },
+    services: { search: "", typeFilter: "", sort: "name" }
+  };
 
   /* -------------------------------------------- */
 
   /**
-   * Current Sell-tab search query, kept live across re-renders.
-   * @type {string}
-   */
-  #sellSearch = "";
-
-  /* -------------------------------------------- */
-
-  /**
-   * Current Buy-tab type filter, kept live across re-renders. Empty string means no filter.
-   * @type {string}
-   */
-  #buyTypeFilter = "";
-
-  /* -------------------------------------------- */
-
-  /**
-   * Current Sell-tab type filter, kept live across re-renders. Empty string means no filter.
-   * @type {string}
-   */
-  #sellTypeFilter = "";
-
-  /* -------------------------------------------- */
-
-  /**
-   * Current Buy-tab sort, kept live across re-renders. "type" is the default server-rendered order.
-   * @type {"type"|"name"}
-   */
-  #buySort = "name";
-
-  /* -------------------------------------------- */
-
-  /**
-   * Current Sell-tab sort, kept live across re-renders. "type" is the default server-rendered order.
-   * @type {"type"|"name"}
-   */
-  #sellSort = "name";
-
-  /* -------------------------------------------- */
-
-  /**
-   * Current Services-tab search query, kept live across re-renders.
-   * @type {string}
-   */
-  #serviceSearch = "";
-
-  /* -------------------------------------------- */
-
-  /**
-   * Current Services-tab type filter, kept live across re-renders. Empty string means no filter.
-   * @type {string}
-   */
-  #serviceTypeFilter = "";
-
-  /* -------------------------------------------- */
-
-  /**
-   * Current Services-tab sort, kept live across re-renders. "type" is the default server-rendered order.
-   * @type {"type"|"name"}
-   */
-  #serviceSort = "name";
-
-  /* -------------------------------------------- */
-
-  /**
-   * Rows currently selected in the shopping cart, resolved from the last render.
+   * Rows currently selected in the shopping cart, resolved from the last render. Suppressed rows are excluded.
    * @type {object[]}
    */
   get cartLines() {
     return [...(this.#lastGroups ?? []), ...(this.#lastServiceGroups ?? [])]
-      .flatMap(group => group.items).filter(row => row.cartQuantity > 0);
+      .flatMap(group => group.items).filter(row => (row.cartQuantity > 0) && !row.suppressed);
   }
 
   /* -------------------------------------------- */
@@ -482,21 +423,21 @@ export default class ShopSheet extends Application5e {
       rows: serviceResolved, settlementCap: context.shop.settlementCap, buyModifier: context.shop.buyModifier,
       cart: this.cart, fixedValueLootTypes: context.shop.fixedValueLootTypes, playerBuyModifier: playerOverride.buy,
       actorName: context.actor?.name, stockDefaults: context.shop.stockDefaults,
-      hasCrafterFeat
+      hasCrafterFeat: false
     });
     this.#lastServiceGroups = context.serviceGroups;
 
     context.sellGroups = context.shop.goldPool.sellDisabled ? [] : await groupSellItems({
-      items: context.actor?.items ?? [], sellModifier: context.shop.sellModifier, sellCart: this.sellCart,
+      items: (context.actor?.items ?? []).filter(item => context.shop.acceptsSellItem(item)),
+      sellModifier: context.shop.sellModifier, sellCart: this.sellCart,
       fixedValueLootTypes: context.shop.fixedValueLootTypes, playerSellModifier: playerOverride.sell,
       actorName: context.actor?.name, settlementCap: context.shop.settlementCap
     });
     this.#lastSellGroups = context.sellGroups;
 
     context.goldPoolDisplay = context.shop.resolveGoldPoolRows({ namePrefix: "currentGold." });
-    context.settlementCapDisplay = context.shop.settlementCap.value != null
-      ? `${context.shop.settlementCap.value} ${context.shop.settlementCap.denomination.toUpperCase()}`
-      : "∞";
+    const { value: capValue, denomination: capDenomination } = context.shop.settlementCap;
+    context.settlementCapDisplay = (capValue != null) ? breakdownCopper(toCopper(capValue, capDenomination)) : null;
     return context;
   }
 
@@ -694,7 +635,7 @@ export default class ShopSheet extends Application5e {
     new game.dnd5e.applications.ContextMenu5e(this.element, "li.item[data-key]", [], {
       onOpen: element => {
         const key = element.dataset.key;
-        const entry = this.shop.items.find(i => ShopItemEntry.key(i) === key);
+        const entry = this.shop.items.find(i => i._id === key);
         ui.context.menuItems = (this.isEditable && entry)
           ? this._getItemContextOptions(key, entry) : [];
       },
@@ -792,7 +733,7 @@ export default class ShopSheet extends Application5e {
         return;
       }
       if ( typeof item.richTooltip !== "function" ) return;
-      const defaultPrice = needsDefaultPrice(item) ? resolveItemPrice(item) : null;
+      const defaultPrice = item.system.price?.value ? null : resolveItemPrice(item);
       if ( !defaultPrice && el.dataset.uuid ) return;
       const resolved = (typeof item.clone === "function") ? Promise.resolve(item) : fromUuid(item.uuid);
       resolved
@@ -814,37 +755,21 @@ export default class ShopSheet extends Application5e {
         dropTab.addEventListener("drop", async event => {
           const data = foundry.applications.ux.TextEditor.implementation.getDragEventData(event);
           if ( data.type !== "Item" ) return;
-          const item = await fromUuid(data.uuid);
-          if ( !item || !CONFIG.Item.dataModels[item.type]?.inventorySection ) return;
-          await this.#mergeItemEntries([
-            { ...itemRef(item), isService: partId === "services", ...newEntryStock(item, this.shop.stockDefaults) }
-          ]);
+          await this.#addItemEntries([data.uuid], { isService: partId === "services" });
         });
       }
     }
 
-    if ( (partId === "buy") || (partId === "sell") || (partId === "services") ) {
-      const tabState = {
-        buy: {
-          sort: this.#buySort, setSort: v => this.#buySort = v,
-          typeFilter: this.#buyTypeFilter, setTypeFilter: v => this.#buyTypeFilter = v,
-          search: this.#buySearch, setSearch: v => this.#buySearch = v
-        },
-        sell: {
-          sort: this.#sellSort, setSort: v => this.#sellSort = v,
-          typeFilter: this.#sellTypeFilter, setTypeFilter: v => this.#sellTypeFilter = v,
-          search: this.#sellSearch, setSearch: v => this.#sellSearch = v
-        },
-        services: {
-          sort: this.#serviceSort, setSort: v => this.#serviceSort = v,
-          typeFilter: this.#serviceTypeFilter, setTypeFilter: v => this.#serviceTypeFilter = v,
-          search: this.#serviceSearch, setSearch: v => this.#serviceSearch = v
-        }
-      }[partId];
-      const content = applyListControls(
-        htmlElement, { sortModes: SORT_MODES, ...tabState, onSort: () => this.render() }
-      );
-      if ( content ) applyItemSort(tabState.sort, content);
+    const listState = this.#listState[partId];
+    if ( listState ) {
+      const content = applyListControls(htmlElement, {
+        sortModes: SORT_MODES,
+        sort: listState.sort, setSort: v => listState.sort = v,
+        typeFilter: listState.typeFilter, setTypeFilter: v => listState.typeFilter = v,
+        search: listState.search, setSearch: v => listState.search = v,
+        onSort: () => this.render()
+      });
+      if ( content ) applyItemSort(listState.sort, content);
     }
   }
 
@@ -929,7 +854,7 @@ export default class ShopSheet extends Application5e {
   async #handleAddEntryMethod(method, uuid, isService) {
     switch ( method ) {
       case "compendium": return this.#pickAndAddItems({ isService });
-      case "uuid": return this.#addByUuid(uuid, isService);
+      case "uuid": return this.#addItemEntries([uuid], { isService });
       case "lodging": return this.#addLodging();
       case "hireling": return this.#addHireling();
     }
@@ -947,19 +872,35 @@ export default class ShopSheet extends Application5e {
       tab: "physical",
       selection: { min: 1 }
     });
-    if ( !selection?.size ) return;
+    if ( selection?.size ) await this.#addItemEntries(Array.from(selection), { isService });
+  }
 
-    const items = await Promise.all(Array.from(selection).map(uuid => fromUuid(uuid)));
+  /* -------------------------------------------- */
+
+  /**
+   * Add items to this shop. Spell scrolls and enchantable items open the template configuration instead.
+   * @param {string[]} uuids             UUIDs of the items to add.
+   * @param {object} options
+   * @param {boolean} options.isService  Should the entries be added to the Services tab?
+   * @returns {Promise<void>}
+   */
+  async #addItemEntries(uuids, { isService }) {
+    const items = await Promise.all(uuids.map(uuid => fromUuid(uuid)));
     const entries = [];
     const templates = [];
-    for ( const item of items ) {
-      if ( !item ) continue;
+    for ( const [index, item] of items.entries() ) {
+      if ( !CONFIG.Item.dataModels[item?.type]?.inventorySection ) {
+        ui.notifications.warn("WARNING.ObjectDoesNotExist", {
+          format: { name: _loc("DOCUMENT.Item"), identifier: uuids[index] }
+        });
+        continue;
+      }
       if ( isSpellScrollItem(item) ) {
         templates.push({ kind: "spellScroll", item });
       } else if ( EnchantedItemBlueprint.getEnchantmentProfiles(item)
         .some(p => EnchantedItemBlueprint.resolveProfileRarity(item, p.effect) !== "artifact") ) {
         templates.push({ kind: "enchant", item });
-      } else if ( item.system?.identifier ) {
+      } else {
         entries.push({ ...itemRef(item), isService, ...newEntryStock(item, this.shop.stockDefaults) });
       }
     }
@@ -969,27 +910,6 @@ export default class ShopSheet extends Application5e {
         templates, isService, onSubmit: newEntries => this.#mergeItemEntries(newEntries)
       }).render({ force: true });
     }
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Add an item to this shop by UUID.
-   * @param {string} uuid
-   * @param {boolean} isService
-   * @returns {Promise<void>}
-   */
-  async #addByUuid(uuid, isService) {
-    if ( !uuid ) return;
-
-    const item = await fromUuid(uuid);
-    if ( !item || !CONFIG.Item.dataModels[item.type]?.inventorySection ) {
-      ui.notifications.warn("WARNING.ObjectDoesNotExist", { format: { name: _loc("DOCUMENT.Item"), identifier: uuid } });
-      return;
-    }
-    await this.#mergeItemEntries([
-      { ...itemRef(item), isService, ...newEntryStock(item, this.shop.stockDefaults) }
-    ]);
   }
 
   /* -------------------------------------------- */
@@ -1006,7 +926,7 @@ export default class ShopSheet extends Application5e {
       price: { value: null, denomination: LODGING_TIERS[tier].price.denomination }
     };
     await this.#mergeItemEntries([entry]);
-    this.#openLodgingConfig(ShopItemEntry.key(entry));
+    this.#openLodgingConfig(entry._id);
   }
 
   /* -------------------------------------------- */
@@ -1035,7 +955,7 @@ export default class ShopSheet extends Application5e {
       price: { value: null, denomination: HIRELING_TYPES[type].price.denomination }
     };
     await this.#mergeItemEntries([entry]);
-    this.#openHirelingConfig(ShopItemEntry.key(entry));
+    this.#openHirelingConfig(entry._id);
   }
 
   /* -------------------------------------------- */
@@ -1062,7 +982,7 @@ export default class ShopSheet extends Application5e {
     const key = target.dataset.key;
     const row = this.#findRow(key);
     const max = row?.suppressed
-      ? 0 : (this.shop.items.find(i => ShopItemEntry.key(i) === key)?.stock.current ?? Infinity);
+      ? 0 : (this.shop.items.find(i => i._id === key)?.stock.current ?? Infinity);
     const delta = Number(target.dataset.delta);
     const next = Math.clamp((this.cart.get(key) ?? 0) + delta, 0, max);
     if ( next === 0 ) this.cart.delete(key);
@@ -1277,18 +1197,7 @@ export default class ShopSheet extends Application5e {
    */
   static async #onSubmit(event, form, formData) {
     const data = foundry.utils.expandObject(formData.object);
-    const overrides = data.items ?? {};
-    const items = this.shop.items.map(entry => {
-      const override = overrides[ShopItemEntry.key(entry)];
-      if ( !override ) return entry.toObject();
-      const result = entry.toObject();
-      if ( override.discount !== undefined ) {
-        result.discount = override.discount === null ? null : Math.clamp(Math.round(override.discount), -100, 1000);
-      }
-      return result;
-    });
-
-    const updateData = { items };
+    const updateData = {};
     if ( data.img !== undefined ) updateData.img = data.img;
     if ( data.location !== undefined ) updateData.location = data.location;
     if ( data.openHour !== undefined ) updateData.openHour = data.openHour;
@@ -1345,7 +1254,7 @@ export default class ShopSheet extends Application5e {
    * @param {HTMLElement} target  Element that was clicked.
    */
   static async #openLinkedActor(event, target) {
-    const entry = this.shop.items.find(i => ShopItemEntry.key(i) === target.dataset.key);
+    const entry = this.shop.items.find(i => i._id === target.dataset.key);
     const actorUuid = entry?.hireling?.actorUuid;
     if ( !actorUuid ) return;
     const actor = await fromUuid(actorUuid);
@@ -1363,7 +1272,7 @@ export default class ShopSheet extends Application5e {
    * @param {string} key
    */
   async #removeEntry(key) {
-    const items = this.shop.items.filter(i => ShopItemEntry.key(i) !== key).map(i => i.toObject());
+    const items = this.shop.items.filter(i => i._id !== key).map(i => i.toObject());
     await this.#updateShop({ items });
   }
 
@@ -1375,7 +1284,7 @@ export default class ShopSheet extends Application5e {
    * @param {boolean} isService
    */
   async #setItemService(key, isService) {
-    const items = this.shop.items.map(i => ShopItemEntry.key(i) === key
+    const items = this.shop.items.map(i => (i._id === key)
       ? { ...i.toObject(), isService } : i.toObject());
     await this.#updateShop({ items });
     ui.notifications.info(
@@ -1470,28 +1379,18 @@ export default class ShopSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
-   * Merge new item entries into the shop's item list, replacing any existing entry with the same
-   * {@link ShopItemEntry.key}. An entry whose key already exists with a different `isService` value
-   * (same catalog item present in both Buy and Services) is skipped with a warning instead of overwriting it.
+   * Merge item entries into the shop's item list. An entry carrying the `_id` of an existing entry replaces it,
+   * any other entry is added.
    * @param {ShopItemEntryData[]} newEntries
    * @returns {Promise<void>}
    */
   async #mergeItemEntries(newEntries) {
-    const entries = new Map(this.shop.items.map(i => [ShopItemEntry.key(i), i.toObject()]));
-    let blocked = false;
-    let changed = false;
-    for ( const entry of newEntries ) {
-      const key = ShopItemEntry.key(entry);
-      const existing = entries.get(key);
-      if ( existing && (!!existing.isService !== !!entry.isService) ) {
-        blocked = true;
-        continue;
-      }
-      entries.set(key, entry);
-      changed = true;
+    const entries = new Map(this.shop.items.map(i => [i._id, i.toObject()]));
+    for ( const newEntry of newEntries ) {
+      const entry = { _id: foundry.utils.randomID(), ...newEntry };
+      entries.set(entry._id, entry);
     }
-    if ( blocked ) ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.AlreadyExistsOtherTab", { localize: true });
-    if ( changed ) await this.#updateShop({ items: Array.from(entries.values()) });
+    await this.#updateShop({ items: Array.from(entries.values()) });
   }
 
   /* -------------------------------------------- */
@@ -1567,7 +1466,7 @@ function festivalOptions() {
  * @param {{ value: number|null, denomination: string }} options.settlementCap
  * @param {number} options.buyModifier  Shop's default buy-side percent discount/markup, used when an item has
  *   no override.
- * @param {Map<string, number>} options.cart  Selected buy quantities, keyed by {@link ShopItemEntry.key}.
+ * @param {Map<string, number>} options.cart  Selected buy quantities, keyed by entry `_id`.
  * @param {Set<string>} options.fixedValueLootTypes
  * @param {number|null} [options.playerBuyModifier]  Acting actor's buy-side override, used when an item has
  *   no override.
@@ -1581,11 +1480,12 @@ async function groupByType({
   rows, settlementCap, buyModifier, cart, fixedValueLootTypes, playerBuyModifier, actorName, stockDefaults,
   hasCrafterFeat
 }) {
-  const targetUnit = game.settings.get("dnd5e", "metricWeightUnits") ? "kg" : "lb";
+  const targetUnit = game.dnd5e.utils.defaultUnits("weight");
   const capCP = settlementCap?.value != null ? toCopper(settlementCap.value, settlementCap.denomination) : null;
   const groups = new Map();
+  const listings = Map.groupBy(rows, ({ entry, item }) => ShopItemEntry.key(entry, item));
   for ( const row of rows ) {
-    row.key = ShopItemEntry.key(row.entry);
+    row.key = row.entry._id;
     const itemPrice = resolveItemPrice(row.item);
     const basePrice = row.entry.price?.value ?? itemPrice?.value ?? 0;
     const denomination = (row.entry.price?.value != null)
@@ -1605,8 +1505,7 @@ async function groupByType({
     row.discountPercent = discountPercent;
     row.discountTooltip = await renderAttribution(sources, `${discountPercent}%`);
     row.cartQuantity = cart.get(row.key) ?? 0;
-    const bundleSize = row.entry.bundleSize
-      ?? ((row.item?.system?.quantity > 1) ? row.item.system.quantity : 1);
+    const bundleSize = row.entry.bundleSize ?? resolveBundleSize(row.item);
     row.bundleSize = bundleSize > 1 ? bundleSize : null;
     row.weight = resolveWeight(row.item?.system, targetUnit);
     row.stockTracked = row.entry.restockMode !== "unlimited";
@@ -1621,8 +1520,17 @@ async function groupByType({
     if ( (capCP != null) && (baseCP > capCP) ) reasons.push(_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.SuppressedCap"));
     row.suppressed = reasons.length > 0;
     row.suppressReason = reasons.join(", ");
+    if ( !row.entry.isService ) {
+      const plain = !row.entry.generated && !row.entry.spellScroll;
+      row.identifierWarning = (plain ? identifierWarning(row, {
+        missing: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoIdentifierWarning",
+        shared: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SharedIdentifierWarning"
+      }) : null) ?? ((listings.get(ShopItemEntry.key(row.entry, row.item)).length > 1)
+        ? _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.DuplicateEntryWarning") : null);
+    }
     row.itemImg = row.item?.img ?? "icons/svg/hazard.svg";
-    row.itemName = row.item?.name ?? row.entry.identifier ?? row.entry.uuid ?? "?";
+    row.itemName = row.item?.name || row.entry.identifier || row.entry.uuid || row.entry.spellScroll?.spellUuid
+      || row.entry.generated?.baseItemUuid || _loc("SIMPLE_SHOP_CRAFT_5E.Unknown");
 
     const type = row.item?.type ?? "unknown";
     if ( !groups.has(type) ) groups.set(type, []);
@@ -1652,17 +1560,15 @@ async function groupByType({
 async function groupSellItems({
   items, sellModifier, sellCart, fixedValueLootTypes, playerSellModifier, actorName, settlementCap
 }) {
-  const targetUnit = game.settings.get("dnd5e", "metricWeightUnits") ? "kg" : "lb";
+  const targetUnit = game.dnd5e.utils.defaultUnits("weight");
   const capCP = (settlementCap?.value != null) && settlementCap.appliesToSell
     ? toCopper(settlementCap.value, settlementCap.denomination) : null;
   const sellable = Array.from(items).filter(item => CONFIG.Item.dataModels[item.type]?.inventorySection);
-  const resolved = await ShopItemEntry.resolveMany(sellable.map(item => ({ identifier: item.system.identifier })));
   const groups = new Map();
-  for ( const [index, item] of sellable.entries() ) {
-    const catalogItem = resolved[index].item;
-    const bundleSize = (catalogItem?.system?.quantity > 1) ? catalogItem.system.quantity : 1;
-    const basePrice = (item.system.price?.value ?? 0) / bundleSize;
-    const denomination = item.system.price?.denomination ?? CONFIG.DND5E.defaultCurrency;
+  for ( const item of sellable ) {
+    const price = resolveUnitPrice(item, { fallback: false });
+    const basePrice = price?.value ?? 0;
+    const denomination = price?.denomination ?? CONFIG.DND5E.defaultCurrency;
     const rowIsFixedValue = isFixedValue(item, fixedValueLootTypes);
     const { percent: discountPercent, sources } = resolveDiscountSources({
       itemOverride: null, isFixedValue: rowIsFixedValue, shopModifier: sellModifier,
@@ -1719,8 +1625,8 @@ async function renderAttribution(sources, total) {
 
 /**
  * Resolve a row's effective discount percent and the attribution sources behind it: item override, else
- * fixed-value (0%), else shop default + player modifier. Rendering the sources into a tooltip is left to
- * the caller.
+ * fixed-value (0%), else shop default + player modifier, limited to -100%. Rendering the sources into a
+ * tooltip is left to the caller.
  * @param {object} options
  * @param {number|null} options.itemOverride    The item entry's own discount override, if any (buy-side only).
  * @param {boolean} options.isFixedValue        Whether the item is a fixed-value loot subtype (always 0%).
@@ -1751,7 +1657,7 @@ function resolveDiscountSources({
     sources.push(additiveSource(_loc("SIMPLE_SHOP_CRAFT_5E.CrafterFeat"), -20));
     percent -= 20;
   }
-  return { percent, sources };
+  return { percent: Math.max(-100, percent), sources };
 }
 
 /* -------------------------------------------- */
@@ -1759,13 +1665,14 @@ function resolveDiscountSources({
 /**
  * Convert an item's weight to the world's configured weight unit, if it has one.
  * @param {object} [itemSystem]  The item's system data.
- * @param {string} targetUnit    "kg" or "lb", per the world's `metricWeightUnits` setting.
+ * @param {string} targetUnit    The world's default weight unit.
  * @returns {{ value: number, unit: string }|undefined}
  */
 function resolveWeight(itemSystem, targetUnit) {
   if ( !itemSystem?.weight ) return undefined;
   return {
-    value: game.dnd5e.utils.convertWeight(itemSystem.weight.value, itemSystem.weight.units || "lb", targetUnit),
+    value: game.dnd5e.utils.convertWeight(itemSystem.weight.value, itemSystem.weight.units || targetUnit,
+      targetUnit),
     unit: targetUnit
   };
 }

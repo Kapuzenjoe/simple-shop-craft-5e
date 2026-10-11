@@ -82,7 +82,7 @@ export default class MaxStockConfig extends BaseShopConfig {
     const data = foundry.utils.expandObject(formData.object);
     const restockMode = data.restockMode ?? "normal";
     const items = this.shopSheet.shop.items.map(i => {
-      if ( ShopItemEntry.key(i) !== this.entryKey ) return i.toObject();
+      if ( i._id !== this.entryKey ) return i.toObject();
       return {
         ...i.toObject(),
         stock: {

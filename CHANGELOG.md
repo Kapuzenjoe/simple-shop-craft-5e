@@ -1,6 +1,57 @@
 # Changelog
 
+## 1.0.0
+
+- Added opening a recipe's target item and materials by clicking their name.
+- Added choosing how many times to craft in the Craft Start dialog, which multiplies the materials and cost while each run takes its own crafting time (#26).
+- Added an Accepted Item Types setting to a shop's Vendor Settings, limiting which item types, and optionally subtypes, it buys from players (#20).
+- Added a Transaction Log that lists a shop's completed purchases and sales, opened from its Vendor Settings or the module settings (#18).
+- Added exporting and importing a shop's Transaction Log (#18).
+- Changed the Recipe Editor's material drop hint to always point to the add and material-rule buttons.
+- Changed a shop's Settlement Cap to show as a formatted amount with a currency icon, and its presets to use the localized currency abbreviation.
+- Changed fixed materials in the Craft Start dialog to list the matching items of the character, like material rules.
+- Fixed a spell-scroll recipe's Proficiency Mode defaulting to "Tool & Skill" instead of "Tool or Skill".
+- Fixed the Crafter feat's discount applying to services.
+- Fixed Vendor Settings resetting the shop name, Magical Items rule, and default stock after toggling Purchase Only or Unlimited.
+- Fixed the Lodging and Hireling editors breaking after selecting the empty Tier or Type option.
+- Fixed Ball Bearings and the Bead of Force being treated as bundles.
+- Fixed the price and currency fields of the Edit Price, Settlement Cap, Hireling, Lodging, and material dialogs not showing on dnd5e 5.3.
+- Fixed shop entries and recipe materials whose item can't be found showing no name.
+- Fixed a player added in a shop's Players dialog not being saved.
+- Fixed editing a Settlement Cap that matches a preset's amount in another currency, such as 20 pp, turning it into gold.
+- Fixed completing a craft whose target item can't be found showing a raw message key instead of an error.
+- Fixed double-clicking Accept on a purchase or craft card applying it twice.
+- Fixed confirming the shopping cart twice in a row creating two purchase cards, and confirming an empty or unaffordable cart creating one.
+- Fixed character and item names containing HTML being rendered as markup in the craft completion message.
+- Fixed the plus button of a material in the Craft Start dialog selecting an item later by itself after the amount of another item was lowered.
+- Fixed accepting two purchase cards in quick succession selling a shop's last item twice or overwriting its gold.
+- Fixed a craft that fails to start still using up the materials and gold.
+- Fixed combined price modifiers below -100% making items cost a negative amount.
+- Fixed a crafting session being credited twice when the game time advances again while it is being resolved.
+- Fixed new shops ignoring the default stock settings when restocking and when adding items.
+- Fixed the Configure Templates dialog showing the first base item again after another one was chosen from a list.
+- Fixed crafting a container whose recipe makes more than one producing only a single container.
+- Fixed buying or crafting a container, such as a pack, only giving the empty container without its contents.
+- Fixed Enspelled Armor, Staff, and Weapon added by hand to a shop being sold without a bound spell.
+- Reworked how shops and recipes recognize items:
+  - Added warnings for items with the default identifier (the item type, such as "weapon"), shared identifiers, and duplicate shop entries.
+  - Added an item type check when recognizing a recipe's materials among a character's items.
+  - Changed items with the default identifier to never stack and to not count as recipe materials, unless overridden.
+  - Changed shops and recipes to reference items by UUID, with the identifier as a fallback.
+  - Changed a material's Change Identifier to override only how items are recognized and keep its item.
+  - Changed spell scrolls and enchantable items dropped on a shop or added by UUID to open the template configuration.
+  - Changed bought and crafted items to only stack onto items of the same type.
+  - Changed starter shops to use the Player's Handbook if active, otherwise the SRD (SRD 5.1 for the 2014 rules).
+  - Changed duplicate detection to use the identifier, so the same item from two compendiums counts once.
+  - Changed shops and recipes to load compendium items in bulk instead of one by one.
+  - Fixed a bought item from a UUID or spell-scroll entry not stacking onto the same item already owned.
+  - Fixed adding an item already in a shop overwriting its price, discount, and stock.
+  - Fixed Fill from Table raising the stock of a service entry instead of adding the item to the Buy tab.
+  - Fixed spell scrolls of spells without an identifier stacking with other spell scrolls of the same level.
+  - Fixed buying and selling items of the same stack in one transaction losing quantity.
+
 ## 0.6.0
+
 - Added a Proficiency Mode to recipes for how Tool and Skill Proficiencies combine: Tool & Skill (default), Tool or Skill, or Every Listed Tool & Skill.
 - Added editable Save DC/Attack Bonus for a crafted spell scroll, defaulting to the crafting character's own spellcasting values.
 - Fixed the Craft Start dialog's spell picker for a compendium-source spell-scroll recipe showing no results instead of the recipe's eligible spells.

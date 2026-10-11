@@ -61,7 +61,7 @@ export default class PlayersConfig extends BaseShopConfig {
         index, actorUuid: uuid, actorImg: actor?.img, actorName: actor?.name,
         buyModifier: existing?.buyModifier ?? null, sellModifier: existing?.sellModifier ?? null,
         hagglingLocked: this.shopSheet.shop.hasHagglingLocks(uuid),
-        template: "modules/simple-shop-craft-5e/templates/shops/shop-sheet/players-dialog-row.hbs"
+        template: "modules/simple-shop-craft-5e/templates/shops/shop-config/players-config/row.hbs"
       };
     });
     context.table = {
@@ -152,6 +152,7 @@ export default class PlayersConfig extends BaseShopConfig {
    * @returns {Promise<void>}
    */
   static async #onSubmit(event, form, formData) {
+    if ( event.target?.name === "newPlayerActors" ) return;
     const data = foundry.utils.expandObject(formData.object);
     const existing = new Map(this.shopSheet.shop.playerDiscounts.map(pd => [pd.actor, pd]));
     const playerDiscounts = Object.values(data.playerDiscounts ?? {}).map(row => ({

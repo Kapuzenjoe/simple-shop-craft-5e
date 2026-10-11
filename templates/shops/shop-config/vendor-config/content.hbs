@@ -12,8 +12,16 @@
         </section>
         {{/if}}
     </fieldset>
+    {{#if typeFilter}}
+    {{> "modules/simple-shop-craft-5e/templates/shared/type-filter.hbs"
+        legend=(localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SellTypes") typeFields=typeFilter.typeFields
+        typeFieldsets=typeFilter.typeFieldsets }}
+    {{/if}}
     <fieldset>
         <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Stock" }}</legend>
         {{> "dnd5e.fieldlist" stockFields}}
     </fieldset>
+    <button type="button" data-action="openTransactionLog">
+        <i class="fa-solid fa-scroll" inert></i> {{ localize "SIMPLE_SHOP_CRAFT_5E.TransactionLog.Open" }}
+    </button>
 </section>

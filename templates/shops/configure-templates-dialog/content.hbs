@@ -50,12 +50,22 @@
         {{/if}}
     </fieldset>
     {{else}}
+    {{#if needsSpell}}
+    <fieldset>
+        <legend>{{ localize "TYPES.Item.spell" }}</legend>
+        <select name="spell-{{ index }}">
+            {{#each spellOptions}}
+            <option value="{{ value }}" {{#if this.selected}}selected{{/if}}>{{ label }}</option>
+            {{/each}}
+        </select>
+    </fieldset>
+    {{/if}}
     <fieldset>
         <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.BaseItem" }}</legend>
         {{#if baseItemOptions}}
         <select name="baseItem-{{ index }}">
             {{#each baseItemOptions}}
-            <option value="{{ value }}">{{ label }}</option>
+            <option value="{{ value }}" {{#if this.selected}}selected{{/if}}>{{ label }}</option>
             {{/each}}
         </select>
         {{else}}

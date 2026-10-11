@@ -13,6 +13,16 @@ export default function SettingCollectionMixin(Base, settingKey) {
   return class SettingCollection extends Base {
 
     /**
+     * Maximum number of instances kept. Creating one beyond it drops the oldest.
+     * @type {number}
+     */
+    static get limit() {
+      return Infinity;
+    }
+
+    /* -------------------------------------------- */
+
+    /**
      * Get every persisted instance.
      * @returns {Base[]}
      */
@@ -52,7 +62,7 @@ export default function SettingCollectionMixin(Base, settingKey) {
     static async create(data) {
       await semaphore.add(async () => {
         const all = this.getAll();
-        await this.setAll([...all.map(e => e.toObject()), data]);
+        await this.setAll([...all.map(e => e.toObject()), data].slice(-this.limit));
       });
       return this.getAll().at(-1);
     }
@@ -65,15 +75,37 @@ export default function SettingCollectionMixin(Base, settingKey) {
      * @returns {Promise<void>}
      */
     static async delete(id) {
+      await this.deleteWhere(e => e._id === id);
+    }
+
+    /* -------------------------------------------- */
+
+    /**
+     * Delete every instance matching a predicate.
+     * @param {function(object): boolean} predicate  Receives the plain data of each instance.
+     * @returns {Promise<void>}
+     */
+    static async deleteWhere(predicate) {
+      await this.updateAll(entries => entries.filter(e => !predicate(e)));
+    }
+
+    /* -------------------------------------------- */
+
+    /**
+     * Replace the persisted collection with a transformation of its plain data.
+     * @param {function(object[]): object[]} transform  Receives the plain data of every instance.
+     * @returns {Promise<void>}
+     */
+    static async updateAll(transform) {
       await semaphore.add(async () => {
-        await this.setAll(this.getAll().filter(e => e._id !== id).map(e => e.toObject()));
+        await this.setAll(transform(this.getAll().map(e => e.toObject())));
       });
     }
 
     /* -------------------------------------------- */
 
     /**
-     * Merge a partial update into a single instance.
+     * Merge a partial update into a single instance. Does nothing if no instance has the id.
      * @param {string} id
      * @param {object|function(Base): object} updateData  Fields to merge, or a function computing them
      *                                                     from the freshest persisted instance.
@@ -82,7 +114,9 @@ export default function SettingCollectionMixin(Base, settingKey) {
     static async update(id, updateData) {
       await semaphore.add(async () => {
         const all = this.getAll();
-        const data = (typeof updateData === "function") ? updateData(all.find(e => e._id === id)) : updateData;
+        const entry = all.find(e => e._id === id);
+        if ( !entry ) return;
+        const data = (typeof updateData === "function") ? updateData(entry) : updateData;
         await this.setAll(all.map(e => e._id === id ? { ...e.toObject(), ...data } : e.toObject()));
       });
     }

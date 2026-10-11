@@ -13,9 +13,8 @@
 
 /**
  * @typedef ShopItemEntryData
- * @property {string} [identifier]       Stable `system.identifier` of the referenced item.
- * @property {string} [uuid]             Direct UUID reference, used for one-off items with no `system.identifier`
- *                                       match.
+ * @property {string} [identifier]       Fallback `system.identifier` reference, used if there is no `uuid`.
+ * @property {string} [uuid]             UUID of the referenced item.
  * @property {object} stock
  * @property {number|null} stock.max      Maximum stock, or `null` for unlimited.
  * @property {number|null} stock.current  Current stock, or `null` for unlimited.
@@ -27,7 +26,8 @@
  * @property {number|null} price.value        Price override. `null` means use the compendium item's price.
  * @property {string} price.denomination      Currency denomination of the override.
  * @property {number|null} bundleSize    Override for how many individual items the listed price buys
- *                                       (e.g. 20 for a bundle of arrows). `null` = guess from the catalog item.
+ *                                       (e.g. 20 for a bundle of arrows). `null` = size from `BUNDLE_SIZES` for
+ *                                       the item's identifier.
  * @property {object|null} generated     Recipe for a generated magic item, `null` for normal entries.
  * @property {string} generated.baseItemUuid      UUID of the base item the enchantment is applied to.
  * @property {string} generated.enchantItemUuid   UUID of the item granting the enchantment.
@@ -54,6 +54,8 @@
  *                                          shop buys items back; 0 = no change.
  * @property {Set<string>} fixedValueLootTypes  Loot subtypes (e.g. gems, art objects) with a fixed market value,
  *                                          exempt from any buy/sell modifier.
+ * @property {Record<string, Set<string>>} sellTypes  Subtypes by item type this shop buys from players. Empty = any
+ *                                          type; an empty set = any subtype.
  * @property {ShopPlayerDiscountData[]} playerDiscounts  Per-actor buy/sell modifier overrides.
  * @property {string} [npc]                  UUID of the NPC actor this shop is assigned to.
  * @property {string} [location]             Optional free-text location (e.g. "Baldur's Gate").
@@ -92,9 +94,35 @@
 /* -------------------------------------------- */
 
 /**
+ * @typedef TransactionData
+ * @property {string} _id           Unique id of this log entry.
+ * @property {number} timestamp     Real-world time the transaction was completed, in milliseconds since the epoch.
+ * @property {number} worldTime     World time (`game.time.worldTime`) the transaction was completed.
+ * @property {string} shopId        Id of the shop the transaction took place in.
+ * @property {string} shopName      Name of that shop when the transaction was completed.
+ * @property {string} actorName     Name of the acting character.
+ * @property {number} netCP         Combined total in copper; negative = the actor owes, positive = the actor is owed.
+ * @property {TransactionLineData[]} buyLines   Items and services the actor bought.
+ * @property {TransactionLineData[]} sellLines  Items the actor sold.
+ */
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef TransactionLineData
+ * @property {string} name        Name of the item or service.
+ * @property {number} quantity    Quantity bought or sold.
+ * @property {number} priceCP     Price of one unit in copper.
+ * @property {boolean} isService  Whether the line is a service.
+ */
+
+/* -------------------------------------------- */
+
+/**
  * @typedef RecipeMaterialData
- * @property {string} [identifier]  Stable `system.identifier` of the referenced material item.
- * @property {string} [uuid]        Direct UUID reference, used when no `system.identifier` match exists.
+ * @property {string} [identifier]  Fallback `system.identifier` reference, used if there is no `uuid`.
+ * @property {string} [identifierOverride]  Identifier used to recognize owned items instead of the item's own.
+ * @property {string} [uuid]        UUID of the referenced material item.
  * @property {RecipeMaterialCriteria|null} [criteria]  Type/subtype/value rule instead of a fixed reference.
  * @property {boolean} required     Whether this slot must have a resolved match to start crafting.
  * @property {number} quantity      Number of matching units required to fully satisfy this slot.
@@ -121,8 +149,8 @@
  * @property {string} name                       Display name of this recipe.
  * @property {string} img                        Recipe image path.
  * @property {object} targetItem
- * @property {string} [targetItem.identifier]    Stable `system.identifier` of the item this recipe produces.
- * @property {string} [targetItem.uuid]          Direct UUID reference, used when no `system.identifier` match exists.
+ * @property {string} [targetItem.identifier]    Fallback `system.identifier` reference, used if there is no `uuid`.
+ * @property {string} [targetItem.uuid]          UUID of the item this recipe produces.
  * @property {number} targetQuantity              Units produced per craft (e.g. 20 for a stack of arrows).
  * @property {RecipeMaterialData[]} materials    Fixed materials required by this recipe.
  * @property {boolean} allowFreeformMaterials    Whether players may substitute any sufficiently valuable item.
@@ -156,9 +184,10 @@
  * @typedef InProgressCraftData
  * @property {string} recipeId                 Id of the recipe this craft was started from.
  * @property {object} targetItem
- * @property {string} [targetItem.identifier]  Stable `system.identifier` of the item this craft produces.
- * @property {string} [targetItem.uuid]        Direct UUID reference, used when no `system.identifier` match exists.
+ * @property {string} [targetItem.identifier]  Fallback `system.identifier` reference, used if there is no `uuid`.
+ * @property {string} [targetItem.uuid]        UUID of the item this craft produces.
  * @property {number} targetQuantity           Units to produce when this craft completes.
+ * @property {number} remaining                Runs of this craft still to finish, including the current one.
  * @property {string} spellUuid                Chosen spell UUID for a spell-scroll craft, or blank.
  * @property {{ dc: number, bonus: number }|null} scrollValues  Save DC/attack bonus for the crafted scroll.
  * @property {string} activityId               Id of the "Progress Craft" activity on the tracked item.
@@ -232,9 +261,10 @@
  * @property {string} status                     Status of the pending craft: "pending", "accepted", or "rejected".
  * @property {string} recipeId                   Id of the recipe this craft was started from.
  * @property {object} targetItem
- * @property {string} [targetItem.identifier]     Stable `system.identifier` of the produced item.
- * @property {string} [targetItem.uuid]           Direct UUID reference, used when no `system.identifier` match exists.
+ * @property {string} [targetItem.identifier]     Fallback `system.identifier` reference, used if there is no `uuid`.
+ * @property {string} [targetItem.uuid]           UUID of the produced item.
  * @property {number} targetQuantity              Units to produce when this craft completes.
+ * @property {number} count                       Runs of the recipe started by this craft.
  * @property {string} targetName                  Display name of the produced item.
  * @property {string} targetImg                   Image path of the produced item.
  * @property {string} spellUuid                   Chosen spell UUID for a spell-scroll craft, or blank.
@@ -280,9 +310,8 @@
 /**
  * @typedef PurchaseBuyLine
  * @property {string} [_id]                                 Stable id, used when neither identifier nor uuid is set.
- * @property {string} [identifier]                         Stable `system.identifier` of the referenced item.
- * @property {string} [uuid]                                Direct UUID reference, used when no `system.identifier`
- *                                                          match exists.
+ * @property {string} [identifier]                         Fallback `system.identifier` reference of the item.
+ * @property {string} [uuid]                                UUID of the referenced item.
  * @property {EnchantedItemBlueprintData|null} generated    Enchant-generation blueprint, `null` for normal items.
  * @property {SpellScrollBlueprintData|null} spellScroll    Spell-scroll blueprint, `null` for normal items.
  * @property {boolean} [isService]                          Whether this is a Services-tab entry — money-only,
@@ -300,7 +329,6 @@
 /**
  * @typedef PurchaseSellLine
  * @property {string} itemId           Id of the sold item.
- * @property {string} identifier       Stable `system.identifier` of the sold item.
  * @property {string} name             Display name of the sold item.
  * @property {string} img              Image path of the sold item.
  * @property {number} quantity         Quantity sold.

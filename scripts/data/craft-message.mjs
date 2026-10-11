@@ -1,4 +1,4 @@
-import { MODULE_ID } from "../config.mjs";
+import { CARD_STATUSES, MODULE_ID } from "../config.mjs";
 import { breakdownCopper } from "../utils.mjs";
 import { InProgressCraft } from "./in-progress-craft.mjs";
 
@@ -18,16 +18,6 @@ const {
 const TEMPLATE = "modules/simple-shop-craft-5e/templates/chat/craft-card.hbs";
 
 /**
- * Localization keys for each pending-craft status.
- * @type {Record<string, string>}
- */
-const STATUS_LABELS = {
-  pending: "SIMPLE_SHOP_CRAFT_5E.Status.Pending",
-  accepted: "SIMPLE_SHOP_CRAFT_5E.Status.Accepted",
-  rejected: "SIMPLE_SHOP_CRAFT_5E.Status.Rejected"
-};
-
-/**
  * A data model that represents a craft-start chat card's own flag data.
  * @extends {foundry.abstract.DataModel<CraftMessageCardData>}
  * @mixes CraftMessageCardData
@@ -37,13 +27,14 @@ export class CraftMessageData extends foundry.abstract.DataModel {
   /** @override */
   static defineSchema() {
     return {
-      status: new StringField({ initial: "pending", choices: ["pending", "accepted", "rejected"] }),
+      status: new StringField({ initial: "pending", choices: Object.keys(CARD_STATUSES) }),
       recipeId: new StringField({ blank: true }),
       targetItem: new SchemaField({
         identifier: new StringField({ blank: true }),
         uuid: new DocumentUUIDField({ type: "Item", blank: true })
       }),
       targetQuantity: new NumberField({ initial: 1, integer: true, min: 1 }),
+      count: new NumberField({ initial: 1, integer: true, min: 1 }),
       targetName: new StringField(),
       targetImg: new FilePathField({ categories: ["IMAGE"] }),
       actorUuid: new DocumentUUIDField({ type: "Actor" }),
@@ -61,13 +52,22 @@ export class CraftMessageData extends foundry.abstract.DataModel {
       totalHours: new NumberField({ initial: 0 }),
       hoursPerUse: new NumberField({ nullable: true, initial: null }),
       weight: new SchemaField({
-        value: new NumberField({ initial: 0 }), units: new StringField({ initial: "lb" })
+        value: new NumberField({ initial: 0 }),
+        units: new StringField({ initial: () => game.dnd5e.utils.defaultUnits("weight") })
       }),
       halfPrice: new SchemaField({
         value: new NumberField({ initial: 0 }), denomination: new StringField({ initial: "gp" })
       })
     };
   }
+
+  /* -------------------------------------------- */
+
+  /**
+   * IDs of the messages whose decision is currently being applied on this client.
+   * @type {Set<string>}
+   */
+  static #processing = new Set();
 
   /* -------------------------------------------- */
 
@@ -97,11 +97,12 @@ export class CraftMessageData extends foundry.abstract.DataModel {
    * @param {number} options.hoursPerUse                Progress hours added by each "Progress Craft" activation.
    * @param {{ value: number, units: string }} options.weight              Target item's weight.
    * @param {{ value: number, denomination: string }} options.halfPrice    Half the target item's price.
+   * @param {number} options.count                      Runs of the recipe started by this craft.
    * @returns {Promise<ChatMessage>}
    */
   static async create({
     actor, recipe, targetItem, materialLines, goldCP, toolKey, spellUuid, scrollValues,
-    totalHours, hoursPerUse, weight, halfPrice
+    totalHours, hoursPerUse, weight, halfPrice, count
   }) {
     const craft = new CraftMessageData({
       recipeId: recipe._id,
@@ -113,7 +114,7 @@ export class CraftMessageData extends foundry.abstract.DataModel {
       materialLines: materialLines.map(line => ({
         itemId: line.item.id, name: line.item.name, img: line.item.img, quantity: line.quantity
       })),
-      goldCP, totalHours, hoursPerUse, weight, halfPrice
+      goldCP, totalHours, hoursPerUse, weight, halfPrice, count
     });
 
     return ChatMessage.create({
@@ -140,8 +141,8 @@ export class CraftMessageData extends foundry.abstract.DataModel {
     }
 
     const craft = new CraftMessageData(flag);
-    html.querySelector('[data-action="acceptCraft"]')?.addEventListener("click", () => craft.#handleDecision(message, "accepted"));
-    html.querySelector('[data-action="rejectCraft"]')?.addEventListener("click", () => craft.#handleDecision(message, "rejected"));
+    html.querySelector('[data-action="acceptCraft"]')?.addEventListener("click", event => craft.#handleDecision(message, "accepted", event.currentTarget));
+    html.querySelector('[data-action="rejectCraft"]')?.addEventListener("click", event => craft.#handleDecision(message, "rejected", event.currentTarget));
   }
 
   /* -------------------------------------------- */
@@ -153,7 +154,7 @@ export class CraftMessageData extends foundry.abstract.DataModel {
   async renderContent() {
     return foundry.applications.handlebars.renderTemplate(TEMPLATE, {
       ...this.toObject(), goldParts: this.goldParts,
-      pending: this.status === "pending", statusLabel: _loc(STATUS_LABELS[this.status])
+      pending: this.status === "pending", statusLabel: _loc(CARD_STATUSES[this.status].label)
     });
   }
 
@@ -163,21 +164,31 @@ export class CraftMessageData extends foundry.abstract.DataModel {
    * Record the GM's decision on this pending craft start.
    * @param {ChatMessage} message              The craft chat message.
    * @param {"accepted"|"rejected"} decision
+   * @param {HTMLButtonElement} button         The clicked button, disabled while the decision is applied.
    * @returns {Promise<void>}
    */
-  async #handleDecision(message, decision) {
-    if ( decision === "accepted" ) {
-      const result = await InProgressCraft.start(this.toObject());
-      if ( !result.ok ) {
-        ui.notifications.error(result.error, { localize: true });
-        return;
+  async #handleDecision(message, decision, button) {
+    const processing = CraftMessageData.#processing;
+    if ( processing.has(message.id) || (message.getFlag(MODULE_ID, "craft")?.status !== "pending") ) return;
+    processing.add(message.id);
+    button.disabled = true;
+    try {
+      if ( decision === "accepted" ) {
+        const result = await InProgressCraft.start(this.toObject());
+        if ( !result.ok ) {
+          ui.notifications.error(result.error, { localize: true });
+          return;
+        }
       }
-    }
 
-    this.updateSource({ status: decision });
-    await message.update({
-      content: await this.renderContent(),
-      [`flags.${MODULE_ID}.craft`]: this.toObject()
-    });
+      this.updateSource({ status: decision });
+      await message.update({
+        content: await this.renderContent(),
+        [`flags.${MODULE_ID}.craft`]: this.toObject()
+      });
+    } finally {
+      processing.delete(message.id);
+      button.disabled = false;
+    }
   }
 }

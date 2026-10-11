@@ -1,7 +1,8 @@
-import { MODULE_ID } from "../config.mjs";
+import { CARD_STATUSES, MODULE_ID } from "../config.mjs";
 import { EnchantedItemBlueprint } from "./enchanted-item-blueprint.mjs";
 import { Shop } from "./shop-data.mjs";
 import { SpellScrollBlueprint } from "./spell-scroll-blueprint.mjs";
+import Transaction from "./transaction-data.mjs";
 
 const {
   ArrayField, BooleanField, DocumentUUIDField, EmbeddedDataField, FilePathField, NumberField, SchemaField, StringField
@@ -19,16 +20,6 @@ const {
 const TEMPLATE = "modules/simple-shop-craft-5e/templates/chat/purchase-card.hbs";
 
 /**
- * Localization keys for each pending-transaction status.
- * @type {Record<string, string>}
- */
-const STATUS_LABELS = {
-  pending: "SIMPLE_SHOP_CRAFT_5E.Status.Pending",
-  accepted: "SIMPLE_SHOP_CRAFT_5E.Status.Accepted",
-  rejected: "SIMPLE_SHOP_CRAFT_5E.Status.Rejected"
-};
-
-/**
  * A data model that represents a purchase chat card's own flag data.
  * @extends {foundry.abstract.DataModel<PurchaseMessageCardData>}
  * @mixes PurchaseMessageCardData
@@ -38,7 +29,7 @@ export class PurchaseMessageData extends foundry.abstract.DataModel {
   /** @override */
   static defineSchema() {
     return {
-      status: new StringField({ initial: "pending", choices: ["pending", "accepted", "rejected"] }),
+      status: new StringField({ initial: "pending", choices: Object.keys(CARD_STATUSES) }),
       shopId: new StringField({ blank: true }),
       shopName: new StringField(),
       shopImg: new FilePathField({ categories: ["IMAGE"] }),
@@ -56,7 +47,7 @@ export class PurchaseMessageData extends foundry.abstract.DataModel {
         subtotal: currencyPartsField()
       })),
       sellLines: new ArrayField(new SchemaField({
-        itemId: new StringField(), identifier: new StringField({ blank: true }),
+        itemId: new StringField(),
         name: new StringField(), img: new FilePathField({ categories: ["IMAGE"] }),
         quantity: new NumberField(), priceCP: new NumberField(), subtotal: currencyPartsField()
       })),
@@ -64,6 +55,14 @@ export class PurchaseMessageData extends foundry.abstract.DataModel {
       netCP: new NumberField({ initial: 0 })
     };
   }
+
+  /* -------------------------------------------- */
+
+  /**
+   * IDs of the messages whose decision is currently being applied on this client.
+   * @type {Set<string>}
+   */
+  static #processing = new Set();
 
   /* -------------------------------------------- */
 
@@ -90,7 +89,7 @@ export class PurchaseMessageData extends foundry.abstract.DataModel {
         bundleSize: row.bundleSize ?? 1, subtotal: row.subtotal
       })),
       sellLines: sellLines.map(row => ({
-        itemId: row.item.id, identifier: row.item.system.identifier,
+        itemId: row.item.id,
         name: row.item.name, img: row.item.img, quantity: row.sellQuantity, priceCP: row.priceCP,
         subtotal: row.subtotal
       })),
@@ -121,8 +120,8 @@ export class PurchaseMessageData extends foundry.abstract.DataModel {
     }
 
     const purchase = new PurchaseMessageData(flag);
-    html.querySelector('[data-action="acceptPurchase"]')?.addEventListener("click", () => purchase.#handleDecision(message, "accepted"));
-    html.querySelector('[data-action="rejectPurchase"]')?.addEventListener("click", () => purchase.#handleDecision(message, "rejected"));
+    html.querySelector('[data-action="acceptPurchase"]')?.addEventListener("click", event => purchase.#handleDecision(message, "accepted", event.currentTarget));
+    html.querySelector('[data-action="rejectPurchase"]')?.addEventListener("click", event => purchase.#handleDecision(message, "rejected", event.currentTarget));
   }
 
   /* -------------------------------------------- */
@@ -133,7 +132,7 @@ export class PurchaseMessageData extends foundry.abstract.DataModel {
    */
   async renderContent() {
     return foundry.applications.handlebars.renderTemplate(TEMPLATE, {
-      ...this.toObject(), pending: this.status === "pending", statusLabel: _loc(STATUS_LABELS[this.status]),
+      ...this.toObject(), pending: this.status === "pending", statusLabel: _loc(CARD_STATUSES[this.status].label),
       buyLines: this.buyLines.filter(l => !l.isService), serviceLines: this.buyLines.filter(l => l.isService)
     });
   }
@@ -144,22 +143,37 @@ export class PurchaseMessageData extends foundry.abstract.DataModel {
    * Record the GM's decision on this pending transaction.
    * @param {ChatMessage} message              The purchase chat message.
    * @param {"accepted"|"rejected"} decision
+   * @param {HTMLButtonElement} button         The clicked button, disabled while the decision is applied.
    * @returns {Promise<void>}
    */
-  async #handleDecision(message, decision) {
-    if ( decision === "accepted" ) {
-      const result = await Shop.applyPurchase(this.toObject());
-      if ( !result.ok ) {
-        ui.notifications.error(result.error, { localize: true });
-        return;
+  async #handleDecision(message, decision, button) {
+    const processing = PurchaseMessageData.#processing;
+    if ( processing.has(message.id) || (message.getFlag(MODULE_ID, "purchase")?.status !== "pending") ) return;
+    processing.add(message.id);
+    button.disabled = true;
+    try {
+      if ( decision === "accepted" ) {
+        const result = await Shop.applyPurchase(this.toObject());
+        if ( !result.ok ) {
+          ui.notifications.error(result.error, { localize: true });
+          return;
+        }
+        try {
+          await Transaction.log(this.toObject());
+        } catch ( err ) {
+          console.warn(`${MODULE_ID} | Failed to log the transaction:`, err);
+        }
       }
-    }
 
-    this.updateSource({ status: decision });
-    await message.update({
-      content: await this.renderContent(),
-      [`flags.${MODULE_ID}.purchase`]: this.toObject()
-    });
+      this.updateSource({ status: decision });
+      await message.update({
+        content: await this.renderContent(),
+        [`flags.${MODULE_ID}.purchase`]: this.toObject()
+      });
+    } finally {
+      processing.delete(message.id);
+      button.disabled = false;
+    }
   }
 }
 

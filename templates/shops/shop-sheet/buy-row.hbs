@@ -26,6 +26,9 @@
             <i class="fa-solid fa-triangle-exclamation warning" data-tooltip="{{ suppressReason }}"></i>
             {{/if}}
             {{/if}}
+            {{#if (and @root.editable identifierWarning)}}
+            <i class="fa-solid fa-triangle-exclamation warning" data-tooltip="{{ identifierWarning }}"></i>
+            {{/if}}
         </div>
         <div class="item-detail item-discount"
              data-tooltip="{{ discountTooltip }}"

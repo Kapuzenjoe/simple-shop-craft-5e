@@ -2,8 +2,8 @@ import { PROFICIENCY_MODES, SPELL_SCROLL_SOURCES, UNLOCK_MODES } from "../../con
 import { Recipe, RecipeMaterial } from "../../data/recipe-data.mjs";
 import {
   applyDropArea, applyLoadingTooltip, breakdownCopper, buildItemTableSections, currencyRows,
-  currencyValueField, goldPoolCurrencies, isDefaultIdentifier, isSpellScrollItem, itemRefKey, recipeCraftCost,
-  resolveEntries, resolveIdentifierIndex, resolveItemPrice, subtypeOptions, toCopper
+  currencyValueField, goldPoolCurrencies, identifierWarning, isSpellScrollItem, itemRef, itemRefKey, matchIdentifier,
+  openItemSheet, recipeCraftCost, resolveBundleSize, resolveEntries, resolveUnitPrice, subtypeOptions, toCopper
 } from "../../utils.mjs";
 import BaseShopConfig from "../shops/shop-config/base-shop-config.mjs";
 import MaterialCriteriaDialog from "./material-criteria-dialog.mjs";
@@ -37,6 +37,7 @@ export default class RecipeSheet extends Application5e {
       addMaterial: RecipeSheet.#addMaterial,
       addMaterialCriteria: RecipeSheet.#addMaterialCriteria,
       editTargetItem: RecipeSheet.#editTargetItem,
+      openItemSheet: RecipeSheet.#openItemSheet,
       removeTargetItem: RecipeSheet.#removeTargetItem,
       stepMaterialQuantity: RecipeSheet.#stepMaterialQuantity,
       toggleMaterialRequired: RecipeSheet.#toggleMaterialRequired
@@ -116,6 +117,10 @@ export default class RecipeSheet extends Application5e {
 
     const [targetResolved] = await resolveEntries([recipe.targetItem]);
     context.targetItem = targetResolved.item;
+    context.targetIdentifierWarning = identifierWarning(targetResolved, {
+      missing: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.TargetNoIdentifierWarning",
+      shared: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.SharedIdentifierWarning"
+    });
     this.#targetItemName = recipe.displayName(targetResolved.item);
     context.craftCost = await recipeCraftCost(recipe, targetResolved.item);
     const craftCostBreakdown = Object.fromEntries(goldPoolCurrencies().map(d => [d, 0]));
@@ -123,8 +128,7 @@ export default class RecipeSheet extends Application5e {
       for ( const part of breakdownCopper(toCopper(context.craftCost.gold, "gp")) ) craftCostBreakdown[part.denomination] = part.value;
     }
     const thresholdCP = recipe.craftThreshold(context.craftCost, targetResolved.item);
-    const targetBundleSize = (targetResolved.item?.system?.quantity > 1) ? targetResolved.item.system.quantity : 1;
-    const durationScale = recipe.targetQuantity / targetBundleSize;
+    const durationScale = recipe.targetQuantity / resolveBundleSize(targetResolved.item);
 
     const materialsResolved = await resolveEntries(recipe.materials);
     const materialRows = materialsResolved.map((r, index) => ({ ...r, index })).map(r => {
@@ -134,11 +138,9 @@ export default class RecipeSheet extends Application5e {
         showQuantity: true, quantity: r.entry.quantity, quantityLabel: r.entry.quantity,
         hasContextMenu: true, uuid: r.item?.uuid ?? null
       };
-      const bundleSize = (r.item?.system?.quantity > 1) ? r.item.system.quantity : 1;
-      const rawPrice = (!r.entry.criteria?.type && r.item) ? resolveItemPrice(r.item) : null;
       const itemPrice = (r.entry.value?.value != null)
         ? r.entry.value
-        : (rawPrice ? { value: rawPrice.value / bundleSize, denomination: rawPrice.denomination } : null);
+        : ((!r.entry.criteria?.type && r.item) ? resolveUnitPrice(r.item) : null);
       const price = (itemPrice?.value != null) ? [itemPrice] : null;
       const valueCP = (itemPrice?.value != null) ? toCopper(itemPrice.value, itemPrice.denomination) : 0;
       if ( r.entry.criteria?.type ) {
@@ -159,10 +161,16 @@ export default class RecipeSheet extends Application5e {
           warning: true, warningTooltip: _loc("SIMPLE_SHOP_CRAFT_5E.RecipeEditor.UnresolvedWarning")
         };
       }
+      const warningTooltip = identifierWarning(r, {
+        missing: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.NoIdentifierWarning",
+        shared: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.SharedIdentifierWarning"
+      });
       return {
-        ...shared, img: r.item.img, name: r.item.name, subtitle: r.entry.identifier || null,
-        price, valueCP, warning: isDefaultIdentifier(r.item),
-        warningTooltip: isDefaultIdentifier(r.item) ? _loc("SIMPLE_SHOP_CRAFT_5E.RecipeEditor.NoIdentifierWarning") : null
+        ...shared, img: r.item.img, name: r.item.name, uuid: r.item.uuid,
+        subtitle: matchIdentifier(r.entry, r.item) || null, price, valueCP, warning: !!warningTooltip, warningTooltip,
+        info: r.entry.identifierOverride
+          ? _loc("SIMPLE_SHOP_CRAFT_5E.RecipeEditor.IdentifierOverrideInfo", { identifier: r.entry.identifierOverride })
+          : null
       };
     });
     const requiredSumCP = materialRows.filter(r => r.required)
@@ -293,15 +301,11 @@ export default class RecipeSheet extends Application5e {
     if ( !selection?.size ) return;
 
     const items = await Promise.all(Array.from(selection).map(uuid => fromUuid(uuid)));
-    const newEntries = await Promise.all(items.filter(Boolean).map(itemEntryRef));
+    const existingKeys = await this.#materialKeys();
+    const newEntries = items.filter(item => item && !existingKeys.has(itemRefKey(itemRef(item), item))).map(itemRef);
     if ( !newEntries.length ) return;
 
-    const recipe = this.recipe;
-    const existingKeys = new Set(recipe.materials.map(m => itemRefKey(m)));
-    const materials = [
-      ...recipe.materials.map(m => m.toObject()),
-      ...newEntries.filter(e => !existingKeys.has(itemRefKey(e)))
-    ];
+    const materials = [...this.recipe.materials.map(m => m.toObject()), ...newEntries];
     await Recipe.update(this.recipeId, { materials });
     this.render();
   }
@@ -371,9 +375,24 @@ export default class RecipeSheet extends Application5e {
     if ( !item ) return;
 
     await Recipe.update(
-      this.recipeId, await getTargetItemUpdate(item, this.recipe.skillProficiencies, this.recipe.toolProficiencies)
+      this.recipeId,
+      getTargetItemUpdate(item, this.recipe.skillProficiencies, this.recipe.toolProficiencies)
     );
     this.render();
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle opening the target item's or a material's item sheet.
+   * @this {RecipeSheet}
+   * @param {Event} event         Triggering click event.
+   * @param {HTMLElement} target  Element that was clicked.
+   * @returns {Promise<void>}
+   */
+  static async #openItemSheet(event, target) {
+    const item = await fromUuid(target.dataset.uuid);
+    if ( item ) openItemSheet(item);
   }
 
   /* -------------------------------------------- */
@@ -389,10 +408,11 @@ export default class RecipeSheet extends Application5e {
   static async #onSubmit(event, form, formData) {
     const data = foundry.utils.expandObject(formData.object);
     if ( data.durationOverride ) data.durationOverride.value ??= null;
-    if ( data.targetItem?.uuid && (data.targetItem.uuid !== this.recipe.targetItem.uuid) ) {
+    if ( data.targetItem?.uuid === this.recipe.targetItem.uuid ) delete data.targetItem;
+    if ( data.targetItem?.uuid ) {
       const item = await fromUuid(data.targetItem.uuid);
       if ( item ) {
-        Object.assign(data, await getTargetItemUpdate(
+        Object.assign(data, getTargetItemUpdate(
           item, data.skillProficiencies ?? this.recipe.skillProficiencies,
           data.toolProficiencies ?? this.recipe.toolProficiencies
         ));
@@ -475,39 +495,35 @@ export default class RecipeSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
-   * Handle editing a fixed material's identifier reference. Resolved the same way as any other identifier
-   * (module compendiums, then system, then world compendiums, then the world's Items directory).
+   * Handle overriding the identifier of a fixed material. The material keeps referencing its item.
    * @param {HTMLElement} target  Row element the context menu was triggered for.
    * @returns {Promise<void>}
    */
   async #editMaterialIdentifier(target) {
     const index = Number(target.dataset.index);
     const entry = this.recipe.materials[index];
+    const [{ item }] = await resolveEntries([entry]);
+    if ( !item ) {
+      ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.RecipeEditor.UnresolvedWarning", { localize: true });
+      return;
+    }
 
     const dialog = new BaseShopConfig({
       window: { title: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.ChangeIdentifier" },
       fields: [
         {
-          field: RecipeMaterial.schema.fields.identifier, name: "identifier", value: entry.identifier,
-          label: _loc("DND5E.Identifier"), hint: _loc("SIMPLE_SHOP_CRAFT_5E.RecipeEditor.ChangeIdentifierHint")
+          field: RecipeMaterial.schema.fields.identifierOverride, name: "identifierOverride",
+          value: entry.identifierOverride,
+          placeholder: item.system.identifier, label: _loc("DND5E.Identifier"),
+          hint: _loc("SIMPLE_SHOP_CRAFT_5E.RecipeEditor.ChangeIdentifierHint")
         }
       ],
       form: {
         handler: async (event, form, formData) => {
           const data = foundry.utils.expandObject(formData.object);
-          const identifier = data.identifier?.trim() ?? "";
-          if ( !identifier ) {
-            ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.RecipeEditor.IdentifierRequired", { localize: true });
-            return;
-          }
-          const resolved = await resolveIdentifierIndex(new Set([identifier]));
-          if ( !resolved.size ) {
-            ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.RecipeEditor.IdentifierNotFound", { localize: true });
-            return;
-          }
-          const materials = this.recipe.materials.map((m, i) => (i !== index) ? m.toObject() : {
-            ...m.toObject(), identifier, uuid: ""
-          });
+          const identifierOverride = game.dnd5e.utils.formatIdentifier(data.identifierOverride ?? "");
+          const materials = this.recipe.materials.map((m, i) => (i !== index)
+            ? m.toObject() : { ...m.toObject(), uuid: item.uuid, identifierOverride });
           await Recipe.update(this.recipeId, { materials });
           this.render();
         }
@@ -547,6 +563,17 @@ export default class RecipeSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
+   * Get the keys of the materials in the recipe.
+   * @returns {Promise<Set<string>>}
+   */
+  async #materialKeys() {
+    const resolved = await resolveEntries(this.recipe.materials);
+    return new Set(resolved.map(({ entry, item }) => itemRefKey(entry, item)));
+  }
+
+  /* -------------------------------------------- */
+
+  /**
    * Handle dropping an item onto the materials drop area.
    * @param {DragEvent} event
    * @returns {Promise<void>}
@@ -559,30 +586,12 @@ export default class RecipeSheet extends Application5e {
     const item = await Item.implementation.fromDropData(data);
     if ( !item ) return;
 
-    const recipe = this.recipe;
-    const entry = await itemEntryRef(item);
-    if ( recipe.materials.some(m => itemRefKey(m) === itemRefKey(entry)) ) return;
+    const entry = itemRef(item);
+    if ( (await this.#materialKeys()).has(itemRefKey(entry, item)) ) return;
 
-    await Recipe.update(this.recipeId, { materials: [...recipe.materials.map(m => m.toObject()), entry] });
+    await Recipe.update(this.recipeId, { materials: [...this.recipe.materials.map(m => m.toObject()), entry] });
     this.render();
   }
-}
-
-/* -------------------------------------------- */
-
-/**
- * Build an identifier/uuid reference for an item. Prefers `identifier` when it resolves against a real
- * compendium/world source (stable regardless of where the item currently lives — a compendium, an actor's
- * inventory, or the world), falls back to `uuid` for items with no identifier or an unresolvable one.
- * @param {Item5e} item
- * @returns {Promise<{ identifier: string }|{ uuid: string }>}
- */
-async function itemEntryRef(item) {
-  if ( item.system.identifier ) {
-    const resolved = await resolveIdentifierIndex(new Set([item.system.identifier]));
-    if ( resolved.size ) return { identifier: item.system.identifier };
-  }
-  return { uuid: item.uuid };
 }
 
 /* -------------------------------------------- */
@@ -621,22 +630,25 @@ async function toolOptions() {
  * @param {Item5e} item                          The chosen target item.
  * @param {Iterable<string>} skillProficiencies  Skill proficiencies to start from.
  * @param {Iterable<string>} toolProficiencies   Tool proficiencies to start from.
- * @returns {Promise<object>}
+ * @returns {object}
  */
-async function getTargetItemUpdate(item, skillProficiencies, toolProficiencies) {
+function getTargetItemUpdate(item, skillProficiencies, toolProficiencies) {
   const skills = new Set(skillProficiencies);
   const tools = new Set(toolProficiencies);
   if ( item.system.identifier === "potion-of-healing" ) tools.add("herb");
   else if ( item.system.properties?.has("mgc") ) skills.add("arc");
   let spellScroll = null;
+  let proficiencyMode;
   if ( isSpellScrollItem(item) ) {
     skills.add("arc");
     tools.add("calligrapher");
     spellScroll = { level: 0, spellSource: "prepared" };
+    proficiencyMode = "either";
   }
   return {
-    targetItem: await itemEntryRef(item),
-    targetQuantity: (item.system.quantity > 1) ? item.system.quantity : 1,
-    img: item.img, skillProficiencies: Array.from(skills), toolProficiencies: Array.from(tools), spellScroll
+    targetItem: itemRef(item),
+    targetQuantity: resolveBundleSize(item),
+    img: item.img, skillProficiencies: Array.from(skills), toolProficiencies: Array.from(tools), spellScroll,
+    ...(proficiencyMode ? { proficiencyMode } : {})
   };
 }

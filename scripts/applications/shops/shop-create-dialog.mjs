@@ -1,6 +1,8 @@
-import { DEFAULT_STOCK_BY_TYPE, defaultStockKey, MODULE_ID, SETTING_KEYS, STARTER_PACKS } from "../../config.mjs";
+import {
+  DEFAULT_STOCK_BY_TYPE, defaultStockKey, LEGACY_IDENTIFIERS, MODULE_ID, SETTING_KEYS, STARTER_PACKS, STARTER_SOURCES
+} from "../../config.mjs";
 import { newEntryStock, Shop } from "../../data/shop-data.mjs";
-import { resolveIdentifierIndex } from "../../utils.mjs";
+import { bulkFromUuid, itemRef } from "../../utils.mjs";
 import ShopSheet from "./shop-sheet.mjs";
 
 const { Dialog5e } = game.dnd5e.applications.api;
@@ -94,12 +96,13 @@ export default class ShopCreateDialog extends Dialog5e {
   static async #onSubmit(event, form, formData) {
     const data = foundry.utils.expandObject(formData.object);
     const packs = getStarterPackOptions();
-    const starterItems = getStarterItems(data.starterPack);
-    const byIdentifier = await resolveIdentifierIndex(new Set(starterItems.map(i => i.identifier)));
-    const resolvedItems = await Promise.all(starterItems.map(({ identifier }) => {
-      const uuid = byIdentifier.get(identifier)?.uuid;
-      return uuid ? fromUuid(uuid) : null;
-    }));
+    const modern = game.dnd5e.settings.rulesVersion === "modern";
+    const identifiers = (STARTER_PACKS[data.starterPack]?.items ?? [])
+      .map(identifier => modern ? identifier : (LEGACY_IDENTIFIERS[identifier] ?? identifier));
+    const byIdentifier = identifiers.length ? await getStarterUuids(modern) : new Map();
+    const uuids = identifiers.map(identifier => byIdentifier.get(identifier)).filter(_ => _);
+    const documents = await bulkFromUuid(uuids);
+    const items = uuids.map(uuid => documents.get(uuid)).filter(_ => _);
     const stockDefaults = {
       byType: Object.fromEntries(
         Object.keys(DEFAULT_STOCK_BY_TYPE).map(type => [type, game.settings.get(MODULE_ID, defaultStockKey(type))])
@@ -113,9 +116,8 @@ export default class ShopCreateDialog extends Dialog5e {
       buyModifier: game.settings.get(MODULE_ID, SETTING_KEYS.DEFAULT_BUY_MODIFIER),
       sellModifier: game.settings.get(MODULE_ID, SETTING_KEYS.DEFAULT_SELL_MODIFIER),
       goldPool: { max: { gp: goldPool }, current: { gp: goldPool }, unlimited: false },
-      items: starterItems.map(({ identifier, bundleSize }, index) => {
-        return { identifier, bundleSize, ...newEntryStock(resolvedItems[index], stockDefaults) };
-      })
+      stockDefaults,
+      items: items.map(item => ({ ...itemRef(item), ...newEntryStock(item, stockDefaults) }))
     };
     const created = await Shop.create(newShop);
     this.shopManager.render();
@@ -127,14 +129,22 @@ export default class ShopCreateDialog extends Dialog5e {
 /* -------------------------------------------- */
 
 /**
- * Get the item identifiers included in a starter pack.
- * @param {string} pack  Starter pack key.
- * @returns {{ identifier: string, bundleSize: number|null }[]}
+ * Get the UUIDs of the items offered to starter packs, from the first compendium that has them.
+ * @param {boolean} modern  Whether the world uses the modern rules.
+ * @returns {Promise<Map<string, string>>}  Identifier of the item mapped to its UUID.
  */
-function getStarterItems(pack) {
-  return (STARTER_PACKS[pack]?.items ?? []).map(item => typeof item === "string"
-    ? { identifier: item, bundleSize: null }
-    : { identifier: item.identifier, bundleSize: item.bundleSize ?? null });
+async function getStarterUuids(modern) {
+  const rules = modern ? "modern" : "legacy";
+  const packs = STARTER_SOURCES[rules].map(name => game.packs.get(name)).filter(_ => _);
+  const byIdentifier = new Map();
+  for ( const pack of packs ) {
+    for ( const entry of await pack.getIndex({ fields: ["system.container", "system.identifier"] }) ) {
+      if ( entry.system?.container || !CONFIG.Item.dataModels[entry.type]?.inventorySection ) continue;
+      const identifier = entry.system?.identifier || game.dnd5e.utils.formatIdentifier(entry.name);
+      if ( !byIdentifier.has(identifier) ) byIdentifier.set(identifier, entry.uuid);
+    }
+  }
+  return byIdentifier;
 }
 
 /* -------------------------------------------- */

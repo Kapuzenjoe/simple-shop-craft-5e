@@ -1,0 +1,31 @@
+<section class="log-content">
+    <input type="search" name="search" class="log-search"
+           placeholder="{{ localize 'SIMPLE_SHOP_CRAFT_5E.TransactionLog.Search' }}">
+    <div class="log-entries">
+        {{#each entries}}
+        <div class="log-entry">
+            <span class="log-time"{{#if this.worldTime}} data-tooltip="{{ this.worldTime }}"{{/if}}>{{ this.time }}</span>
+            {{#if ../showShop}}<span class="log-shop">[{{ this.shopName }}]</span>{{/if}}
+            <span class="log-actor">{{ this.actorName }}</span>
+            {{#if this.bought}}<span class="log-bought">{{ localize "SIMPLE_SHOP_CRAFT_5E.TransactionLog.Bought" items=this.bought }}</span>{{/if}}
+            {{#if this.sold}}<span class="log-sold">{{ localize "SIMPLE_SHOP_CRAFT_5E.TransactionLog.Sold" items=this.sold }}</span>{{/if}}
+            <span class="log-net">{{ localize "SIMPLE_SHOP_CRAFT_5E.TransactionLog.Net" amount=this.net }}</span>
+        </div>
+        {{else}}
+        <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.TransactionLog.Empty" }}</p>
+        {{/each}}
+    </div>
+    <footer class="log-actions">
+        {{#unless showShop}}
+        <button type="button" data-action="exportLog">
+            <i class="fa-solid fa-file-export" inert></i> {{ localize "SIMPLE_SHOP_CRAFT_5E.TransactionLog.Export" }}
+        </button>
+        <button type="button" data-action="importLog">
+            <i class="fa-solid fa-file-import" inert></i> {{ localize "SIMPLE_SHOP_CRAFT_5E.TransactionLog.Import" }}
+        </button>
+        {{/unless}}
+        <button type="button" data-action="clearLog">
+            <i class="fa-solid fa-trash" inert></i> {{ localize "SIMPLE_SHOP_CRAFT_5E.TransactionLog.Clear" }}
+        </button>
+    </footer>
+</section>

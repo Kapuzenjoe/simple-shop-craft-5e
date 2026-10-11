@@ -1,0 +1,11 @@
+<fieldset>
+    <legend>{{ legend }}</legend>
+    {{> "dnd5e.fieldlist" typeFields }}
+</fieldset>
+
+{{#each typeFieldsets}}
+<fieldset>
+    <legend>{{ this.label }}</legend>
+    {{> "dnd5e.fieldlist" this.fields }}
+</fieldset>
+{{/each}}

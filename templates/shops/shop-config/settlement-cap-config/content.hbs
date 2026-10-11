@@ -1,12 +1,12 @@
 <section class="tab active settlement-cap-content">
     <fieldset>
         <legend>{{ localize legend }}</legend>
-        {{> "dnd5e.fieldlist" fields}}
+        {{> "modules/simple-shop-craft-5e/templates/shared/fieldlist.hbs" fields}}
     </fieldset>
     {{#if customFields}}
     <fieldset>
         <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.Custom" }}</legend>
-        {{> "dnd5e.fieldlist" customFields}}
+        {{> "modules/simple-shop-craft-5e/templates/shared/fieldlist.hbs" customFields}}
     </fieldset>
     {{/if}}
 </section>

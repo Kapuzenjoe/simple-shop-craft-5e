@@ -1,16 +1,17 @@
 import {
-  DEFAULT_STOCK_BY_TYPE, MAGIC_EXEMPT_TYPES, RESTOCK_MODES, SETTING_KEYS, STOCK_MAGIC_RULES
+  DEFAULT_STOCK_BY_TYPE, MAGIC_EXEMPT_TYPES, MODULE_ID, RESTOCK_MODES, SETTING_KEYS, STOCK_MAGIC_RULES
 } from "../config.mjs";
 import { calendariaDayOfWeek, isCalendariaActive } from "../integrations/calendaria.mjs";
 import {
-  breakdownCopper, currencyRows, deductActorCurrencyChecked, isCalendarModeActive, secondsPerDay, itemRefKey,
-  needsDefaultPrice, resolveEntries, resolveItemPrice, shouldHandleWorldTimeAdvance, toCopper
+  breakdownCopper, currencyRows, deductActorCurrencyChecked, isCalendarModeActive, findStack,
+  secondsPerDay, itemRefKey, matchesTypeFilter, resolveEntries, resolveItemPrice, shouldHandleWorldTimeAdvance, toCopper
 } from "../utils.mjs";
 import { EnchantedItemBlueprint } from "./enchanted-item-blueprint.mjs";
 import { HirelingBlueprint } from "./hireling-blueprint.mjs";
 import { LodgingBlueprint } from "./lodging-blueprint.mjs";
 import SettingCollectionMixin from "./setting-collection-mixin.mjs";
 import { SpellScrollBlueprint } from "./spell-scroll-blueprint.mjs";
+import Transaction from "./transaction-data.mjs";
 
 const {
   ArrayField, BooleanField, DocumentIdField, DocumentUUIDField, EmbeddedDataField, FilePathField, HTMLField,
@@ -23,7 +24,7 @@ const {
 
 /**
  * A data model that represents a single item entry within a shop.
- * Most entries use `identifier`. `uuid` is used instead for one-off items with no `system.identifier` match.
+ * Item entries reference their item by `uuid`. Entries without one are resolved by their `identifier`.
  * @extends {foundry.abstract.DataModel<ShopItemEntryData>}
  * @mixes ShopItemEntryData
  */
@@ -80,39 +81,56 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
   /* -------------------------------------------- */
 
   /**
-   * Stable key identifying a shop item entry — a composite of the generation blueprint for generated
-   * entries, the spell UUID for spell scroll entries, otherwise the generic identifier/uuid key.
+   * Stable key identifying the item an entry offers — a composite of the generation blueprint for generated
+   * entries, the spell UUID for spell scroll entries, otherwise the generic identifier/uuid key. Used to detect
+   * items already in the shop; entries themselves are told apart by `_id`.
    * @param {ShopItemEntryData} entry
+   * @param {Item5e|object|null} [item]  The item the entry resolves to.
    * @returns {string}
    */
-  static key(entry) {
+  static key(entry, item) {
     if ( entry.generated ) {
       const { baseItemUuid, enchantItemUuid, effectId, spellUuid } = entry.generated;
       return [baseItemUuid, enchantItemUuid, effectId, ...(spellUuid ? [spellUuid] : [])].join("|");
     }
     if ( entry.spellScroll ) return entry.spellScroll.spellUuid;
-    return itemRefKey(entry) || entry._id;
+    return itemRefKey(entry, item) || entry._id;
   }
 
   /* -------------------------------------------- */
 
   /**
-   * Resolve a batch of shop item entries (by `identifier` or `uuid`) to their referenced items.
-   * Generated and spell scroll entries are synthesized fresh from their blueprint instead.
+   * Index a batch of shop item entries by their key. The first entry wins if several share a key.
+   * @param {ShopItemEntryData[]} entries
+   * @returns {Promise<Map<string, ShopItemEntryData>>}
+   */
+  static async byKey(entries) {
+    const resolved = await resolveEntries(entries);
+    const items = new Map(resolved.map(({ entry, item }) => [entry, item]));
+    const byKey = new Map();
+    for ( const entry of entries ) {
+      const key = ShopItemEntry.key(entry, items.get(entry));
+      if ( !byKey.has(key) ) byKey.set(key, entry);
+    }
+    return byKey;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Resolve a batch of shop item entries to their referenced items.
+   * Generated, spell scroll, lodging, and hireling entries are synthesized fresh from their blueprint instead.
    * @param {ShopItemEntryData[]} entries
    * @returns {Promise<{ entry: ShopItemEntryData, item: object|null }[]>}
    */
   static async resolveMany(entries) {
-    const plain = entries.filter(e => !e.generated && !e.spellScroll && !e.lodging && !e.hireling);
-    const plainResolved = await resolveEntries(plain);
-    const byEntry = new Map(plainResolved.map(r => [r.entry, r]));
-
-    return Promise.all(entries.map(async entry => {
+    const resolved = await resolveEntries(entries);
+    return Promise.all(resolved.map(async ({ entry, item }) => {
       if ( entry.generated ) return { entry, item: await new EnchantedItemBlueprint(entry.generated).resolve() };
       if ( entry.spellScroll ) return { entry, item: await new SpellScrollBlueprint(entry.spellScroll).resolve() };
       if ( entry.lodging ) return { entry, item: new LodgingBlueprint(entry.lodging).resolve() };
       if ( entry.hireling ) return { entry, item: await new HirelingBlueprint(entry.hireling).resolve() };
-      return byEntry.get(entry);
+      return { entry, item };
     }));
   }
 }
@@ -154,6 +172,14 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
 
   /* -------------------------------------------- */
 
+  /**
+   * Queue serializing the application of accepted purchases on this client.
+   * @type {foundry.utils.Semaphore}
+   */
+  static #purchases = new foundry.utils.Semaphore(1);
+
+  /* -------------------------------------------- */
+
   /** @override */
   static LOCALIZATION_PREFIXES = ["SIMPLE_SHOP_CRAFT_5E.SHOP"];
 
@@ -169,6 +195,7 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
       buyModifier: new NumberField({ required: true, initial: 0, integer: true, min: -100, max: 1000 }),
       sellModifier: new NumberField({ required: true, initial: -50, integer: true, min: -100, max: 1000 }),
       fixedValueLootTypes: new SetField(new StringField(), { initial: ["gem", "art"] }),
+      sellTypes: new TypedObjectField(new SetField(new StringField())),
       playerDiscounts: new ArrayField(new EmbeddedDataField(ShopPlayerDiscount)),
       npc: new DocumentUUIDField({ type: "Actor", blank: true }),
       location: new StringField({ blank: true }),
@@ -239,6 +266,21 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
   /* -------------------------------------------- */
 
   /**
+   * Delete a shop along with its transaction log entries.
+   * @inheritDoc
+   */
+  static async delete(id) {
+    await super.delete(id);
+    try {
+      await Transaction.deleteWhere(entry => entry.shopId === id);
+    } catch ( err ) {
+      console.warn(`${MODULE_ID} | Failed to remove the transaction log entries of shop ${id}:`, err);
+    }
+  }
+
+  /* -------------------------------------------- */
+
+  /**
    * Resolve this shop's effective gold pool for buy-back transactions, summed to copper.
    * @returns {number|null}  Copper amount available, or `null` if unlimited (no cap enforced).
    */
@@ -247,6 +289,19 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
     return Object.entries(this.goldPool.current ?? {}).reduce((sum, [denom, value]) => {
       return value ? sum + toCopper(value, denom) : sum;
     }, 0);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Whether this shop buys an item from players: any item if no accepted types are set, otherwise only items
+   * of those types and subtypes.
+   * @param {Item5e} item
+   * @returns {boolean}
+   */
+  acceptsSellItem(item) {
+    return foundry.utils.isEmpty(this.sellTypes)
+      || matchesTypeFilter(this.sellTypes, item.type, item.system.type?.value);
   }
 
   /* -------------------------------------------- */
@@ -277,7 +332,9 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
    * @returns {boolean}
    */
   isHagglingLocked(actorUuid, skill) {
-    return !!(actorUuid && this.playerDiscounts.find(pd => pd.actor === actorUuid)?.hagglingLocks?.[skill]);
+    const locks = actorUuid ? this.playerDiscounts.find(pd => pd.actor === actorUuid)?.hagglingLocks : null;
+    const lock = locks?.[skill];
+    return (lock != null) && ((game.time.worldTime - lock) < secondsPerDay());
   }
 
   /* -------------------------------------------- */
@@ -288,8 +345,8 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
    * @returns {boolean}
    */
   hasHagglingLocks(actorUuid) {
-    const locks = actorUuid && this.playerDiscounts.find(pd => pd.actor === actorUuid)?.hagglingLocks;
-    return !!locks && (Object.keys(locks).length > 0);
+    const locks = actorUuid ? this.playerDiscounts.find(pd => pd.actor === actorUuid)?.hagglingLocks : null;
+    return Object.keys(locks ?? {}).some(skill => this.isHagglingLocked(actorUuid, skill));
   }
 
   /* -------------------------------------------- */
@@ -317,8 +374,8 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
     const openMinutes = (this.openHour * 60) + this.openMinute;
     const closeMinutes = (this.closeHour * 60) + this.closeMinute;
     return (openMinutes > closeMinutes)
-      ? (minutesNow >= openMinutes) || (minutesNow <= closeMinutes)
-      : (minutesNow >= openMinutes) && (minutesNow <= closeMinutes);
+      ? (minutesNow >= openMinutes) || (minutesNow < closeMinutes)
+      : (minutesNow >= openMinutes) && (minutesNow < closeMinutes);
   }
 
   /* -------------------------------------------- */
@@ -393,6 +450,17 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
    * @returns {Promise<{ ok: true }|{ ok: false, error: string }>}
    */
   static async applyPurchase(purchase) {
+    return Shop.#purchases.add(() => Shop.#applyPurchase(purchase));
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Apply a purchase once all earlier ones have been applied.
+   * @param {object} purchase  Purchase flag data.
+   * @returns {Promise<{ ok: true }|{ ok: false, error: string }>}
+   */
+  static async #applyPurchase(purchase) {
     const actor = fromUuidSync(purchase.actorUuid);
     if ( !actor ) return { ok: false, error: "SIMPLE_SHOP_CRAFT_5E.PurchaseCard.MissingActor" };
 
@@ -405,7 +473,7 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
     }
 
     for ( const line of purchase.buyLines ) {
-      const entry = shop.items.find(i => ShopItemEntry.key(i) === ShopItemEntry.key(line));
+      const entry = shop.items.find(i => i._id === line._id);
       const current = (entry && (entry.restockMode !== "unlimited")) ? (entry.stock.current ?? 0) : null;
       if ( (current !== null) && (current < line.quantity) ) {
         return { ok: false, error: "SIMPLE_SHOP_CRAFT_5E.PurchaseCard.InsufficientStock" };
@@ -416,6 +484,9 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
       const owned = actor.items.get(line.itemId);
       if ( !owned || (owned.system.quantity < line.quantity) ) {
         return { ok: false, error: "SIMPLE_SHOP_CRAFT_5E.PurchaseCard.InsufficientSellQuantity" };
+      }
+      if ( !shop.acceptsSellItem(owned) ) {
+        return { ok: false, error: "SIMPLE_SHOP_CRAFT_5E.PurchaseCard.SellTypeNotAccepted" };
       }
     }
 
@@ -430,19 +501,16 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
       }))
     );
     const itemsToCreate = [];
-    const itemUpdates = [];
+    const quantities = new Map();
+    const currentQuantity = id => quantities.get(id) ?? actor.items.get(id).system.quantity;
     for ( const [index, line] of purchase.buyLines.entries() ) {
       if ( line.isService ) continue;
       const indexEntry = resolved[index].item;
       const totalQuantity = line.quantity * line.bundleSize;
 
-      const existing = line.identifier
-        ? actor.items.find(i => i.system.identifier === line.identifier)
-        : (line.generated && indexEntry?.system.identifier
-          ? actor.items.find(i => i.system.identifier === indexEntry.system.identifier)
-          : null);
-      if ( existing && (existing.type !== "container") ) {
-        itemUpdates.push({ _id: existing.id, "system.quantity": existing.system.quantity + totalQuantity });
+      const existing = findStack(actor, indexEntry);
+      if ( existing ) {
+        quantities.set(existing.id, currentQuantity(existing.id) + totalQuantity);
         continue;
       }
 
@@ -452,24 +520,30 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
       if ( !fullItem ) return { ok: false, error: "SIMPLE_SHOP_CRAFT_5E.PurchaseCard.MissingItem" };
       const itemData = fullItem.toObject();
       delete itemData._id;
-      if ( needsDefaultPrice(fullItem) ) {
+      if ( !fullItem.system.price?.value ) {
         const defaultPrice = resolveItemPrice(fullItem);
         if ( defaultPrice ) itemData.system.price = defaultPrice;
       }
       if ( fullItem.type === "container" ) {
-        for ( let i = 0; i < totalQuantity; i++ ) itemsToCreate.push(foundry.utils.deepClone(itemData));
+        const copies = Array.from({ length: totalQuantity }, () => fullItem);
+        itemsToCreate.push(...await Item.implementation.createWithContents(copies, {
+          transformFirst: () => foundry.utils.deepClone(itemData)
+        }));
       } else {
         itemData.system.quantity = totalQuantity;
         itemsToCreate.push(itemData);
       }
     }
 
-    const itemsToDelete = [];
     for ( const line of purchase.sellLines ) {
-      const owned = actor.items.get(line.itemId);
-      const remaining = owned.system.quantity - line.quantity;
-      if ( remaining > 0 ) itemUpdates.push({ _id: line.itemId, "system.quantity": remaining });
-      else itemsToDelete.push(line.itemId);
+      quantities.set(line.itemId, currentQuantity(line.itemId) - line.quantity);
+    }
+
+    const itemUpdates = [];
+    const itemsToDelete = [];
+    for ( const [id, quantity] of quantities ) {
+      if ( quantity > 0 ) itemUpdates.push({ _id: id, "system.quantity": quantity });
+      else itemsToDelete.push(id);
     }
 
     if ( purchase.netCP < 0 ) {
@@ -481,25 +555,21 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
       await game.dnd5e.applications.Award.awardCurrency(amounts, [actor]);
     }
 
-    if ( itemsToCreate.length ) await actor.createEmbeddedDocuments("Item", itemsToCreate);
+    if ( itemsToCreate.length ) await actor.createEmbeddedDocuments("Item", itemsToCreate, { keepId: true });
     if ( itemUpdates.length ) await actor.updateEmbeddedDocuments("Item", itemUpdates);
     if ( itemsToDelete.length ) await actor.deleteEmbeddedDocuments("Item", itemsToDelete);
 
     await Shop.update(shop._id, freshShop => {
       const items = freshShop.items.map(entry => {
-        const line = purchase.buyLines.find(l => ShopItemEntry.key(l) === ShopItemEntry.key(entry));
+        const line = purchase.buyLines.find(l => l._id === entry._id);
         if ( !line || (entry.restockMode === "unlimited") ) return entry.toObject();
         return { ...entry.toObject(), stock: { ...entry.stock, current: (entry.stock.current ?? 0) - line.quantity } };
       });
-      for ( const line of purchase.sellLines ) {
-        if ( !line.identifier ) continue;
-        const existing = items.find(i => i.identifier === line.identifier);
-        if ( existing && (existing.stock.current !== null) ) existing.stock.current += line.quantity;
-      }
 
       const goldPool = { ...freshShop.goldPool };
-      if ( effectiveGoldCurrent !== null ) {
-        const parts = breakdownCopper(effectiveGoldCurrent - purchase.netCP);
+      const effectiveGold = freshShop.effectiveGoldPool();
+      if ( effectiveGold !== null ) {
+        const parts = breakdownCopper(effectiveGold - purchase.netCP);
         goldPool.current = Object.fromEntries(parts.map(p => [p.denomination, p.value]));
       }
 
@@ -512,44 +582,26 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
   /* -------------------------------------------- */
 
   /**
-   * Restock due shops and clear expired haggling locks.
-   * @param {number} worldTime
+   * Restock due shops.
    * @param {number[]|null} weekdaysPassed  Weekday indices crossed since the last check, or `null` for a
    *   full week or more.
    * @returns {Promise<void>}
    */
-  static async handleDayChange(worldTime, weekdaysPassed) {
+  static async handleDayChange(weekdaysPassed) {
     if ( !game.user.isActiveGM ) return;
 
-    const perDay = secondsPerDay();
     for ( const shop of Shop.getAll() ) {
-      const updateData = {};
-
       const restockDue = weekdaysPassed === null
         ? (shop.restockWeekdays.size > 0)
         : weekdaysPassed.some(d => shop.restockWeekdays.has(d));
-      if ( restockDue ) Object.assign(updateData, await shop.restockUpdates());
-
-      let hagglingChanged = false;
-      const playerDiscounts = shop.playerDiscounts.map(pd => {
-        const locks = pd.hagglingLocks ?? {};
-        const remaining = Object.fromEntries(
-          Object.entries(locks).filter(([, timestamp]) => Math.floor((worldTime - timestamp) / perDay) < 1)
-        );
-        if ( Object.keys(remaining).length === Object.keys(locks).length ) return pd.toObject();
-        hagglingChanged = true;
-        return { ...pd.toObject(), hagglingLocks: remaining };
-      });
-      if ( hagglingChanged ) updateData.playerDiscounts = playerDiscounts;
-
-      if ( Object.keys(updateData).length ) await Shop.update(shop._id, updateData);
+      if ( restockDue ) await Shop.update(shop._id, await shop.restockUpdates());
     }
   }
 
   /* -------------------------------------------- */
 
   /**
-   * Handle Foundry's `updateWorldTime` hook, restocking due shops and clearing expired haggling locks.
+   * Handle Foundry's `updateWorldTime` hook, restocking due shops.
    * @param {number} worldTime
    * @param {number} dt
    * @returns {Promise<void>}
@@ -566,7 +618,7 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
     const weekdaysPassed = (midnights >= weekLength)
       ? null
       : Array.from({ length: midnights }, (_, i) => (dayOfWeek - i + weekLength) % weekLength);
-    await Shop.handleDayChange(worldTime, weekdaysPassed);
+    await Shop.handleDayChange(weekdaysPassed);
   }
 }
 
