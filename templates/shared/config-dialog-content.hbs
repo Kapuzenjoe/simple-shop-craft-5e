@@ -1,6 +1,7 @@
 <section class="tab active config-content">
     <fieldset>
         <legend>{{ localize legend }}</legend>
+        {{#if hint}}<p class="hint">{{ hint }}</p>{{/if}}
         {{> "modules/simple-shop-craft-5e/templates/shared/fieldlist.hbs" fields}}
     </fieldset>
     {{{ extraContent }}}

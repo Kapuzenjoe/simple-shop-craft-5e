@@ -408,7 +408,8 @@ export default class RecipeSheet extends Application5e {
   static async #onSubmit(event, form, formData) {
     const data = foundry.utils.expandObject(formData.object);
     if ( data.durationOverride ) data.durationOverride.value ??= null;
-    if ( data.targetItem?.uuid && (data.targetItem.uuid !== this.recipe.targetItem.uuid) ) {
+    if ( data.targetItem?.uuid === this.recipe.targetItem.uuid ) delete data.targetItem;
+    if ( data.targetItem?.uuid ) {
       const item = await fromUuid(data.targetItem.uuid);
       if ( item ) {
         Object.assign(data, getTargetItemUpdate(

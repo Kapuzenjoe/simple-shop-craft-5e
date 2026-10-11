@@ -525,7 +525,10 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
         if ( defaultPrice ) itemData.system.price = defaultPrice;
       }
       if ( fullItem.type === "container" ) {
-        for ( let i = 0; i < totalQuantity; i++ ) itemsToCreate.push(foundry.utils.deepClone(itemData));
+        const copies = Array.from({ length: totalQuantity }, () => fullItem);
+        itemsToCreate.push(...await Item.implementation.createWithContents(copies, {
+          transformFirst: () => foundry.utils.deepClone(itemData)
+        }));
       } else {
         itemData.system.quantity = totalQuantity;
         itemsToCreate.push(itemData);
@@ -552,7 +555,7 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
       await game.dnd5e.applications.Award.awardCurrency(amounts, [actor]);
     }
 
-    if ( itemsToCreate.length ) await actor.createEmbeddedDocuments("Item", itemsToCreate);
+    if ( itemsToCreate.length ) await actor.createEmbeddedDocuments("Item", itemsToCreate, { keepId: true });
     if ( itemUpdates.length ) await actor.updateEmbeddedDocuments("Item", itemUpdates);
     if ( itemsToDelete.length ) await actor.deleteEmbeddedDocuments("Item", itemsToDelete);
 

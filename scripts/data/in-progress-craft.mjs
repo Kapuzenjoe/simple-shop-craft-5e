@@ -389,8 +389,9 @@ export class InProgressCraft extends foundry.abstract.DataModel {
         { _id: existing.id, "system.quantity": existing.system.quantity + itemData.system.quantity }
       ]);
     } else if ( fullItem.type === "container" ) {
-      const copies = Array.from({ length: this.targetQuantity }, () => foundry.utils.deepClone(itemData));
-      await actor.createEmbeddedDocuments("Item", copies);
+      const copies = Array.from({ length: this.targetQuantity }, () => fullItem);
+      const toCreate = await Item.implementation.createWithContents(copies);
+      await actor.createEmbeddedDocuments("Item", toCreate, { keepId: true });
     } else {
       await actor.createEmbeddedDocuments("Item", [itemData]);
     }
