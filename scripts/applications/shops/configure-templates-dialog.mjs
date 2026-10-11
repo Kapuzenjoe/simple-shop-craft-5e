@@ -1,4 +1,6 @@
+import { ENSPELLED_ITEMS } from "../../config.mjs";
 import { EnchantedItemBlueprint } from "../../data/enchanted-item-blueprint.mjs";
+import GeneratorProfile from "../../data/generator-profile.mjs";
 import { createSpellScroll } from "../../utils.mjs";
 
 const { Dialog5e } = game.dnd5e.applications.api;
@@ -21,8 +23,10 @@ export default class ConfigureTemplatesDialog extends Dialog5e {
       : {
         kind: "enchant", item: t.item,
         profiles: EnchantedItemBlueprint.getEnchantmentProfiles(t.item)
+          .map((profile, level) => ({ ...profile, level }))
           .filter(p => EnchantedItemBlueprint.resolveProfileRarity(t.item, p.effect) !== "artifact"),
-        profileIndex: 0, candidates: null, baseItem: null, imgOverride: "", identifierOverride: ""
+        profileIndex: 0, candidates: null, baseItem: null, spell: null, spellOptions: [],
+        imgOverride: "", identifierOverride: ""
       });
   }
 
@@ -91,10 +95,17 @@ export default class ConfigureTemplatesDialog extends Dialog5e {
       const identifierPreview = (row.kind === "spellScroll")
         ? (row.previewScroll?.system.identifier ?? "")
         : (row.baseItem
-          ? EnchantedItemBlueprint.resolveIdentifier(row.baseItem, row.item, row.profiles[row.profileIndex].effect)
+          ? EnchantedItemBlueprint.resolveIdentifier(
+            row.baseItem, row.item, row.profiles[row.profileIndex].effect, row.spell
+          )
           : "");
       return {
         index, kind: row.kind, itemName: row.item.name, itemImg: row.item.img,
+        needsSpell: isEnspelled(row),
+        spellOptions: isEnspelled(row)
+          ? row.spellOptions.map(spell => ({
+            value: spell.uuid, label: spell.name, selected: spell.uuid === row.spell?.uuid
+          })) : null,
         hasMultipleProfiles: (row.kind === "enchant") && (row.profiles.length > 1),
         profileOptions: (row.kind === "enchant")
           ? row.profiles.map((p, i) => ({ value: i, label: p.effect.name })) : null,
@@ -136,7 +147,7 @@ export default class ConfigureTemplatesDialog extends Dialog5e {
   /** @inheritDoc */
   _onChangeForm(formConfig, event) {
     super._onChangeForm(formConfig, event);
-    const [, prefix, index] = event.target.name?.match(/^(img|identifier|baseItem|profile)-(\d+)$/) ?? [];
+    const [, prefix, index] = event.target.name?.match(/^(img|identifier|baseItem|spell|profile)-(\d+)$/) ?? [];
     if ( !prefix ) return;
     const row = this.#rows[index];
     if ( prefix === "img" ) row.imgOverride = event.target.value;
@@ -144,6 +155,11 @@ export default class ConfigureTemplatesDialog extends Dialog5e {
     else if ( prefix === "baseItem" ) {
       row.baseItem = row.candidates.explicit.find(item => item.uuid === event.target.value) ?? null;
       this.render({ parts: ["content", "footer"] });
+    } else if ( prefix === "spell" ) {
+      fromUuid(event.target.value).then(spell => {
+        row.spell = spell;
+        this.render({ parts: ["content", "footer"] });
+      });
     } else {
       row.profileIndex = Number(event.target.value);
       this.#resolveRowCandidates(row).then(() => this.render({ parts: ["content", "footer"] }));
@@ -219,7 +235,7 @@ export default class ConfigureTemplatesDialog extends Dialog5e {
         ...shared,
         generated: {
           baseItemUuid: row.baseItem.uuid, enchantItemUuid: row.item.uuid, effectId: effect.id,
-          img: row.imgOverride, identifier: row.identifierOverride
+          spellUuid: row.spell?.uuid ?? "", img: row.imgOverride, identifier: row.identifierOverride
         }
       };
     });
@@ -232,14 +248,21 @@ export default class ConfigureTemplatesDialog extends Dialog5e {
   /* -------------------------------------------- */
 
   /**
-   * Resolve and cache the base-item candidates for a row's currently selected profile.
+   * Resolve and cache the base-item and spell candidates for a row's currently selected profile.
    * @param {object} row
    * @returns {Promise<void>}
    */
   async #resolveRowCandidates(row) {
-    const { activity } = row.profiles[row.profileIndex];
+    const { activity, level } = row.profiles[row.profileIndex];
     row.candidates = await EnchantedItemBlueprint.resolveBaseItemCandidates(activity);
-    row.baseItem = row.candidates.explicit?.[0] ?? null;
+    const { explicit } = row.candidates;
+    const keepBaseItem = row.baseItem && (explicit
+      ? explicit.some(item => item.uuid === row.baseItem.uuid) : (activity.canEnchant(row.baseItem) === true));
+    if ( !keepBaseItem ) row.baseItem = explicit?.[0] ?? null;
+    if ( isEnspelled(row) ) {
+      row.spellOptions = await GeneratorProfile.fetchEnspelledSpells(row.item.system.identifier, level);
+      row.spell = row.spellOptions.length ? await fromUuid(row.spellOptions[0].uuid) : null;
+    }
   }
 
   /* -------------------------------------------- */
@@ -249,6 +272,18 @@ export default class ConfigureTemplatesDialog extends Dialog5e {
    * @returns {boolean}
    */
   #isComplete() {
-    return this.#rows.every(row => (row.kind === "spellScroll") ? !!row.spell : !!row.baseItem);
+    return this.#rows.every(row => (row.kind === "spellScroll")
+      ? !!row.spell : (!!row.baseItem && (!isEnspelled(row) || !!row.spell)));
   }
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Does the row's enchanted item bind a spell?
+ * @param {object} row
+ * @returns {boolean}
+ */
+function isEnspelled(row) {
+  return (row.kind === "enchant") && (row.item.system.identifier in ENSPELLED_ITEMS);
 }

@@ -324,6 +324,22 @@ export default class GeneratorProfile extends foundry.abstract.DataModel {
   /* -------------------------------------------- */
 
   /**
+   * Fetch the spells that can be bound into an Enspelled item at a spell level: those of the level and of the
+   * item's allowed schools that belong to the active rules version.
+   * @param {string} identifier  `system.identifier` of the Enspelled item.
+   * @param {number} level       Spell level of the chosen profile.
+   * @returns {Promise<object[]>}
+   */
+  static async fetchEnspelledSpells(identifier, level) {
+    const filters = [{ k: "system.level", v: level }];
+    const schools = ENSPELLED_ITEMS[identifier];
+    if ( schools ) filters.push({ k: "system.school", o: "in", v: schools });
+    return GeneratorProfile.#fetchSpells(filters);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
    * Fetch the spell index entries matching the given filters that belong to the active rules version.
    * @param {FilterDescription[]} filters
    * @returns {Promise<object[]>}
@@ -428,10 +444,7 @@ export default class GeneratorProfile extends foundry.abstract.DataModel {
       if ( !baseItem ) continue;
       const generated = { baseItemUuid: baseItem.uuid, enchantItemUuid: item.uuid, effectId: chosen.effect.id };
       if ( item.system.identifier in ENSPELLED_ITEMS ) {
-        const filters = [{ k: "system.level", v: chosen.level }];
-        const schools = ENSPELLED_ITEMS[item.system.identifier];
-        if ( schools ) filters.push({ k: "system.school", o: "in", v: schools });
-        const spells = await GeneratorProfile.#fetchSpells(filters);
+        const spells = await GeneratorProfile.fetchEnspelledSpells(item.system.identifier, chosen.level);
         if ( !spells.length ) continue;
         generated.spellUuid = spells[Math.floor(Math.random() * spells.length)].uuid;
       }

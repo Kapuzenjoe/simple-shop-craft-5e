@@ -32,6 +32,7 @@
 - Fixed the Configure Templates dialog showing the first base item again after another one was chosen from a list.
 - Fixed crafting a container whose recipe makes more than one producing only a single container.
 - Fixed buying or crafting a container, such as a pack, only giving the empty container without its contents.
+- Fixed Enspelled Armor, Staff, and Weapon added by hand to a shop being sold without a bound spell.
 - Reworked how shops and recipes recognize items:
   - Added warnings for items with the default identifier (the item type, such as "weapon"), shared identifiers, and duplicate shop entries.
   - Added an item type check when recognizing a recipe's materials among a character's items.
