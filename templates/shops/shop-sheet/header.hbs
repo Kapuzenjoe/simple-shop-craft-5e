@@ -105,7 +105,7 @@
                 {{/each}}
             </select>
             <div class="player-area-actions">
-                {{#if actor}}
+                {{#if actor.system.skills}}
                 <button type="button" class="gold-button always-interactive" data-action="haggle" data-tooltip
                         aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.Haggling' }}">
                     <i class="fa-solid fa-handshake" inert></i>

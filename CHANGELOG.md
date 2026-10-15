@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.1
+
+- Added choosing the icon of items in the Generate Item preview by clicking it.
+- Fixed custom items sold in bundles, such as a pack of 20 bullets, being treated as single items (#30).
+- Fixed restocking making items sold out after the default stock of their type was cleared, instead of unlimited.
+- Fixed items sold to a shop not being added back to its stock.
+- Fixed players being able to confirm a purchase in a shop outside its opening hours when its window was already open.
+
 ## 1.0.0
 
 - Added opening a recipe's target item and materials by clicking their name.

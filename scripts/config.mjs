@@ -33,16 +33,13 @@ export const SETTING_KEYS = {
 export const EXCLUDED_PACKS = new Set(["dnd5e.monsterfeatures", "dnd5e.monsterfeatures24", "dnd-monster-manual.features"]);
 
 /**
- * Number of units covered by the price of a bundle, such as 20 arrows, by item identifier.
- * @type {Record<string, number>}
+ * Items whose quantity in the compendium is a default stack and not the amount their price buys, by item
+ * identifier. The value is the rules version the exception is limited to, or `null` for every version.
+ * @type {Record<string, "2014"|"2024"|null>}
  */
-export const BUNDLE_SIZES = {
-  arrows: 20,
-  bolts: 20,
-  "bullets-firearm": 10,
-  "bullets-sling": 20,
-  needles: 50,
-  "spikes-iron": 10
+export const NON_BUNDLE_ITEMS = {
+  "ball-bearings": "2014",
+  "bead-of-force": null
 };
 
 /**

@@ -1,5 +1,5 @@
 import { PurchaseMessageData } from "../../data/purchase-message.mjs";
-import { breakdownCopper } from "../../utils.mjs";
+import { breakdownCopper, canAffordCP } from "../../utils.mjs";
 
 const { Dialog5e } = game.dnd5e.applications.api;
 
@@ -73,14 +73,21 @@ export default class ShopCart extends Dialog5e {
 
     const actor = this.shopSheet.selectedActorUuid ? fromUuidSync(this.shopSheet.selectedActorUuid) : null;
     const balance = { insufficient: false };
-    if ( actor && (netCP < 0) ) {
-      const updates = game.dnd5e.applications.CurrencyManager.getActorCurrencyUpdates(actor, -netCP, "cp", {});
-      balance.insufficient = !updates.remainder.almostEqual(0);
-    }
+    if ( actor && (netCP < 0) ) balance.insufficient = !canAffordCP(actor, -netCP);
 
     const noActiveGM = !game.users.activeGM;
-    const confirmDisabled = noActiveGM || !hasLines || !actor || !!balance.insufficient;
-    return { lines, sellLines, netCP, hasLines, total, actor, balance, noActiveGM, confirmDisabled };
+    const shopClosed = !game.user.isGM && !this.shopSheet.shop.isOpen();
+    const confirmDisabled = noActiveGM || shopClosed || !hasLines || !actor || !!balance.insufficient;
+    return { lines, sellLines, netCP, hasLines, total, actor, balance, noActiveGM, shopClosed, confirmDisabled };
+  }
+
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  async _prepareContext(options) {
+    const context = await super._prepareContext(options);
+    context.state = this.#computeState();
+    return context;
   }
 
   /* -------------------------------------------- */
@@ -88,10 +95,10 @@ export default class ShopCart extends Dialog5e {
   /** @inheritDoc */
   async _prepareContentContext(context, options) {
     context = await super._prepareContentContext(context, options);
-    const state = this.#computeState();
+    const state = context.state;
     const buyRows = state.lines.map(row => ({
       isService: row.entry.isService,
-      img: row.item.img, name: row.item.name, quantity: row.cartQuantity, subtotal: row.subtotal
+      img: row.itemImg, name: row.item.name, quantity: row.cartQuantity, subtotal: row.subtotal
     }));
     context.buyRows = buyRows.filter(row => !row.isService);
     context.serviceRows = buyRows.filter(row => row.isService);
@@ -103,6 +110,7 @@ export default class ShopCart extends Dialog5e {
     context.balance = state.balance;
     context.actor = state.actor;
     context.noActiveGM = state.noActiveGM;
+    context.shopClosed = state.shopClosed;
     return context;
   }
 
@@ -111,8 +119,7 @@ export default class ShopCart extends Dialog5e {
   /** @inheritDoc */
   async _prepareFooterContext(context, options) {
     context = await super._prepareFooterContext(context, options);
-    const state = this.#computeState();
-    context.buttons = [{ action: "confirm", label: "DND5E.Confirm", disabled: state.confirmDisabled }];
+    context.buttons = [{ action: "confirm", label: "DND5E.Confirm", disabled: context.state.confirmDisabled }];
     return context;
   }
 

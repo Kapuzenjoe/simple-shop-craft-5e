@@ -1,4 +1,4 @@
-import { ANY_VALUE, BUNDLE_SIZES, EXCLUDED_PACKS, MODULE_ID, RARITY_DEFAULT_PRICES, SETTING_KEYS } from "./config.mjs";
+import { ANY_VALUE, EXCLUDED_PACKS, MODULE_ID, NON_BUNDLE_ITEMS, RARITY_DEFAULT_PRICES, SETTING_KEYS } from "./config.mjs";
 import { isCalendariaActive } from "./integrations/calendaria.mjs";
 import { isEmberActive } from "./integrations/ember.mjs";
 
@@ -197,6 +197,20 @@ export async function deductActorCurrencyChecked(actor, amountCP) {
   } catch ( err ) {
     return { ok: false, error: err.message };
   }
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Determine whether an actor's currency covers an amount via dnd5e's CurrencyManager, making change as needed.
+ * @param {Actor5e} actor
+ * @param {number} amountCP
+ * @returns {boolean}
+ */
+export function canAffordCP(actor, amountCP) {
+  if ( amountCP <= 0 ) return true;
+  const { remainder } = game.dnd5e.applications.CurrencyManager.getActorCurrencyUpdates(actor, amountCP, "cp", {});
+  return remainder.almostEqual(0);
 }
 
 /* -------------------------------------------- */
@@ -622,13 +636,34 @@ export async function spotlightShop(shopId) {
 /* -------------------------------------------- */
 
 /**
- * Determine how many units the price of an item covers.
+ * Determine how many units the price of a catalog item covers: its quantity, unless the item is listed in
+ * `NON_BUNDLE_ITEMS`. The quantity of an item owned by an actor is the size of its stack, so it resolves to 1.
+ * Use `resolveBundleSizes` for those.
  * @param {Item5e|object|null} item  Item to check.
- * @returns {number}                 The size of the bundle, or 1 if the item is not a mundane bundle.
+ * @returns {number}                 The size of the bundle, or 1 if the item is not a bundle.
  */
 export function resolveBundleSize(item) {
-  const identifier = item?.system.identifier;
-  return Object.hasOwn(BUNDLE_SIZES, identifier) ? BUNDLE_SIZES[identifier] : 1;
+  const { identifier, quantity, source } = item?.system ?? {};
+  if ( item?.isEmbedded || !(quantity > 1) ) return 1;
+  if ( Object.hasOwn(NON_BUNDLE_ITEMS, identifier) ) {
+    const rules = NON_BUNDLE_ITEMS[identifier];
+    if ( !rules || (source?.rules === rules) ) return 1;
+  }
+  return quantity;
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Determine how many units the price of each of an actor's items covers, from the catalog item with the same
+ * `system.identifier`.
+ * @param {Item5e[]} items                Items owned by an actor.
+ * @returns {Promise<Map<string, number>>}  The size of the bundle per item id.
+ */
+export async function resolveBundleSizes(items) {
+  const identifiers = new Set(items.map(item => item.system.identifier).filter(Boolean));
+  const catalog = await findCatalogItems(identifiers);
+  return new Map(items.map(item => [item.id, resolveBundleSize(catalog.get(item.system.identifier))]));
 }
 
 /* -------------------------------------------- */
@@ -683,9 +718,9 @@ export async function resolveEntries(entries) {
   const missing = resolved.filter(({ entry, item }) => !item && entry.identifier).map(({ entry }) => entry);
   if ( !missing.length ) return resolved;
 
-  const uuids = await resolveIdentifiers(new Set(missing.map(({ identifier }) => identifier)));
-  const found = missing.filter(({ identifier }) => uuids.has(identifier));
-  for ( const entry of found ) entry.uuid = uuids.get(entry.identifier);
+  const catalog = await findCatalogItems(new Set(missing.map(({ identifier }) => identifier)));
+  const found = missing.filter(({ identifier }) => catalog.has(identifier));
+  for ( const entry of found ) entry.uuid = catalog.get(entry.identifier).uuid;
   const retried = new Map((await fetchEntries(found)).map(({ entry, item }) => [entry, item]));
   return resolved.map(result => {
     return retried.has(result.entry) ? { entry: result.entry, item: retried.get(result.entry) } : result;
@@ -716,18 +751,18 @@ async function fetchEntries(entries) {
 /* -------------------------------------------- */
 
 /**
- * Resolve a batch of `system.identifier`s to the UUID of an item. Items of the current rules version are
+ * Find the catalog item of each of a batch of `system.identifier`s. Items of the current rules version are
  * preferred, and compendium items over items of the world's Items directory.
  * @param {Set<string>} identifiers
- * @returns {Promise<Map<string, string>>}  UUID of the matching item per identifier, when found.
+ * @returns {Promise<Map<string, object>>}  Matching item or compendium index entry per identifier, when found.
  */
-async function resolveIdentifiers(identifiers) {
-  const uuids = new Map();
-  if ( !identifiers.size ) return uuids;
+async function findCatalogItems(identifiers) {
+  const items = new Map();
+  if ( !identifiers.size ) return items;
   const rules = (game.dnd5e.settings.rulesVersion === "modern") ? "2024" : "2014";
   const index = await game.dnd5e.applications.CompendiumBrowser.fetch(Item, {
     filters: [{ k: "system.identifier", o: "in", v: identifiers }],
-    indexFields: new Set(["system.source"]),
+    indexFields: new Set(["system.quantity", "system.source"]),
     sort: false
   });
   const rank = ({ system }) => ((system.source?.rules ?? rules) === rules) ? 0 : 1;
@@ -736,9 +771,9 @@ async function resolveIdentifiers(identifiers) {
       && CONFIG.Item.dataModels[item.type]?.inventorySection;
   });
   for ( const item of candidates.sort((a, b) => rank(a) - rank(b)) ) {
-    if ( !uuids.has(item.system.identifier) ) uuids.set(item.system.identifier, item.uuid);
+    if ( !items.has(item.system.identifier) ) items.set(item.system.identifier, item);
   }
-  return uuids;
+  return items;
 }
 
 /* -------------------------------------------- */
@@ -770,11 +805,13 @@ export function resolveItemPrice(item, { rarity, isAmmo, isConsumable }={}) {
  * @param {Item5e} item                    The item being priced.
  * @param {object} [options]
  * @param {boolean} [options.fallback=true]  Fall back to the rarity-based price if the item has no price.
+ * @param {number} [options.bundleSize]      Size of the bundle of an item owned by an actor, from
+ *   `resolveBundleSizes`. Defaults to `resolveBundleSize(item)`.
  * @returns {{ value: number, denomination: string }|null}  Price per unit, or `null` if the item has none.
  */
-export function resolveUnitPrice(item, { fallback=true }={}) {
+export function resolveUnitPrice(item, { fallback=true, bundleSize=resolveBundleSize(item) }={}) {
   const { value, denomination } = item?.system.price ?? {};
-  if ( value ) return { value: value / resolveBundleSize(item), denomination };
+  if ( value ) return { value: value / bundleSize, denomination };
   const price = fallback ? resolveItemPrice(item) : null;
   return price?.value ? price : null;
 }

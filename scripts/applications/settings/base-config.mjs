@@ -89,7 +89,7 @@ export default class BaseSettingsConfig extends HandlebarsApplicationMixin(Appli
       if ( !setting ) continue;
       const prior = game.settings.get(setting.namespace, setting.key);
       await game.settings.set(setting.namespace, setting.key, value);
-      if ( setting.requiresReload && !foundry.utils.objectsEqual(prior, value) ) {
+      if ( setting.requiresReload && !foundry.utils.equals(prior, value) ) {
         requiresClientReload ||= setting.scope !== "world";
         requiresWorldReload ||= setting.scope === "world";
       }

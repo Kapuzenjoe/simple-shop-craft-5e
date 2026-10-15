@@ -1,4 +1,11 @@
+{{#if iconAction}}
+<button type="button" class="unbutton" data-action="{{ iconAction }}" data-index="{{ index }}"
+        data-tooltip aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.Icon' }}">
+    {{ dnd5e-icon img alt=name classes="item-image gold-icon" }}
+</button>
+{{else}}
 {{ dnd5e-icon img alt=name classes="item-image gold-icon" }}
+{{/if}}
 <div class="name name-stacked">
     <span class="title">
         {{ name }}

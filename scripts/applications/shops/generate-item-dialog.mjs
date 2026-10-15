@@ -45,7 +45,8 @@ export default class GenerateItemDialog extends Dialog5e {
       generate: GenerateItemDialog.#generate,
       add: GenerateItemDialog.#add,
       reroll: GenerateItemDialog.#reroll,
-      remove: GenerateItemDialog.#remove
+      remove: GenerateItemDialog.#remove,
+      editImage: GenerateItemDialog.#editImage
     }
   };
 
@@ -320,12 +321,13 @@ export default class GenerateItemDialog extends Dialog5e {
    * @protected
    */
   async _preparePreviewContext(context, options) {
-    context.results = this.#results.map(({ item }) => {
+    context.results = this.#results.map(({ entry, item }) => {
+      const source = entry.generated ?? entry.spellScroll ?? entry;
       const rarity = itemRarity(item);
       const price = resolveItemPrice(item);
       return {
         name: item.name,
-        img: item.img,
+        img: source.img || item.img,
         rarity: rarity ? CONFIG.DND5E.itemRarity[rarity].capitalize()
           : _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemMundane"),
         price: price ? breakdownCopper(toCopper(price.value, price.denomination)) : null
@@ -407,7 +409,7 @@ export default class GenerateItemDialog extends Dialog5e {
       count: Math.clamp(Number(data.count) || 1, 1, 10)
     });
     const previous = { ...this.#profile.toObject(), count: 0 };
-    if ( !foundry.utils.objectsEqual(previous, { ...profile.toObject(), count: 0 }) ) this.#pool = null;
+    if ( !foundry.utils.equals(previous, { ...profile.toObject(), count: 0 }) ) this.#pool = null;
     this.#profile = profile;
     this._debouncedRefreshPool();
     await this.render({ parts: ["filters", "options", "preview", "footer"] });
@@ -541,6 +543,30 @@ export default class GenerateItemDialog extends Dialog5e {
   static async #remove(event, target) {
     this.#results.splice(Number(target.dataset.index), 1);
     await this.render({ parts: ["preview", "footer"] });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Choose the icon of an item of the result list.
+   * @this {GenerateItemDialog}
+   * @param {Event} event         Triggering click event.
+   * @param {HTMLElement} target  Button that was clicked.
+   * @returns {Promise<void>}
+   */
+  static async #editImage(event, target) {
+    const { entry, item } = this.#results[Number(target.dataset.index)] ?? {};
+    if ( !entry ) return;
+    const source = entry.generated ?? entry.spellScroll ?? entry;
+    const fp = new foundry.applications.apps.FilePicker.implementation({
+      current: source.img || item.img,
+      type: "image",
+      callback: path => {
+        source.img = path;
+        this.render({ parts: ["preview"] });
+      }
+    });
+    await fp.browse();
   }
 
   /* -------------------------------------------- */
