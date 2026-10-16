@@ -1099,8 +1099,11 @@ export function applyLoadingTooltip(el) {
  * @returns {Promise<void>}
  */
 export async function applyRichTooltip(el, data) {
+  const description = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
+    data.description, { secrets: false }
+  );
   el.dataset.tooltipHtml = await foundry.applications.handlebars.renderTemplate(
-    "modules/simple-shop-craft-5e/templates/shared/rich-tooltip.hbs", data
+    "modules/simple-shop-craft-5e/templates/shared/rich-tooltip.hbs", { ...data, description }
   );
   el.dataset.tooltipClass = "dnd5e2 dnd5e-tooltip item-tooltip document-tooltip";
   el.dataset.tooltipDirection ??= "LEFT";

@@ -7,6 +7,8 @@
 - Fixed restocking making items sold out after the default stock of their type was cleared, instead of unlimited.
 - Fixed items sold to a shop not being added back to its stock.
 - Fixed players being able to confirm a purchase in a shop outside its opening hours when its window was already open.
+- Fixed secret blocks in shop, lodging and hireling descriptions being visible to players.
+- Fixed players not seeing or starting recipes unlocked for one of their characters unless it was their assigned character.
 
 ## 1.0.0
 

@@ -527,6 +527,9 @@ export default class ShopSheet extends Application5e {
     const closedFestivalNames = context.festivalOptions
       .filter(o => context.shop.closedFestivals.has(o.value)).map(o => o.label);
     context.closedFestivalsDisplay = closedFestivalNames.join(", ");
+    context.enrichedDescription = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
+      context.shop.description, { secrets: false }
+    );
     return context;
   }
 
@@ -1313,7 +1316,7 @@ export default class ShopSheet extends Application5e {
 
   /**
    * Handle resetting this shop's stock (to each item's max, per-type default, or unchanged depending on
-   * its restock mode) and gold pool (to its max, falling back to the default gold pool unless unlimited).
+   * its restock mode) and gold pool (to its max unless unlimited).
    * @this {ShopSheet}
    */
   static async #resetShop() {
