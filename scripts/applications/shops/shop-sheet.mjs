@@ -6,7 +6,8 @@ import { newEntryStock, Shop, ShopItemEntry } from "../../data/shop-data.mjs";
 import {
   applyItemSort, applyListControls, applyLoadingTooltip, applyRichTooltip, breakdownCopper, buildItemTableSections,
   confirmDeleteShop, finalizeGroups, identifierWarning, isCalendarModeActive, isSpellScrollItem, itemRef,
-  openItemSheet, resolveBundleSize, resolveItemPrice, resolveUnitPrice, selectableActors, spotlightShop, toCopper
+  openItemSheet, resolveBundleSize, resolveBundleSizes, resolveItemPrice, resolveUnitPrice, selectableActors,
+  spotlightShop, toCopper
 } from "../../utils.mjs";
 import AddEntryDialog from "./add-entry-dialog.mjs";
 import ConfigureTemplatesDialog from "./configure-templates-dialog.mjs";
@@ -305,6 +306,15 @@ export default class ShopSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
+   * Shop item entries resolved to their items, kept until the shop's entries change. Cart and actor changes
+   * do not affect the resolved items.
+   * @type {{ items: ShopItemEntryData[], resolved: { entry: ShopItemEntryData, item: object|null }[] }|null}
+   */
+  #resolvedEntries = null;
+
+  /* -------------------------------------------- */
+
+  /**
    * Search query, type filter, and sort mode of each list tab, kept live across re-renders. An empty type filter
    * means no filter.
    * @type {Record<string, { search: string, typeFilter: string, sort: "name"|"price" }>}
@@ -408,7 +418,13 @@ export default class ShopSheet extends Application5e {
     const hasCrafterFeat = (game.dnd5e.settings.rulesVersion === "modern")
       && !!context.actor?.items.some(i => (i.type === "feat") && (i.system.identifier === "crafter"));
 
-    const resolved = await ShopItemEntry.resolveMany(context.shop.items);
+    const { items } = context.shop;
+    let cached = this.#resolvedEntries;
+    if ( cached?.items !== items ) {
+      cached = { items, resolved: await ShopItemEntry.resolveMany(items) };
+      this.#resolvedEntries = cached;
+    }
+    const resolved = cached.resolved.map(row => ({ ...row }));
     const buyResolved = resolved.filter(({ entry }) => !entry.isService);
     const serviceResolved = resolved.filter(({ entry }) => entry.isService);
     context.groups = await groupByType({
@@ -511,6 +527,9 @@ export default class ShopSheet extends Application5e {
     const closedFestivalNames = context.festivalOptions
       .filter(o => context.shop.closedFestivals.has(o.value)).map(o => o.label);
     context.closedFestivalsDisplay = closedFestivalNames.join(", ");
+    context.enrichedDescription = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
+      context.shop.description, { secrets: false }
+    );
     return context;
   }
 
@@ -692,6 +711,24 @@ export default class ShopSheet extends Application5e {
 
     const canShowActions = context.editable && this.isEditMode;
     this.element.querySelectorAll(".window-content-actions").forEach(actions => actions.hidden = !canShowActions);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle Foundry's `updateWorldTime` hook, re-rendering the open sheets and carts of shops that opened or
+   * closed.
+   * @param {number} worldTime
+   * @param {number} dt
+   * @returns {Promise<void>}
+   */
+  static async onUpdateWorldTime(worldTime, dt) {
+    await Promise.all(Array.from(this.instances(), async sheet => {
+      const shop = sheet.shop;
+      if ( sheet.isEditMode || !shop || (shop.isOpen(worldTime) === shop.isOpen(worldTime - dt)) ) return;
+      await sheet.render();
+      if ( sheet.#cartApp?.rendered ) sheet.#cartApp.render();
+    }));
   }
 
   /* -------------------------------------------- */
@@ -1297,7 +1334,7 @@ export default class ShopSheet extends Application5e {
 
   /**
    * Handle resetting this shop's stock (to each item's max, per-type default, or unchanged depending on
-   * its restock mode) and gold pool (to its max, falling back to the default gold pool unless unlimited).
+   * its restock mode) and gold pool (to its max unless unlimited).
    * @this {ShopSheet}
    */
   static async #resetShop() {
@@ -1410,7 +1447,13 @@ export default class ShopSheet extends Application5e {
         ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoActiveGM", { localize: true });
         return;
       }
-      await gm.query(`${MODULE_ID}.updatePlayerDiscount`, { shopId: this.shopId, actorUuid, updateData });
+      try {
+        await gm.query(`${MODULE_ID}.updatePlayerDiscount`, { shopId: this.shopId, actorUuid, updateData });
+      } catch ( err ) {
+        console.error(err);
+        ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoActiveGM", { localize: true });
+        return;
+      }
     }
     this.render();
     if ( this.#cartApp?.rendered ) this.#cartApp.render();
@@ -1528,7 +1571,7 @@ async function groupByType({
       }) : null) ?? ((listings.get(ShopItemEntry.key(row.entry, row.item)).length > 1)
         ? _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.DuplicateEntryWarning") : null);
     }
-    row.itemImg = row.item?.img ?? "icons/svg/hazard.svg";
+    row.itemImg = row.entry.img || (row.item?.img ?? "icons/svg/hazard.svg");
     row.itemName = row.item?.name || row.entry.identifier || row.entry.uuid || row.entry.spellScroll?.spellUuid
       || row.entry.generated?.baseItemUuid || _loc("SIMPLE_SHOP_CRAFT_5E.Unknown");
 
@@ -1564,9 +1607,10 @@ async function groupSellItems({
   const capCP = (settlementCap?.value != null) && settlementCap.appliesToSell
     ? toCopper(settlementCap.value, settlementCap.denomination) : null;
   const sellable = Array.from(items).filter(item => CONFIG.Item.dataModels[item.type]?.inventorySection);
+  const bundleSizes = await resolveBundleSizes(sellable);
   const groups = new Map();
   for ( const item of sellable ) {
-    const price = resolveUnitPrice(item, { fallback: false });
+    const price = resolveUnitPrice(item, { fallback: false, bundleSize: bundleSizes.get(item.id) });
     const basePrice = price?.value ?? 0;
     const denomination = price?.denomination ?? CONFIG.DND5E.defaultCurrency;
     const rowIsFixedValue = isFixedValue(item, fixedValueLootTypes);

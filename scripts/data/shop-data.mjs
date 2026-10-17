@@ -3,8 +3,9 @@ import {
 } from "../config.mjs";
 import { calendariaDayOfWeek, isCalendariaActive } from "../integrations/calendaria.mjs";
 import {
-  breakdownCopper, currencyRows, deductActorCurrencyChecked, isCalendarModeActive, findStack,
-  secondsPerDay, itemRefKey, matchesTypeFilter, resolveEntries, resolveItemPrice, shouldHandleWorldTimeAdvance, toCopper
+  breakdownCopper, currencyRows, deductActorCurrencyChecked, isCalendarModeActive, findStack, isDefaultIdentifier,
+  secondsPerDay, itemRefKey, matchesTypeFilter, resolveBundleSize, resolveEntries, resolveItemPrice,
+  shouldHandleWorldTimeAdvance, toCopper
 } from "../utils.mjs";
 import { EnchantedItemBlueprint } from "./enchanted-item-blueprint.mjs";
 import { HirelingBlueprint } from "./hireling-blueprint.mjs";
@@ -36,6 +37,7 @@ export class ShopItemEntry extends foundry.abstract.DataModel {
       identifier: new StringField({ blank: true }),
       _id: new DocumentIdField({ initial: () => foundry.utils.randomID() }),
       uuid: new DocumentUUIDField({ type: "Item", blank: true }),
+      img: new FilePathField({ categories: ["IMAGE"], blank: true }),
       stock: new SchemaField({
         max: new NumberField({ initial: null, nullable: true, integer: true, min: 0 }),
         current: new NumberField({ initial: null, nullable: true, integer: true, min: 0 })
@@ -421,7 +423,7 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
 
   /**
    * Resolve this shop's restock updates: full stock for normal-mode items (falling back to the shop's
-   * per-type default when uncapped) and gold pool.
+   * per-type default when uncapped, and to unlimited stock when the type has none) and gold pool.
    * @returns {Promise<{ items: object[], goldPool: object }>}
    */
   async restockUpdates() {
@@ -432,13 +434,46 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
       if ( obj.restockMode === "normal" ) {
         const item = resolved[index]?.item;
         const defaultMax = item ? Shop.defaultStockMax(item, this.stockDefaults) : null;
-        obj.stock = { ...obj.stock, current: obj.stock.max ?? defaultMax };
+        const max = obj.stock.max ?? defaultMax;
+        if ( max !== null ) obj.stock = { ...obj.stock, current: max };
+        else if ( item && (newEntryStock(item, this.stockDefaults).restockMode === "unlimited") ) {
+          obj.stock = { ...obj.stock, current: null };
+          obj.restockMode = "unlimited";
+        }
       }
       return obj;
     });
     const goldPool = { ...this.goldPool };
     if ( !goldPool.unlimited ) goldPool.current = { ...goldPool.max };
     return { items, goldPool };
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Determine how many bundles of stock the items sold to this shop add back to its entries. Items match the
+   * entries they stack with, by identifier and type, except containers and items with the default identifier.
+   * @param {{ item: Item5e, quantity: number }[]} sold  The items sold to the shop and the quantity of each.
+   * @returns {Promise<Map<string, number>>}             Bundles to add, by entry ID.
+   */
+  async stockFromSales(sold) {
+    const stackable = sold.filter(({ item }) => (item.type !== "container") && !isDefaultIdentifier(item));
+    if ( !stackable.length ) return new Map();
+    const resolved = await resolveEntries(this.items.filter(entry => {
+      return (entry.restockMode !== "unlimited") && !entry.isService
+        && !entry.generated && !entry.spellScroll && !entry.lodging && !entry.hireling;
+    }));
+    const quantities = new Map();
+    for ( const { item, quantity } of stackable ) {
+      const match = resolved.find(candidate => candidate.item && (candidate.item.type === item.type)
+        && (candidate.item.system.identifier === item.system.identifier));
+      if ( match ) quantities.set(match, (quantities.get(match) ?? 0) + quantity);
+    }
+    const stock = new Map();
+    for ( const [{ entry, item }, quantity] of quantities ) {
+      stock.set(entry._id, Math.floor(quantity / (entry.bundleSize ?? resolveBundleSize(item))));
+    }
+    return stock;
   }
 
   /* -------------------------------------------- */
@@ -520,6 +555,7 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
       if ( !fullItem ) return { ok: false, error: "SIMPLE_SHOP_CRAFT_5E.PurchaseCard.MissingItem" };
       const itemData = fullItem.toObject();
       delete itemData._id;
+      if ( line.img && !line.generated && !line.spellScroll ) itemData.img = line.img;
       if ( !fullItem.system.price?.value ) {
         const defaultPrice = resolveItemPrice(fullItem);
         if ( defaultPrice ) itemData.system.price = defaultPrice;
@@ -538,6 +574,10 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
     for ( const line of purchase.sellLines ) {
       quantities.set(line.itemId, currentQuantity(line.itemId) - line.quantity);
     }
+
+    const restocked = await shop.stockFromSales(
+      purchase.sellLines.map(line => ({ item: actor.items.get(line.itemId), quantity: line.quantity }))
+    );
 
     const itemUpdates = [];
     const itemsToDelete = [];
@@ -561,9 +601,12 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
 
     await Shop.update(shop._id, freshShop => {
       const items = freshShop.items.map(entry => {
-        const line = purchase.buyLines.find(l => l._id === entry._id);
-        if ( !line || (entry.restockMode === "unlimited") ) return entry.toObject();
-        return { ...entry.toObject(), stock: { ...entry.stock, current: (entry.stock.current ?? 0) - line.quantity } };
+        const obj = entry.toObject();
+        if ( entry.restockMode === "unlimited" ) return obj;
+        const bought = purchase.buyLines.find(l => l._id === entry._id)?.quantity ?? 0;
+        const change = (restocked.get(entry._id) ?? 0) - bought;
+        if ( change ) obj.stock = { ...obj.stock, current: (obj.stock.current ?? 0) + change };
+        return obj;
       });
 
       const goldPool = { ...freshShop.goldPool };
@@ -590,12 +633,18 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
   static async handleDayChange(weekdaysPassed) {
     if ( !game.user.isActiveGM ) return;
 
-    for ( const shop of Shop.getAll() ) {
-      const restockDue = weekdaysPassed === null
+    const due = Shop.getAll().filter(shop => {
+      return weekdaysPassed === null
         ? (shop.restockWeekdays.size > 0)
         : weekdaysPassed.some(d => shop.restockWeekdays.has(d));
-      if ( restockDue ) await Shop.update(shop._id, await shop.restockUpdates());
-    }
+    });
+    if ( !due.length ) return;
+
+    const restocks = new Map(await Promise.all(due.map(async shop => [shop._id, await shop.restockUpdates()])));
+    await Shop.updateAll(entries => entries.map(entry => {
+      const restock = restocks.get(entry._id);
+      return restock ? { ...entry, ...restock } : entry;
+    }));
   }
 
   /* -------------------------------------------- */
@@ -634,7 +683,8 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
  */
 export function newEntryStock(item, stockDefaults) {
   if ( !item ) return {};
-  const isMagic = item.system.properties?.has("mgc") ?? false;
+  const props = item.system.properties;
+  const isMagic = props?.has?.("mgc") ?? props?.includes?.("mgc") ?? false;
   if ( isMagic ) {
     const { magicRule } = stockDefaults;
     const exempt = (magicRule === "all") || ((magicRule === "gear") && MAGIC_EXEMPT_TYPES.has(item.type));

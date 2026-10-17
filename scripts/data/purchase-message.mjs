@@ -85,7 +85,7 @@ export class PurchaseMessageData extends foundry.abstract.DataModel {
         _id: row.entry._id, identifier: row.entry.identifier, uuid: row.entry.uuid,
         generated: row.entry.generated ?? null, spellScroll: row.entry.spellScroll ?? null,
         isService: row.entry.isService ?? false,
-        name: row.item.name, img: row.item.img, quantity: row.cartQuantity, priceCP: row.priceCP,
+        name: row.item.name, img: row.itemImg, quantity: row.cartQuantity, priceCP: row.priceCP,
         bundleSize: row.bundleSize ?? 1, subtotal: row.subtotal
       })),
       sellLines: sellLines.map(row => ({

@@ -1,9 +1,9 @@
 import { CraftMessageData } from "../../data/craft-message.mjs";
 import { Recipe } from "../../data/recipe-data.mjs";
 import {
-  applyDropArea, applyLoadingTooltip, breakdownCopper, buildItemTableSections, matchIdentifier, maxHoursPerWorkday,
-  openItemSheet, recipeCraftCost, resolveBundleSize, resolveEntries, resolveTotalHours, resolveUnitPrice,
-  selectableActors, subtypeOptions, toCopper
+  applyDropArea, applyLoadingTooltip, breakdownCopper, buildItemTableSections, canAffordCP, matchIdentifier,
+  maxHoursPerWorkday, openItemSheet, recipeCraftCost, resolveBundleSize, resolveBundleSizes, resolveEntries,
+  resolveTotalHours, resolveUnitPrice, selectableActors, subtypeOptions, toCopper
 } from "../../utils.mjs";
 
 const { Dialog5e } = game.dnd5e.applications.api;
@@ -547,6 +547,7 @@ export default class CraftStartDialog extends Dialog5e {
         ? actor.items.filter(i => (i.system.identifier === identifier) && (!item || (i.type === item.type)))
         : [];
     });
+    const bundleSizes = await resolveBundleSizes([...rawCandidates.flat(), ...freeformItems]);
     const allocated = new Map(freeformItems.map(item => [item.id, 1]));
 
     const fixedLines = materialsResolved.map(({ entry, item }, index) => {
@@ -556,9 +557,9 @@ export default class CraftStartDialog extends Dialog5e {
       const minValueCP = (entry.value?.value != null) ? toCopper(entry.value.value, entry.value.denomination) : null;
       let suppliedUnits = 0;
       const candidates = rawCandidates[index]
-        .filter(i => !isRule || (materialValueCP(i) >= (minValueCP ?? 0)))
+        .filter(i => !isRule || (materialValueCP(i, bundleSizes.get(i.id)) >= (minValueCP ?? 0)))
         .map(i => {
-          const valueCP = materialValueCP(i);
+          const valueCP = materialValueCP(i, bundleSizes.get(i.id));
           const available = Math.max(0, i.system.quantity - (allocated.get(i.id) ?? 0));
           const max = Math.min(available, limit - suppliedUnits);
           const requested = this.#materialQuantities.get(`${index}:${i.id}`) ?? 0;
@@ -588,7 +589,7 @@ export default class CraftStartDialog extends Dialog5e {
       };
     });
     const suppliedCP = fixedLines.reduce((sum, l) => sum + l.suppliedLineCP, 0)
-      + freeformItems.reduce((sum, item) => sum + materialValueCP(item), 0);
+      + freeformItems.reduce((sum, item) => sum + materialValueCP(item, bundleSizes.get(item.id)), 0);
     const thresholdCP = recipe.craftThreshold(craftCost, targetItem) * count;
     const shortfallCP = Math.max(0, thresholdCP - suppliedCP);
     const materialsMet = recipe.ignoreCraftValue || (suppliedCP >= thresholdCP);
@@ -599,8 +600,7 @@ export default class CraftStartDialog extends Dialog5e {
     let goldInsufficient = false;
     if ( this.#fillWithGold && (shortfallCP > 0) && actor ) {
       goldCP = shortfallCP;
-      const updates = game.dnd5e.applications.CurrencyManager.getActorCurrencyUpdates(actor, goldCP, "cp", {});
-      goldInsufficient = !updates.remainder.almostEqual(0);
+      goldInsufficient = !canAffordCP(actor, goldCP);
     }
 
     const toolKeys = Array.from(recipe.toolProficiencies);
@@ -714,9 +714,10 @@ function buildMaterialsTable(state) {
  * Resolve an owned item's contributed value in copper, per unit — via its own price or the rarity-based
  * fallback, divided by its bundle size (e.g. a stack of 20 arrows priced as a whole).
  * @param {Item5e} item
+ * @param {number} [bundleSize]  Size of the bundle of the item, from `resolveBundleSizes`.
  * @returns {number}
  */
-function materialValueCP(item) {
-  const price = resolveUnitPrice(item);
+function materialValueCP(item, bundleSize) {
+  const price = resolveUnitPrice(item, { bundleSize });
   return price ? toCopper(price.value, price.denomination) : 0;
 }

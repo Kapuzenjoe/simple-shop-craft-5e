@@ -4,7 +4,7 @@ import { Shop } from "../data/shop-data.mjs";
 import {
   applyItemSort, applyListControls, applyLoadingTooltip, breakdownCopper, buildItemTableSections,
   confirmDeleteShop, finalizeGroups, formatDuration, promptImportFiles, recipeCraftCost, resolveEntries,
-  resolveTotalHours, spotlightShop, toCopper
+  resolveTotalHours, selectableActors, spotlightShop, toCopper
 } from "../utils.mjs";
 import CraftStartDialog from "./craft/craft-start-dialog.mjs";
 import RecipeSheet from "./craft/recipe-sheet.mjs";
@@ -179,10 +179,10 @@ export default class ShopManager extends Application5e {
       sections
     };
     const recipes = Recipe.getAll();
-    const actor = game.user.character;
+    const actors = selectableActors();
     const visibleRecipes = context.isGM
       ? recipes
-      : recipes.filter(r => r.canCraft(actor));
+      : recipes.filter(r => (r.unlockMode === "all") || actors.some(actor => r.canCraft(actor)));
     const targetResolved = await resolveEntries(visibleRecipes.map(r => r.targetItem));
     const craftCosts = await Promise.all(
       targetResolved.map(({ item }, index) => recipeCraftCost(visibleRecipes[index], item))
@@ -406,13 +406,10 @@ export default class ShopManager extends Application5e {
   static #startCraft(event, target) {
     const recipe = Recipe.get(target.dataset.recipeId);
     if ( !recipe ) return;
-    if ( !game.user.isGM ) {
-      const actor = game.user.character;
-      const allowed = recipe.canCraft(actor);
-      if ( !allowed ) {
-        ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Locked", { localize: true });
-        return;
-      }
+    const unlocked = (recipe.unlockMode === "all") || selectableActors().some(actor => recipe.canCraft(actor));
+    if ( !game.user.isGM && !unlocked ) {
+      ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Locked", { localize: true });
+      return;
     }
     new CraftStartDialog({ recipeId: recipe._id }).render({ force: true });
   }

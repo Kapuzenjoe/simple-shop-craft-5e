@@ -15,6 +15,7 @@
  * @typedef ShopItemEntryData
  * @property {string} [identifier]       Fallback `system.identifier` reference, used if there is no `uuid`.
  * @property {string} [uuid]             UUID of the referenced item.
+ * @property {string} [img]              Icon shown instead of the referenced item's own, for normal entries.
  * @property {object} stock
  * @property {number|null} stock.max      Maximum stock, or `null` for unlimited.
  * @property {number|null} stock.current  Current stock, or `null` for unlimited.
@@ -26,8 +27,7 @@
  * @property {number|null} price.value        Price override. `null` means use the compendium item's price.
  * @property {string} price.denomination      Currency denomination of the override.
  * @property {number|null} bundleSize    Override for how many individual items the listed price buys
- *                                       (e.g. 20 for a bundle of arrows). `null` = size from `BUNDLE_SIZES` for
- *                                       the item's identifier.
+ *                                       (e.g. 20 for a bundle of arrows). `null` = quantity of the compendium item.
  * @property {object|null} generated     Recipe for a generated magic item, `null` for normal entries.
  * @property {string} generated.baseItemUuid      UUID of the base item the enchantment is applied to.
  * @property {string} generated.enchantItemUuid   UUID of the item granting the enchantment.

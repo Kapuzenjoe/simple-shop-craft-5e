@@ -18,6 +18,10 @@ Hooks.once("init", () => {
   Hooks.on("updateWorldTime", InProgressCraft.onUpdateWorldTime);
   Hooks.on("renderCharacterActorSheet", InProgressCraft.onRenderCharacterActorSheet);
   Hooks.on("updateWorldTime", Shop.onUpdateWorldTime);
+  Hooks.on("updateWorldTime", async (worldTime, dt) => {
+    const { default: ShopSheet } = await import("./applications/shops/shop-sheet.mjs");
+    ShopSheet.onUpdateWorldTime(worldTime, dt);
+  });
   Hooks.on("renderItemDirectory", async (app, html) => {
     const { default: ShopManager } = await import("./applications/shop-manager.mjs");
     ShopManager.injectSidebarButton(html);

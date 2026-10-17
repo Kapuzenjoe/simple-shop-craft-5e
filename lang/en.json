@@ -380,7 +380,7 @@
       "PriceTooltip": "Edit Price",
       "PriceOverrideHint": "Override this item's default price for this shop.",
       "BundleSize": "Bundle Size",
-      "BundleSizeHint": "How many individual items the listed price buys (e.g. 20 for a bundle of arrows). Leave blank to use the default size of the item.",
+      "BundleSizeHint": "How many individual items the listed price buys (e.g. 20 for a bundle of arrows). Leave blank to use the quantity of the compendium item.",
       "PriceModifier": "Price Modifier",
       "Discount": "Discount",
       "DiscountTooltip": "Edit Price Modifier",

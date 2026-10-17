@@ -38,7 +38,7 @@
             {{#each results}}
             <li>
                 {{> "modules/simple-shop-craft-5e/templates/shared/item-avatar-name.hbs"
-                    img=img name=name subtitle=rarity }}
+                    img=img name=name subtitle=rarity iconAction="editImage" index=@index }}
                 <div class="item-price">{{> "modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs" parts=price }}</div>
                 <button type="button" class="unbutton item-control item-action" data-action="reroll" data-index="{{ @index }}"
                         data-tooltip aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemReroll' }}">
