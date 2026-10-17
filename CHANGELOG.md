@@ -9,6 +9,8 @@
 - Fixed players being able to confirm a purchase in a shop outside its opening hours when its window was already open.
 - Fixed secret blocks in shop, lodging and hireling descriptions being visible to players.
 - Fixed players not seeing or starting recipes unlocked for one of their characters unless it was their assigned character.
+- Fixed prices of less than 1 copper piece, such as a single item of a bundle, rounding down to free.
+- Fixed an open shop window not updating when the shop opens or closes as the world time advances.
 
 ## 1.0.0
 

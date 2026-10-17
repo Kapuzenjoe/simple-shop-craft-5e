@@ -714,6 +714,24 @@ export default class ShopSheet extends Application5e {
   }
 
   /* -------------------------------------------- */
+
+  /**
+   * Handle Foundry's `updateWorldTime` hook, re-rendering the open sheets and carts of shops that opened or
+   * closed.
+   * @param {number} worldTime
+   * @param {number} dt
+   * @returns {Promise<void>}
+   */
+  static async onUpdateWorldTime(worldTime, dt) {
+    await Promise.all(Array.from(this.instances(), async sheet => {
+      const shop = sheet.shop;
+      if ( sheet.isEditMode || !shop || (shop.isOpen(worldTime) === shop.isOpen(worldTime - dt)) ) return;
+      await sheet.render();
+      if ( sheet.#cartApp?.rendered ) sheet.#cartApp.render();
+    }));
+  }
+
+  /* -------------------------------------------- */
   /*  Event Listeners and Handlers                */
   /* -------------------------------------------- */
 

@@ -271,7 +271,7 @@ export function goldPoolCurrencies() {
 
 /**
  * Convert a value in a given denomination to a whole number of copper pieces, rounded down after removing
- * floating-point error.
+ * floating-point error. A value above zero never rounds down below 1 cp.
  * Uses the system's `roundCurrency` if it is available.
  * @param {number} value
  * @param {string} [denomination="gp"]
@@ -280,7 +280,8 @@ export function goldPoolCurrencies() {
 export function toCopper(value, denomination="gp") {
   const cpPerUnit = CONFIG.DND5E.currencies.cp.conversion / (CONFIG.DND5E.currencies[denomination]?.conversion ?? 1);
   const copper = Number((value * cpPerUnit).toFixed(6));
-  return Math.floor(game.dnd5e.utils.roundCurrency?.(copper, "cp") ?? copper);
+  const rounded = Math.floor(game.dnd5e.utils.roundCurrency?.(copper, "cp") ?? copper);
+  return ((copper > 0) && !rounded) ? 1 : rounded;
 }
 
 /* -------------------------------------------- */
