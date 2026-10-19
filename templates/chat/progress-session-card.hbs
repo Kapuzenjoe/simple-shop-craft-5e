@@ -5,6 +5,9 @@
             <div class="name-stacked">
                 <span class="title">{{ itemName }}</span>
                 <span class="subtitle">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftCard.Crafter" }}: {{ actorName }}</span>
+                {{#if assistantNames}}
+                <span class="subtitle">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftCard.AssistedBy" }}: {{ assistantNames }}</span>
+                {{/if}}
             </div>
         </header>
     </section>

@@ -4,6 +4,7 @@ import TransactionLog from "./applications/transaction-log.mjs";
 import {
   CALENDAR_MODES, DEFAULT_STOCK_BY_TYPE, defaultStockKey, HOURS_PER_USE, MODULE_ID, SETTING_KEYS, STOCK_MAGIC_RULES
 } from "./config.mjs";
+import { InProgressCraft } from "./data/in-progress-craft.mjs";
 import { Recipe } from "./data/recipe-data.mjs";
 import { Shop } from "./data/shop-data.mjs";
 import Transaction from "./data/transaction-data.mjs";
@@ -97,6 +98,22 @@ const SETTINGS = [
   },
   {
     config: false,
+    name: "SIMPLE_SHOP_CRAFT_5E.Settings.Homebrew.Assistants.Name",
+    hint: "SIMPLE_SHOP_CRAFT_5E.Settings.Homebrew.Assistants.Hint",
+    key: SETTING_KEYS.ASSISTANTS_ENABLED,
+    scope: "world",
+    type: new BooleanField({ initial: true })
+  },
+  {
+    config: false,
+    name: "SIMPLE_SHOP_CRAFT_5E.Settings.Homebrew.MaxAssistants.Name",
+    hint: "SIMPLE_SHOP_CRAFT_5E.Settings.Homebrew.MaxAssistants.Hint",
+    key: SETTING_KEYS.MAX_ASSISTANTS,
+    scope: "world",
+    type: new NumberField({ nullable: true, initial: 1, integer: true, min: 1, placeholder: "∞" })
+  },
+  {
+    config: false,
     name: "SIMPLE_SHOP_CRAFT_5E.Settings.Defaults.StockMagicRule.Name",
     hint: "SIMPLE_SHOP_CRAFT_5E.Settings.Defaults.StockMagicRule.Hint",
     key: SETTING_KEYS.DEFAULT_STOCK_MAGIC_RULE,
@@ -157,6 +174,10 @@ export function registerSettings() {
     const actor = fromUuidSync(actorUuid);
     if ( !actor?.testUserPermission(user, "OWNER") ) return;
     await Shop.update(shopId, Shop.mergePlayerDiscount(actorUuid, { hagglingLocks: updateData?.hagglingLocks }));
+  };
+
+  CONFIG.queries[`${MODULE_ID}.chargeAssistants`] = async ({ itemUuid, assistantUuids, hours }, { user }) => {
+    return InProgressCraft.chargeAssistants(itemUuid, assistantUuids, hours, user);
   };
 
   CONFIG.queries[`${MODULE_ID}.spotlight`] = async ({ shopId }) => {

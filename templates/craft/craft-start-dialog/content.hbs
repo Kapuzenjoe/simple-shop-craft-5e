@@ -28,6 +28,9 @@
             </div>
         </li>
     </ol>
+    {{#unless targetItem}}
+    <p class="hint warning">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SuppressedNotFound" }}</p>
+    {{/unless}}
     {{#if countField}}
     {{> "dnd5e.fieldlist" countField}}
     {{/if}}
@@ -60,45 +63,48 @@
 </fieldset>
 {{/if}}
 
-{{#if chosenToolKey}}
+{{#if requirementGroups.length}}
 <fieldset>
-    <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.Tool" }}</legend>
-    {{#if toolField}}
-    {{> "dnd5e.fieldlist" toolField}}
-    {{else}}
-    <p>{{ toolLabel }}</p>
-    {{/if}}
-    {{#unless toolProficient}}
-    <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.NotProficient" }}</p>
-    {{/unless}}
-    {{#unless toolOwned}}
-    <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.ToolMissing" }}</p>
-    {{/unless}}
-    {{#if skillRequired}}
-    {{#unless skillProficient}}
-    <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.SkillMissing" }}</p>
-    {{/unless}}
-    {{/if}}
-    {{#if workshopField}}
-    {{> "dnd5e.fieldlist" workshopField}}
-    {{/if}}
-</fieldset>
-{{/if}}
-
-{{#if statusList}}
-<fieldset>
-    <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.Tool" }}</legend>
-    <ul class="value-list unlist">
-        {{#each statusList}}
-        <li class="value-row">
-            <i class="fa-solid {{#if this.met}}fa-check{{else}}fa-xmark warning{{/if}}" inert></i>
-            {{ this.label }}
-        </li>
+    <legend>{{ localize "DND5E.Requirements" }}</legend>
+    <section class="items-list">
+        {{#each requirementGroups}}
+        <div class="items-section card">
+            {{#if this.heading}}
+            <div class="items-header header">
+                <h3 class="item-name">{{ this.heading }}</h3>
+            </div>
+            {{/if}}
+            <ul class="item-list unlist">
+                {{#each this.entries}}
+                <li class="item{{#if this.dimmed}} suppressed{{/if}}">
+                    <div class="item-row">
+                        <div class="item-name">
+                            <i class="fa-solid fa-fw {{#if this.met}}fa-check success{{else}}fa-xmark failure{{/if}}" inert></i>
+                            <div class="name name-stacked">
+                                <span class="title">{{ this.label }}</span>
+                                {{#if (or this.workshop this.notProficient this.notInInventory)}}
+                                <span class="subtitle">
+                                    {{#if this.workshop}}{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.Workshop" }}{{/if}}
+                                    {{#if this.notProficient}}{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.NotProficient" }}{{/if}}
+                                    {{#if (and this.notProficient this.notInInventory)}}&middot;{{/if}}
+                                    {{#if this.notInInventory}}{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.NotInInventory" }}{{/if}}
+                                </span>
+                                {{/if}}
+                            </div>
+                        </div>
+                    </div>
+                </li>
+                {{/each}}
+            </ul>
+        </div>
+        {{#if this.atLeastOne}}
+        <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.AtLeastOne" }}</p>
+        {{/if}}
+        {{#if this.workshopField}}
+        {{> "dnd5e.fieldlist" this.workshopField}}
+        {{/if}}
         {{/each}}
-    </ul>
-    {{#if workshopField}}
-    {{> "dnd5e.fieldlist" workshopField}}
-    {{/if}}
+    </section>
 </fieldset>
 {{/if}}
 

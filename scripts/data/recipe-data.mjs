@@ -8,7 +8,7 @@ const {
 } = foundry.data.fields;
 
 /**
- * @import { RecipeData, RecipeMaterialData } from "../_types.mjs";
+ * @import { RecipeData, RecipeMaterialData, RecipeProficiencyResult } from "../_types.mjs";
  */
 
 /**
@@ -119,7 +119,7 @@ export class Recipe extends SettingCollectionMixin(foundry.abstract.DataModel, S
 
   /**
    * This recipe's display name: its own name if set, otherwise the target item's name — with the spell
-   * level appended for a spell-scroll recipe, or a generic placeholder if nothing resolves.
+   * level appended for a spell-scroll recipe, or a placeholder if nothing resolves.
    * @param {Item5e|null} targetItem  The resolved target item, if any.
    * @returns {string}
    */
@@ -127,7 +127,20 @@ export class Recipe extends SettingCollectionMixin(foundry.abstract.DataModel, S
     const itemName = this.spellScroll
       ? `${_loc("SIMPLE_SHOP_CRAFT_5E.RecipeEditor.SpellScroll")}, ${_loc(CONFIG.DND5E.spellLevels[this.spellScroll.level])}`
       : targetItem?.name;
-    return this.name || itemName || _loc("SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder");
+    const placeholder = this.isTargetMissing(targetItem)
+      ? "SIMPLE_SHOP_CRAFT_5E.ItemNotFound" : "SIMPLE_SHOP_CRAFT_5E.NewRecipePlaceholder";
+    return this.name || itemName || _loc(placeholder);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Whether this recipe names a target item that could not be resolved.
+   * @param {Item5e|null} targetItem  The resolved target item, if any.
+   * @returns {boolean}
+   */
+  isTargetMissing(targetItem) {
+    return !targetItem && !!(this.targetItem.uuid || this.targetItem.identifier);
   }
 
   /* -------------------------------------------- */
@@ -145,6 +158,48 @@ export class Recipe extends SettingCollectionMixin(foundry.abstract.DataModel, S
       return Array.from(this.toolProficiencies).some(key => (actor.system.tools?.[key]?.value ?? 0) > 0);
     }
     return false;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Evaluate an actor's tool and skill proficiencies against this recipe's requirements, according to its
+   * proficiency mode.
+   * @param {Actor5e|null} actor
+   * @param {object} [options]
+   * @param {boolean} [options.workshopClaimed=false]  Whether workshop access counts in place of owning the tool,
+   *                                                   if the recipe allows it.
+   * @returns {RecipeProficiencyResult}
+   */
+  checkProficiency(actor, { workshopClaimed=false }={}) {
+    const toolKeys = Array.from(this.toolProficiencies);
+    const skillKeys = Array.from(this.skillProficiencies);
+    const mode = this.proficiencyMode;
+
+    const toolStatuses = toolKeys.map(key => {
+      const keyProficient = !!actor && ((actor.system.tools[key]?.value ?? 0) > 0);
+      const owned = !!actor?.items.some(i => (i.type === "tool") && (i.system.type?.baseItem === key));
+      return {
+        key, proficient: keyProficient, owned,
+        met: keyProficient && (owned || (this.allowWorkshopOverride && workshopClaimed))
+      };
+    });
+    const skillStatuses = skillKeys.map(key => ({
+      key, proficient: !!actor && ((actor.system.skills[key]?.value ?? 0) > 0)
+    }));
+
+    const toolEligible = !toolKeys.length || toolStatuses.some(t => t.met);
+    const skillEligible = !skillKeys.length || skillStatuses.some(s => s.proficient);
+
+    let eligible = toolEligible && skillEligible;
+    if ( mode === "all" ) {
+      eligible = toolStatuses.every(t => t.met) && skillStatuses.every(s => s.proficient);
+    } else if ( mode === "either" ) {
+      eligible = (!toolKeys.length && !skillKeys.length)
+        || toolStatuses.some(t => t.met) || skillStatuses.some(s => s.proficient);
+    }
+
+    return { toolStatuses, skillStatuses, eligible };
   }
 
   /* -------------------------------------------- */

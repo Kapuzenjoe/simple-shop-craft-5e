@@ -1,4 +1,4 @@
-import { excludeFilter, isShopPackSource, itemRarity, itemRef, itemRefKey } from "../utils.mjs";
+import { excludeFilter, isShopPackSource, itemRarity, itemRef, itemRefKey, setDependentOn } from "../utils.mjs";
 
 const { DocumentUUIDField, FilePathField, StringField } = foundry.data.fields;
 
@@ -64,6 +64,37 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
   /* -------------------------------------------- */
 
   /**
+   * Resolve the Additional Items of this blueprint's enchantment profile.
+   * @returns {Promise<Item5e[]>}
+   */
+  async resolveRiderItems() {
+    const enchantItem = await fromUuid(this.enchantItemUuid);
+    if ( !enchantItem ) return [];
+    const uuids = EnchantedItemBlueprint.#findProfile(enchantItem, this.effectId)?.profile.riders.item;
+    if ( !uuids?.size ) return [];
+    return (await Promise.all(Array.from(uuids, uuid => fromUuid(uuid)))).filter(item => item);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Prepare the Additional Items of this blueprint's enchantment profile. They are marked as dependent on the
+   * enchantment effect of the synthesized item, so they are removed together with it.
+   * @see dnd5e — EnchantmentData#collectRiders()
+   * @param {string} itemUuid  UUID that the synthesized item will have once it is created.
+   * @returns {Promise<object[]>}  Creation data of the items, to be created with `keepId`.
+   */
+  async collectRiderItems(itemUuid) {
+    const items = await this.resolveRiderItems();
+    const effectUuid = `${itemUuid}.ActiveEffect.${this.effectId}`;
+    return Item.implementation.createWithContents(items, {
+      transformAll: item => setDependentOn(item.clone({}, { keepId: true }).toObject(), effectUuid)
+    });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
    * Can this item's type/subtype be an enchant-item template, per the DMG/SRD catalog's own pattern?
    * @param {Item5e} item
    * @returns {boolean}
@@ -82,14 +113,13 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
 
   /**
    * List all enchantment profiles offered by an item's `enchant` Activities — every effect profile across
-   * every such Activity that isn't itself a rider, excluding profiles with rider items.
+   * every such Activity that isn't itself a rider.
    * @param {Item5e} item
    * @returns {{ activity: EnchantActivity, effect: ActiveEffect5e }[]}
    */
   static getEnchantmentProfiles(item) {
     const enchantActivities = item.system.activities?.getByType("enchant") ?? [];
     return enchantActivities.filter(activity => !activity.isRider).flatMap(activity => (activity.effects ?? [])
-      .filter(profile => !profile.riders?.item?.length)
       .map(profile => ({ activity, effect: item.effects.get(profile._id) }))
       .filter(profile => profile.effect));
   }
@@ -227,7 +257,9 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
   /* -------------------------------------------- */
 
   /**
-   * Build a non-persisted Item combining a base item with a cloned enchantment effect.
+   * Build a non-persisted Item combining a base item with a cloned enchantment effect. The rider activities and
+   * effects of the enchantment profile are added and marked as dependent on that effect.
+   * @see dnd5e — EnchantmentData#collectRiders()
    * @param {Item5e} baseItem
    * @param {Item5e} enchantItem
    * @param {ActiveEffect5e} effect
@@ -240,7 +272,7 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
     itemData.system.quantity = 1;
     if ( spell ) itemData.name = `${itemData.name} (${spell.name})`;
     const effectData = effect.clone({ origin: effect.parent.uuid, disabled: false }).toObject();
-    effectData._id = foundry.utils.randomID();
+    effectData._id = effect.id;
     itemData.effects = [...(itemData.effects ?? []), effectData];
 
     const profile = EnchantedItemBlueprint.#findProfile(enchantItem, effect.id)?.profile;
@@ -250,16 +282,17 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
       if ( !activityData ) continue;
       activityData._id = foundry.utils.randomID();
       if ( spell && activityData.spell ) activityData.spell.uuid = spell.uuid;
-      itemData.system.activities[activityData._id] = activityData;
+      itemData.system.activities[activityData._id] = setDependentOn(activityData, effectData._id);
       for ( const riderProfile of riderActivity.effects ?? [] ) {
         if ( itemData.effects.some(e => e._id === riderProfile._id) ) continue;
         const riderEffectData = enchantItem.effects.get(riderProfile._id)?.toObject();
-        if ( riderEffectData ) itemData.effects.push(riderEffectData);
+        if ( riderEffectData ) itemData.effects.push(setDependentOn(riderEffectData, effectData._id));
       }
     }
     for ( const riderEffectId of profile?.riders.effect ?? [] ) {
       const riderEffectData = enchantItem.effects.get(riderEffectId)?.toObject();
-      if ( riderEffectData ) itemData.effects.push({ ...riderEffectData, _id: foundry.utils.randomID() });
+      if ( !riderEffectData ) continue;
+      itemData.effects.push(setDependentOn({ ...riderEffectData, _id: foundry.utils.randomID() }, effectData._id));
     }
 
     const changeKeys = new Set(effect.system.changes?.map(change => change.key));

@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.1.0
+
+- Added assistants for crafting, who share the crafting time and work the same hours of their own workday, with Homebrew settings to turn them off or allow more of them (#11).
+- Added grouping the recipe list in the Shop Manager by tool proficiency (#25).
+- Added giving a character the Additional Items of an enchantment, such as the Clawed Gauntlets of Demon Armor, when it buys the generated item (#16).
+- Added a hint to shop entries that come with Additional Items.
+- Added a hint to the Recipe Editor and the Craft Start dialog when the target item of a recipe can't be found, and a greyed-out entry with a warning for such recipes in the Shop Manager.
+- Changed the warning icons in shops and recipes to yellow for minor issues, such as a sold-out or capped item, and kept red for problems, such as a missing item or identifier.
+- Fixed the rider activities and effects of generated enchanted items staying active when the enchantment is disabled or removed.
+- Reworked the tool and skill requirements in the Craft Start dialog to list every option with what is missing, so a tool no longer has to be picked.
+
 ## 1.0.1
 
 - Added choosing the icon of items in the Generate Item preview by clicking it.

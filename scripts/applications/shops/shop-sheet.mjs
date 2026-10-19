@@ -1574,6 +1574,10 @@ async function groupByType({
     row.itemImg = row.entry.img || (row.item?.img ?? "icons/svg/hazard.svg");
     row.itemName = row.item?.name || row.entry.identifier || row.entry.uuid || row.entry.spellScroll?.spellUuid
       || row.entry.generated?.baseItemUuid || _loc("SIMPLE_SHOP_CRAFT_5E.Unknown");
+    const riderItems = row.item ? await row.entry.generated?.resolveRiderItems() : null;
+    row.riderItemsInfo = riderItems?.length
+      ? _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.RiderItems", { names: riderItems.map(item => item.name).join(", ") })
+      : null;
 
     const type = row.item?.type ?? "unknown";
     if ( !groups.has(type) ) groups.set(type, []);

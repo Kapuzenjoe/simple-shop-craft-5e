@@ -80,14 +80,6 @@ export default class CraftStartDialog extends Dialog5e {
   /* -------------------------------------------- */
 
   /**
-   * Chosen tool proficiency key, when the recipe allows more than one.
-   * @type {string|null}
-   */
-  #toolKey = null;
-
-  /* -------------------------------------------- */
-
-  /**
    * Whether the player has claimed workshop access in place of owning the tool.
    * @type {boolean}
    */
@@ -245,45 +237,7 @@ export default class CraftStartDialog extends Dialog5e {
     context.materialsMet = state.materialsMet;
     context.requiredMet = state.requiredMet;
     context.requiredAvailable = state.requiredAvailable;
-    context.toolProficient = state.proficient;
-    context.toolOwned = state.toolOwned;
-    context.skillProficient = state.skillProficient;
-    context.skillRequired = state.skillRequired;
-    context.chosenToolKey = state.chosenToolKey;
-
-    context.toolLabel = null;
-    context.toolField = null;
-    if ( state.chosenToolKey ) {
-      const categories = await game.dnd5e.documents.Trait.categories("tool");
-      if ( state.toolKeys.length > 1 ) {
-        context.toolField = [{
-          field: new foundry.data.fields.StringField(), name: "toolKey", value: state.chosenToolKey,
-          label: _loc("SIMPLE_SHOP_CRAFT_5E.RECIPE.FIELDS.toolProficiencies.label"),
-          options: state.toolKeys.map(key => ({
-            value: key, label: categories.art?.children?.[key]?.label ?? categories[key]?.label ?? key
-          }))
-        }];
-      } else {
-        context.toolLabel = categories.art?.children?.[state.chosenToolKey]?.label
-          ?? categories[state.chosenToolKey]?.label ?? state.chosenToolKey;
-      }
-    }
-
-    context.statusList = (!state.chosenToolKey && (state.toolStatuses.length || state.skillStatuses.length)) ? [
-      ...state.toolStatuses.map(({ key, met }) => ({
-        met, label: game.dnd5e.documents.Trait.keyLabel(key, { trait: "tool" })
-      })),
-      ...state.skillStatuses.map(({ key, proficient: met }) => ({
-        met, label: _loc(CONFIG.DND5E.skills[key]?.label ?? key)
-      }))
-    ] : null;
-
-    context.workshopField = ((state.chosenToolKey || state.toolStatuses.length) && state.recipe.allowWorkshopOverride)
-      ? [{
-        field: new foundry.data.fields.BooleanField(), name: "workshopClaimed", value: this.#workshopClaimed,
-        label: _loc("SIMPLE_SHOP_CRAFT_5E.CraftStart.WorkshopAccess")
-      }]
-      : null;
+    context.requirementGroups = this.#prepareRequirementGroups(state);
 
     context.goldField = (state.shortfallCP > 0) ? [{
       field: new foundry.data.fields.BooleanField(), name: "fillWithGold", value: this.#fillWithGold,
@@ -330,7 +284,6 @@ export default class CraftStartDialog extends Dialog5e {
     if ( event.target.name === "selectedActor" ) {
       this.selectedActorUuid = event.target.value;
       this.#freeformIds.clear();
-      this.#toolKey = null;
       this.#workshopClaimed = false;
       this.#fillWithGold = false;
       this.#materialQuantities.clear();
@@ -338,7 +291,6 @@ export default class CraftStartDialog extends Dialog5e {
       this.#scrollDC = null;
       this.#scrollBonus = null;
     }
-    else if ( event.target.name === "toolKey" ) this.#toolKey = event.target.value;
     else if ( event.target.name === "count" ) this.#count = Math.max(1, Math.floor(Number(event.target.value)) || 1);
     else if ( event.target.name === "workshopClaimed" ) this.#workshopClaimed = event.target.checked;
     else if ( event.target.name === "fillWithGold" ) this.#fillWithGold = event.target.checked;
@@ -470,7 +422,7 @@ export default class CraftStartDialog extends Dialog5e {
     await CraftMessageData.create({
       actor: state.actor, recipe: state.recipe, targetItem: state.chosenSpell ?? state.targetItem,
       materialLines, spellUuid: state.chosenSpell?.uuid ?? null, scrollValues: state.scrollValues,
-      goldCP: state.goldCP, toolKey: state.chosenToolKey, totalHours: state.totalHours,
+      goldCP: state.goldCP, totalHours: state.totalHours,
       hoursPerUse: state.hoursPerUse, weight: state.weight, halfPrice: state.halfPrice, count: state.count
     });
     ui.notifications.info("SIMPLE_SHOP_CRAFT_5E.CraftStart.Requested", { localize: true });
@@ -479,6 +431,50 @@ export default class CraftStartDialog extends Dialog5e {
 
   /* -------------------------------------------- */
   /*  Helpers                                     */
+  /* -------------------------------------------- */
+
+  /**
+   * Prepare the tool and skill requirements for display, grouped by how many of them are needed.
+   * @param {object} state  State from `#computeState`.
+   * @returns {object[]}
+   */
+  #prepareRequirementGroups(state) {
+    const { recipe, toolStatuses, skillStatuses } = state;
+    const tools = toolStatuses.map(({ key, proficient, owned, met }) => {
+      const workshop = !owned && recipe.allowWorkshopOverride && this.#workshopClaimed;
+      return {
+        met, label: game.dnd5e.documents.Trait.keyLabel(key, { trait: "tool" }),
+        notProficient: !proficient, notInInventory: !owned && !workshop, workshop: met && workshop
+      };
+    });
+    const skills = skillStatuses.map(({ key, proficient }) => ({
+      met: proficient, label: _loc(CONFIG.DND5E.skills[key]?.label ?? key), notProficient: !proficient
+    }));
+
+    const needsAll = recipe.proficiencyMode === "all";
+    const groups = (recipe.proficiencyMode === "both") ? [
+      { label: _loc("SIMPLE_SHOP_CRAFT_5E.Tool"), entries: tools, hasTools: true },
+      { label: _loc("DND5E.Skill"), entries: skills, hasTools: false }
+    ] : [{ label: null, entries: [...tools, ...skills], hasTools: true }];
+    const workshopField = [{
+      field: new foundry.data.fields.BooleanField(), name: "workshopClaimed", value: this.#workshopClaimed,
+      label: _loc("SIMPLE_SHOP_CRAFT_5E.CraftStart.WorkshopAccess")
+    }];
+
+    return groups.filter(g => g.entries.length).map(({ label, entries, hasTools }) => {
+      const satisfied = !needsAll && entries.some(e => e.met);
+      const count = (entries.length > 1)
+        ? _loc(needsAll ? "SIMPLE_SHOP_CRAFT_5E.CraftStart.AllNeeded" : "SIMPLE_SHOP_CRAFT_5E.CraftStart.OneNeeded")
+        : null;
+      return {
+        heading: label ? (count ? `${label} (${count})` : label) : count?.capitalize(),
+        entries: entries.map(e => ({ ...e, dimmed: satisfied && !e.met })),
+        atLeastOne: !needsAll && !satisfied && (entries.length > 1),
+        workshopField: (hasTools && tools.length && recipe.allowWorkshopOverride) ? workshopField : null
+      };
+    });
+  }
+
   /* -------------------------------------------- */
 
   /**
@@ -603,44 +599,13 @@ export default class CraftStartDialog extends Dialog5e {
       goldInsufficient = !canAffordCP(actor, goldCP);
     }
 
-    const toolKeys = Array.from(recipe.toolProficiencies);
-    const skillKeys = Array.from(recipe.skillProficiencies);
-    const mode = recipe.proficiencyMode;
-
-    const toolStatuses = toolKeys.map(key => {
-      const keyProficient = !!actor && ((actor.system.tools[key]?.value ?? 0) > 0);
-      const owned = !!actor?.items.some(i => (i.type === "tool") && (i.system.type?.baseItem === key));
-      return {
-        key, proficient: keyProficient, owned,
-        met: keyProficient && (owned || (recipe.allowWorkshopOverride && this.#workshopClaimed))
-      };
-    });
-    const skillStatuses = skillKeys.map(key => ({
-      key, proficient: !!actor && ((actor.system.skills[key]?.value ?? 0) > 0)
-    }));
-
-    const chosenToolKey = (mode === "both")
-      ? ((toolKeys.length > 1) ? (this.#toolKey ?? toolKeys[0]) : (toolKeys[0] ?? null))
-      : null;
-    const chosenTool = toolStatuses.find(t => t.key === chosenToolKey) ?? {};
-    const proficient = chosenToolKey ? !!chosenTool.proficient : true;
-    const toolOwned = chosenToolKey ? !!chosenTool.owned : true;
-    const toolEligible = !chosenToolKey || !!chosenTool.met;
-
-    const skillProficient = skillStatuses.some(s => s.proficient);
-    const skillEligible = !skillKeys.length || skillProficient;
-
-    let proficiencyEligible = toolEligible && skillEligible;
-    if ( mode === "all" ) {
-      proficiencyEligible = toolStatuses.every(t => t.met) && skillStatuses.every(s => s.proficient);
-    } else if ( mode === "either" ) {
-      proficiencyEligible = (!toolKeys.length && !skillKeys.length)
-        || toolStatuses.some(t => t.met) || skillStatuses.some(s => s.proficient);
-    }
+    const { toolStatuses, skillStatuses, eligible } = recipe.checkProficiency(
+      actor, { workshopClaimed: this.#workshopClaimed }
+    );
 
     const spellChosen = !recipe.spellScroll || !!chosenSpell;
     const unlocked = game.user.isGM || recipe.canCraft(actor);
-    const canStart = !!actor && unlocked && !!targetItem && spellChosen && proficiencyEligible && requiredMet
+    const canStart = !!actor && unlocked && !!targetItem && spellChosen && eligible && requiredMet
       && (materialsMet || (this.#fillWithGold && !goldInsufficient));
 
     const totalHours = resolveTotalHours(recipe, craftCost, targetItem);
@@ -649,8 +614,7 @@ export default class CraftStartDialog extends Dialog5e {
     return {
       recipe, actor, targetItem, craftCost, fixedLines, freeformItems,
       suppliedCP, thresholdCP, shortfallCP, materialsMet, goldCP, goldInsufficient,
-      toolKeys, chosenToolKey, proficient, toolOwned, toolEligible, skillProficient,
-      skillRequired: skillKeys.length > 0, toolStatuses, skillStatuses, canStart, unlocked, totalHours,
+      toolStatuses, skillStatuses, canStart, unlocked, totalHours,
       hoursPerUse, weight, halfPrice, count, requiredMet, requiredAvailable, spellOptions, chosenSpell,
       scrollValues
     };

@@ -33,6 +33,15 @@ const RECIPE_SORT_MODES = {
 };
 
 /**
+ * Cycle-able Recipes-list grouping modes, in cycle order.
+ * @type {Record<string, { icon: string, label: string }>}
+ */
+const RECIPE_GROUP_MODES = {
+  type: { icon: "fa-solid fa-layer-group", label: "DND5E.FilterGroupCategory" },
+  tool: { icon: "fa-solid fa-hammer", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.GroupByTool" }
+};
+
+/**
  * GM-facing application for managing shops.
  */
 export default class ShopManager extends Application5e {
@@ -130,6 +139,14 @@ export default class ShopManager extends Application5e {
   #recipeSort = "name";
 
   /* -------------------------------------------- */
+
+  /**
+   * Current grouping mode for the recipes list, a key of {@link RECIPE_GROUP_MODES}.
+   * @type {"type"|"tool"}
+   */
+  #recipeGroup = "type";
+
+  /* -------------------------------------------- */
   /*  Rendering                                   */
   /* -------------------------------------------- */
 
@@ -210,6 +227,7 @@ export default class ShopManager extends Application5e {
           toolProfTooltip: Array.from(recipe.toolProficiencies).map(toolLabel).filter(Boolean).join("\n"),
           skillProfTooltip: Array.from(recipe.skillProficiencies).map(skillLabel).filter(Boolean).join("\n"),
           type: item?.type ?? "unknown",
+          targetMissing: recipe.isTargetMissing(item),
           bundleSize: (recipe.targetQuantity > 1) ? recipe.targetQuantity : null,
           materialValueCP,
           materialValueDisplay: recipe.ignoreCraftValue ? null : breakdownCopper(materialValueCP),
@@ -222,8 +240,28 @@ export default class ShopManager extends Application5e {
       if ( !recipeGroups.has(row.type) ) recipeGroups.set(row.type, []);
       recipeGroups.get(row.type).push(row);
     }
+    const typeGroups = finalizeGroups(recipeGroups);
+    context.recipeTypes = typeGroups.map(({ type, label }) => ({ type, label }));
+    let groups = typeGroups;
+    if ( this.#recipeGroup === "tool" ) {
+      const toolGroups = new Map();
+      for ( const row of recipeRows ) {
+        const keys = Array.from(row.recipe.toolProficiencies);
+        for ( const key of keys.length ? keys : ["none"] ) {
+          if ( !toolGroups.has(key) ) toolGroups.set(key, []);
+          toolGroups.get(key).push(row);
+        }
+      }
+      groups = Array.from(toolGroups, ([type, items]) => ({
+        type, items,
+        label: (type === "none") ? _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.NoTool") : toolLabel(type)
+      })).sort((a, b) => {
+        if ( (a.type === "none") !== (b.type === "none") ) return (a.type === "none") ? 1 : -1;
+        return a.label.localeCompare(b.label);
+      });
+    }
     context.recipeTable = buildItemTableSections({
-      groups: finalizeGroups(recipeGroups),
+      groups,
       emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.None",
       columns: [
         { id: "materialValue", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.MaterialValue" },
@@ -291,6 +329,18 @@ export default class ShopManager extends Application5e {
         onSort: () => this.render()
       });
       if ( content ) applyItemSort(this.#recipeSort, content);
+
+      const groupButton = htmlElement.querySelector(".group-control");
+      if ( groupButton ) {
+        const { icon, label } = RECIPE_GROUP_MODES[this.#recipeGroup];
+        groupButton.querySelector("i").className = icon;
+        groupButton.setAttribute("aria-label", _loc(label));
+        groupButton.addEventListener("click", () => {
+          const modes = Object.keys(RECIPE_GROUP_MODES);
+          this.#recipeGroup = modes[(modes.indexOf(this.#recipeGroup) + 1) % modes.length];
+          this.render();
+        });
+      }
     }
   }
 

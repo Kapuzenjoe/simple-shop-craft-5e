@@ -38,5 +38,8 @@
             </div>
             {{#if hint}}<p class="hint">{{{ hint }}}</p>{{/if}}
         </div>
+        {{#if assistantField}}
+        {{> "dnd5e.fieldlist" assistantField}}
+        {{/if}}
     </fieldset>
 </section>

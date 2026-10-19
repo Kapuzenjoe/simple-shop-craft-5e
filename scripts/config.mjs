@@ -20,6 +20,8 @@ export const SETTING_KEYS = {
   DEFAULT_STOCK_MAGIC_RULE: "defaultStockMagicRule",
   MAX_HOURS_PER_WORKDAY: "maxHoursPerWorkday",
   CALENDAR_MODE: "calendarMode",
+  ASSISTANTS_ENABLED: "assistantsEnabled",
+  MAX_ASSISTANTS: "maxAssistants",
   TRANSACTIONS: "transactions",
   LOG_TRANSACTIONS: "logTransactions",
   TRANSACTION_LIMIT: "transactionLimit"

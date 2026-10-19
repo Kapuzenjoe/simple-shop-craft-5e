@@ -107,6 +107,23 @@
     }
   }
 
+  .item.suppressed {
+    opacity: .5;
+  }
+
+  i.success {
+    color: var(--dnd5e-chat-status-success, var(--color-level-success));
+  }
+
+  i.failure,
+  i.error {
+    color: var(--dnd5e-chat-status-failure, var(--color-level-error));
+  }
+
+  i.warning {
+    color: var(--color-level-warning);
+  }
+
   .icon-picker-preview {
     flex: none;
     width: 32px;
@@ -312,7 +329,7 @@
         color: var(--dnd5e-color-red);
       }
 
-      &.clear-control, &.sort-control {
+      &.clear-control, &.sort-control, &.group-control {
         border: none;
         background: none;
         padding: 0;
@@ -452,14 +469,8 @@
     min-width: 120px;
   }
 
-  .item.suppressed {
-    opacity: .5;
-  }
-
-  .warning {
+  .hint.warning {
     color: var(--dnd5e-color-failure);
-    margin-left: 4px;
-    cursor: help;
   }
 
   .linked-actor-icon {

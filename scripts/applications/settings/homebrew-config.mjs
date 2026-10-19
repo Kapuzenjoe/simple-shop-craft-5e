@@ -20,7 +20,12 @@ export default class HomebrewConfig extends BaseSettingsConfig {
   static FIELDSETS = [
     {
       legend: "SIMPLE_SHOP_CRAFT_5E.Settings.Homebrew.Groups.Crafting",
-      keys: [SETTING_KEYS.MAX_HOURS_PER_WORKDAY, SETTING_KEYS.CALENDAR_MODE]
+      keys: [
+        SETTING_KEYS.MAX_HOURS_PER_WORKDAY,
+        SETTING_KEYS.CALENDAR_MODE,
+        SETTING_KEYS.ASSISTANTS_ENABLED,
+        SETTING_KEYS.MAX_ASSISTANTS
+      ]
     }
   ];
 }

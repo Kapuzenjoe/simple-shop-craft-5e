@@ -181,6 +181,17 @@
 /* -------------------------------------------- */
 
 /**
+ * @typedef RecipeProficiencyResult
+ * @property {{ key: string, proficient: boolean, owned: boolean, met: boolean }[]} toolStatuses
+ *                                         Proficiency, ownership, and whether the requirement is met for each
+ *                                         listed tool.
+ * @property {{ key: string, proficient: boolean }[]} skillStatuses  Proficiency in each listed skill.
+ * @property {boolean} eligible            Whether the requirements are met for the recipe's proficiency mode.
+ */
+
+/* -------------------------------------------- */
+
+/**
  * @typedef InProgressCraftData
  * @property {string} recipeId                 Id of the recipe this craft was started from.
  * @property {object} targetItem
@@ -199,6 +210,8 @@
  * @property {number|null} pendingHours        Hours planned for the current calendar-mode progress session.
  * @property {string} pendingMessageId         Id of the chat message announcing the pending session, so it
  *                                             can be marked resolved once the session ends.
+ * @property {string[]} pendingAssistants      UUIDs of the actors assisting the current calendar-mode progress
+ *                                             session.
  */
 
 /* -------------------------------------------- */
@@ -271,7 +284,6 @@
  * @property {{ dc: number, bonus: number }|null} scrollValues  Save DC/attack bonus for the crafted scroll.
  * @property {string} actorUuid                   UUID of the crafting actor.
  * @property {string} actorName                   Display name of the crafting actor.
- * @property {string|null} toolKey                Tool proficiency key used, or `null` if none required.
  * @property {CraftMaterialLine[]} materialLines   Materials contributed toward this craft.
  * @property {number} goldCP                      Copper amount filled in from the actor's own currency.
  * @property {number} totalHours                  Total progress hours needed to finish the craft.
@@ -292,6 +304,7 @@
  * @property {string} itemUuid      UUID of the in-progress craft item this session belongs to.
  * @property {string} actorUuid     UUID of the crafting actor.
  * @property {string} actorName     Display name of the crafting actor.
+ * @property {string} assistantNames  Comma-separated display names of the assisting actors, or blank.
  * @property {string} itemName      Display name of the in-progress craft item.
  * @property {string} itemImg       Image path of the in-progress craft item.
  * @property {number} pendingHours  Hours planned for this session.

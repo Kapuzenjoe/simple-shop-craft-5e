@@ -5,7 +5,7 @@
             {{> "modules/simple-shop-craft-5e/templates/shared/item-avatar-name.hbs"
                 img=img name=name subtitle=subtitle bundleSize=bundleSize }}
             {{#if warning}}
-            <i class="fa-solid fa-triangle-exclamation warning" data-tooltip="{{ warningTooltip }}"></i>
+            <i class="fa-solid fa-triangle-exclamation error" data-tooltip="{{ warningTooltip }}"></i>
             {{/if}}
             {{#if info}}
             <i class="fa-solid fa-circle-info" data-tooltip="{{ info }}"></i>

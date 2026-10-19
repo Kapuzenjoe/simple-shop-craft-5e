@@ -477,6 +477,20 @@ export function itemRarity(item) {
 /* -------------------------------------------- */
 
 /**
+ * Mark the source data of an activity, effect, or item as dependent on an active effect. A dependent is
+ * suppressed while that effect is inactive and removed together with it.
+ * @param {object} data     Source data of the dependent document.
+ * @param {string} effect   ID of an effect on the same item, or UUID of an effect.
+ * @returns {object}        The provided source data.
+ */
+export function setDependentOn(data, effect) {
+  foundry.utils.setProperty(data, "flags.dnd5e.dependentOn", effect);
+  return data;
+}
+
+/* -------------------------------------------- */
+
+/**
  * Get the identifier used to match an entry against owned items.
  * An identifier override of the entry takes precedence over the identifier of its item, whose default
  * identifier is ignored. The identifier stored on the entry is only used if its item can't be resolved.
@@ -934,17 +948,18 @@ export function matchesTypeFilter(types, type, subtype) {
 /* -------------------------------------------- */
 
 /**
- * Show or hide item rows within an `.items-list` by name match and/or selected type, hiding a type section
- * entirely once every row within it is filtered out. Leaves already-suppressed (`[hidden]`) rows untouched.
+ * Show or hide item rows within an `.items-list` by name match and/or selected type, hiding a section
+ * entirely once every row within it is filtered out. A row's type is its own `data-type`, falling back to
+ * the one of its section. Leaves already-suppressed (`[hidden]`) rows untouched.
  * @param {RegExp} rgx
  * @param {string} typeFilter  Selected type, or "" for no filter.
  * @param {HTMLElement} content
  */
 function applyItemFilters(rgx, typeFilter, content) {
   for ( const section of content.querySelectorAll(".items-section") ) {
-    const typeMatches = !typeFilter || (section.dataset.type === typeFilter);
     let matched = false;
     for ( const row of section.querySelectorAll(".item:not([hidden])") ) {
+      const typeMatches = !typeFilter || ((row.dataset.type ?? section.dataset.type) === typeFilter);
       const match = typeMatches && foundry.applications.ux.SearchFilter.testQuery(rgx, row.dataset.name);
       if ( match ) matched = true;
       row.style.display = match ? "" : "none";
