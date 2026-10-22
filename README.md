@@ -65,11 +65,13 @@ Each shop opens in its own sheet with four tabs. The header shows the shop's own
 Sell modifiers, and the coin in its till.
 
 - **Buy.** The GM adds items from the Compendium Browser, by UUID, or by dragging them in. Fill from Table
-  draws stock from a RollTable, and Generate Item rolls up new wares (see
+  draws stock from a RollTable, configuring drawn Spell Scrolls and enchantment items by hand or at random,
+  and Generate Item rolls up new wares (see
   [Random Item Generator](#random-item-generator)).
 - **Sell.** Lists the items of the buying character that the shop accepts (see
   [Stock & Restock](#stock--restock)). Items bought as a bundle, such as arrows, are sold back one piece at
-  a time.
+  a time. With Tidy 5e Sheets active, the items are grouped by the custom sections of the character's
+  inventory instead of by item type.
 - **Services.** Holds Lodging and Hirelings, along with any Buy item marked as a Service. A service costs
   coin but hands over no item.
 - **Description.** The shop's location, opening hours, restock days, and a description of the place.
@@ -265,6 +267,8 @@ where clicking the name of a target item or material opens it.
   tool.
 - **Spell Scrolls.** With a Spell Scroll as its target, the crafter picks a spell of the recipe's level, from
   their prepared or known spells or from any compendium.
+- **Enchantable items.** With an enchantment template as its target, such as a magic weapon or armor, the recipe
+  is configured like an item added to a shop, with its profile and base item.
 - **Sharing.** Export recipes to JSON and import them into another world.
 
 <table>

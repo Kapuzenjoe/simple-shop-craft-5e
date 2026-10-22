@@ -1,10 +1,10 @@
 import { MODULE_ID } from "../config.mjs";
 import { Recipe } from "../data/recipe-data.mjs";
-import { Shop } from "../data/shop-data.mjs";
+import { Shop, ShopItemEntry } from "../data/shop-data.mjs";
 import {
   applyItemSort, applyListControls, applyLoadingTooltip, breakdownCopper, buildItemTableSections,
-  confirmDeleteShop, finalizeGroups, formatDuration, promptImportFiles, recipeCraftCost, resolveEntries,
-  resolveTotalHours, selectableActors, spotlightShop, toCopper
+  confirmDeleteShop, finalizeGroups, formatDuration, promptImportFiles, recipeCraftCost, resolveTotalHours,
+  selectableActors, spotlightShop, toCopper
 } from "../utils.mjs";
 import CraftStartDialog from "./craft/craft-start-dialog.mjs";
 import RecipeSheet from "./craft/recipe-sheet.mjs";
@@ -200,7 +200,7 @@ export default class ShopManager extends Application5e {
     const visibleRecipes = context.isGM
       ? recipes
       : recipes.filter(r => (r.unlockMode === "all") || actors.some(actor => r.canCraft(actor)));
-    const targetResolved = await resolveEntries(visibleRecipes.map(r => r.targetItem));
+    const targetResolved = await ShopItemEntry.resolveMany(visibleRecipes.map(r => r.targetItem));
     const craftCosts = await Promise.all(
       targetResolved.map(({ item }, index) => recipeCraftCost(visibleRecipes[index], item))
     );

@@ -1,10 +1,14 @@
 import { PROFICIENCY_MODES, SPELL_SCROLL_SOURCES, UNLOCK_MODES } from "../../config.mjs";
+import { EnchantedItemBlueprint } from "../../data/enchanted-item-blueprint.mjs";
 import { Recipe, RecipeMaterial } from "../../data/recipe-data.mjs";
+import { ShopItemEntry } from "../../data/shop-data.mjs";
+import { SpellScrollBlueprint } from "../../data/spell-scroll-blueprint.mjs";
 import {
   applyDropArea, applyLoadingTooltip, breakdownCopper, buildItemTableSections, currencyRows,
-  currencyValueField, goldPoolCurrencies, identifierWarning, isSpellScrollItem, itemRef, itemRefKey, matchIdentifier,
+  currencyValueField, goldPoolCurrencies, identifierWarning, itemRef, itemRefKey, matchIdentifier,
   openItemSheet, recipeCraftCost, resolveBundleSize, resolveEntries, resolveUnitPrice, subtypeOptions, toCopper
 } from "../../utils.mjs";
+import ConfigureTemplatesDialog from "../shops/configure-templates-dialog.mjs";
 import BaseShopConfig from "../shops/shop-config/base-shop-config.mjs";
 import MaterialCriteriaDialog from "./material-criteria-dialog.mjs";
 
@@ -115,7 +119,7 @@ export default class RecipeSheet extends Application5e {
     context.recipe = recipe;
     const fields = Recipe.schema.fields;
 
-    const [targetResolved] = await resolveEntries([recipe.targetItem]);
+    const [targetResolved] = await ShopItemEntry.resolveMany([recipe.targetItem]);
     context.targetItem = targetResolved.item;
     context.targetIdentifierWarning = identifierWarning(targetResolved, {
       missing: "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.TargetNoIdentifierWarning",
@@ -373,12 +377,34 @@ export default class RecipeSheet extends Application5e {
     const uuid = await game.dnd5e.applications.CompendiumBrowser.selectOne({ tab: "physical" });
     const item = uuid ? await fromUuid(uuid) : null;
     if ( !item ) return;
+    if ( EnchantedItemBlueprint.isEnchantItem(item) ) return this.#configureTarget(item);
 
     await Recipe.update(
       this.recipeId,
       getTargetItemUpdate(item, this.recipe.skillProficiencies, this.recipe.toolProficiencies)
     );
     this.render();
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Configure an enchantment template chosen as the target, as when adding it to a shop, and save the result.
+   * @param {Item5e} item  The enchant item.
+   */
+  #configureTarget(item) {
+    new ConfigureTemplatesDialog({
+      templates: [{ kind: "enchant", item }], isService: false,
+      onSubmit: async ([{ generated }]) => {
+        const [{ item: target }] = await ShopItemEntry.resolveMany([{ generated }]);
+        if ( !target ) return;
+        await Recipe.update(this.recipeId, {
+          ...getTargetItemUpdate(target, this.recipe.skillProficiencies, this.recipe.toolProficiencies),
+          targetItem: { identifier: "", uuid: "", generated }
+        });
+        this.render();
+      }
+    }).render({ force: true });
   }
 
   /* -------------------------------------------- */
@@ -411,7 +437,10 @@ export default class RecipeSheet extends Application5e {
     if ( data.targetItem?.uuid === this.recipe.targetItem.uuid ) delete data.targetItem;
     if ( data.targetItem?.uuid ) {
       const item = await fromUuid(data.targetItem.uuid);
-      if ( item ) {
+      if ( item && EnchantedItemBlueprint.isEnchantItem(item) ) {
+        delete data.targetItem;
+        this.#configureTarget(item);
+      } else if ( item ) {
         Object.assign(data, getTargetItemUpdate(
           item, data.skillProficiencies ?? this.recipe.skillProficiencies,
           data.toolProficiencies ?? this.recipe.toolProficiencies
@@ -555,7 +584,7 @@ export default class RecipeSheet extends Application5e {
    */
   static async #removeTargetItem() {
     await Recipe.update(this.recipeId, {
-      targetItem: { identifier: "", uuid: "" }, img: Recipe.DEFAULT_ICON, spellScroll: null
+      targetItem: { identifier: "", uuid: "", generated: null }, img: Recipe.DEFAULT_ICON, spellScroll: null
     });
     this.render();
   }
@@ -639,7 +668,7 @@ function getTargetItemUpdate(item, skillProficiencies, toolProficiencies) {
   else if ( item.system.properties?.has("mgc") ) skills.add("arc");
   let spellScroll = null;
   let proficiencyMode;
-  if ( isSpellScrollItem(item) ) {
+  if ( SpellScrollBlueprint.isSpellScrollItem(item) ) {
     skills.add("arc");
     tools.add("calligrapher");
     spellScroll = { level: 0, spellSource: "prepared" };

@@ -1,5 +1,6 @@
 import { CraftMessageData } from "../../data/craft-message.mjs";
 import { Recipe } from "../../data/recipe-data.mjs";
+import { ShopItemEntry } from "../../data/shop-data.mjs";
 import {
   applyDropArea, applyLoadingTooltip, breakdownCopper, buildItemTableSections, canAffordCP, matchIdentifier,
   maxHoursPerWorkday, openItemSheet, recipeCraftCost, resolveBundleSize, resolveBundleSizes, resolveEntries,
@@ -486,15 +487,15 @@ export default class CraftStartDialog extends Dialog5e {
     const recipe = this.recipe;
     const actor = this.actor;
 
-    const [targetResolved] = await resolveEntries([recipe.targetItem]);
+    const [targetResolved] = await ShopItemEntry.resolveMany([recipe.targetItem]);
     const targetItem = targetResolved.item;
     const count = (targetItem?.type === "container") ? 1 : this.#count;
     const units = count * recipe.targetQuantity;
     const craftCost = await recipeCraftCost(recipe, targetItem);
     let weight = null;
     let halfPrice = null;
-    if ( !recipe.spellScroll && targetItem?.uuid ) {
-      const fullTargetItem = await fromUuid(targetItem.uuid);
+    if ( !recipe.spellScroll && targetItem ) {
+      const fullTargetItem = targetItem.uuid ? await fromUuid(targetItem.uuid) : targetItem;
       if ( fullTargetItem ) {
         weight = { ...fullTargetItem.system.weight, value: fullTargetItem.system.weight.value * units };
         halfPrice = {

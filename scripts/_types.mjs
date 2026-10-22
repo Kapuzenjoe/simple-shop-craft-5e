@@ -151,6 +151,7 @@
  * @property {object} targetItem
  * @property {string} [targetItem.identifier]    Fallback `system.identifier` reference, used if there is no `uuid`.
  * @property {string} [targetItem.uuid]          UUID of the item this recipe produces.
+ * @property {EnchantedItemBlueprintData|null} [targetItem.generated]  Blueprint of the enchanted item it produces.
  * @property {number} targetQuantity              Units produced per craft (e.g. 20 for a stack of arrows).
  * @property {RecipeMaterialData[]} materials    Fixed materials required by this recipe.
  * @property {boolean} allowFreeformMaterials    Whether players may substitute any sufficiently valuable item.
@@ -197,6 +198,7 @@
  * @property {object} targetItem
  * @property {string} [targetItem.identifier]  Fallback `system.identifier` reference, used if there is no `uuid`.
  * @property {string} [targetItem.uuid]        UUID of the item this craft produces.
+ * @property {EnchantedItemBlueprintData|null} [targetItem.generated]  Blueprint of the enchanted item it produces.
  * @property {number} targetQuantity           Units to produce when this craft completes.
  * @property {number} remaining                Runs of this craft still to finish, including the current one.
  * @property {string} spellUuid                Chosen spell UUID for a spell-scroll craft, or blank.
@@ -276,6 +278,7 @@
  * @property {object} targetItem
  * @property {string} [targetItem.identifier]     Fallback `system.identifier` reference, used if there is no `uuid`.
  * @property {string} [targetItem.uuid]           UUID of the produced item.
+ * @property {EnchantedItemBlueprintData|null} [targetItem.generated]  Blueprint of the enchanted item it produces.
  * @property {number} targetQuantity              Units to produce when this craft completes.
  * @property {number} count                       Runs of the recipe started by this craft.
  * @property {string} targetName                  Display name of the produced item.
@@ -379,13 +382,25 @@
 /* -------------------------------------------- */
 
 /**
- * @typedef GeneratorTemplateProfile
- * @property {EnchantActivity} activity  The enchant Activity offering the profile.
- * @property {ActiveEffect5e} effect  The profile's enchantment effect.
- * @property {number} level  Position of the profile among all of the item's profiles.
- * @property {string} rarity  Rarity given by the profile's enchantment.
+ * @typedef EnchantmentProfile
+ * @property {EnchantActivity} activity  Enchant activity that offers the profile.
+ * @property {ActiveEffect5e} effect     Enchantment effect of the profile.
+ * @property {number} level              Position among the item's profiles, before artifact ones are left out.
+ * @property {string} rarity             Rarity given by the enchantment.
+ */
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef _GeneratorTemplateProfile
  * @property {string[]} baseItems  UUIDs of the base items the profile can be applied to.
- * @property {number} weight  How likely the profile is drawn, relative to the item's other profiles.
+ * @property {number} weight       How likely the profile is drawn, relative to the item's other profiles.
+ */
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef {EnchantmentProfile & _GeneratorTemplateProfile} GeneratorTemplateProfile
  */
 
 /* -------------------------------------------- */

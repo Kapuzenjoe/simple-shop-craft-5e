@@ -2,14 +2,23 @@
 
 ## 1.1.0
 
+- Added grouping the items in the Sell tab by the custom sections of Tidy 5e Sheets, if Tidy 5e Sheets is active (#32).
 - Added assistants for crafting, who share the crafting time and work the same hours of their own workday, with Homebrew settings to turn them off or allow more of them (#11).
 - Added grouping the recipe list in the Shop Manager by tool proficiency (#25).
 - Added giving a character the Additional Items of an enchantment, such as the Clawed Gauntlets of Demon Armor, when it buys the generated item (#16).
 - Added a hint to shop entries that come with Additional Items.
 - Added a hint to the Recipe Editor and the Craft Start dialog when the target item of a recipe can't be found, and a greyed-out entry with a warning for such recipes in the Shop Manager.
 - Changed the warning icons in shops and recipes to yellow for minor issues, such as a sold-out or capped item, and kept red for problems, such as a missing item or identifier.
+- Changed the Craft Start dialog to list every tool and skill option with what is missing, so a tool no longer has to be picked.
 - Fixed the rider activities and effects of generated enchanted items staying active when the enchantment is disabled or removed.
-- Reworked the tool and skill requirements in the Craft Start dialog to list every option with what is missing, so a tool no longer has to be picked.
+- Reworked how enchantment templates are recognized:
+  - Added recipes for enchantable items, such as magic weapons and armor, configured like items added to a shop.
+  - Changed Fill from Table to configure drawn spell scrolls and enchantable items, by hand or at random, instead of adding them as empty templates.
+  - Changed the enchantment templates of the SRD and DMG to be recognized by their embedded journal page, and homebrew ones by item type and base item.
+  - Fixed items being treated as templates and templates as plain items, in shops, recipes, and the Item Generator.
+  - Fixed enchantment templates offering add-ons and self-enchantments as separate variants.
+  - Fixed the base item choice of enchantment templates being empty when no item matches, and being asked for when only one item fits.
+  - Fixed some generated enchanted items stacking with unrelated items in an inventory.
 
 ## 1.0.1
 

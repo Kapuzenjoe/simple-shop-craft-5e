@@ -314,6 +314,11 @@
       "FillFromTableResult": "Added {name}.",
       "FillFromTableResultMultiple": "Added {count} items.",
       "FillFromTablePartial": "Added {count} items ({skipped} results weren't usable items).",
+      "FillFromTableTemplates": "Templates",
+      "FillFromTableTemplatesHint": "Spell Scrolls and enchantment items need a spell or a base item before they can be sold.",
+      "FillFromTableTemplatesManual": "Configure manually",
+      "FillFromTableTemplatesRandom": "Pick randomly",
+      "FillFromTableRandomFailed": "No spell or base item could be picked at random for some templates. Choose one manually.",
       "Tabs": {
         "Buy": "Buy",
         "Sell": "Sell",

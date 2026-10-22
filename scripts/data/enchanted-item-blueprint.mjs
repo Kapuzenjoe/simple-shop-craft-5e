@@ -1,9 +1,14 @@
-import { excludeFilter, isShopPackSource, itemRarity, itemRef, itemRefKey, setDependentOn } from "../utils.mjs";
+import {
+  ENCHANT_BASE_ITEMS, ENCHANT_TEMPLATE_PAGE_ID, ENSPELLED_ITEMS, MAIN_PROFILE_ITEMS, NON_TEMPLATE_ITEMS
+} from "../config.mjs";
+import {
+  excludeFilter, isShopPackSource, itemRarity, itemRef, itemRefKey, resolveEntries, setDependentOn
+} from "../utils.mjs";
 
 const { DocumentUUIDField, FilePathField, StringField } = foundry.data.fields;
 
 /**
- * @import { EnchantedItemBlueprintData } from "../_types.mjs";
+ * @import { EnchantedItemBlueprintData, EnchantmentProfile } from "../_types.mjs";
  */
 
 /**
@@ -95,33 +100,22 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
   /* -------------------------------------------- */
 
   /**
-   * Can this item's type/subtype be an enchant-item template, per the DMG/SRD catalog's own pattern?
+   * List the enchantment profiles of an item's enchant activities, leaving out riders, self-enchantments, and
+   * artifacts.
    * @param {Item5e} item
-   * @returns {boolean}
-   */
-  static canBeTemplate(item) {
-    if ( item.type === "weapon" ) return true;
-    if ( item.type === "equipment" ) {
-      const subtype = item.system.type?.value;
-      return (subtype in CONFIG.DND5E.armorTypes) || ["ring", "rod", "wand"].includes(subtype);
-    }
-    if ( item.type === "consumable" ) return ["ammo", "scroll"].includes(item.system.type?.value);
-    return false;
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * List all enchantment profiles offered by an item's `enchant` Activities — every effect profile across
-   * every such Activity that isn't itself a rider.
-   * @param {Item5e} item
-   * @returns {{ activity: EnchantActivity, effect: ActiveEffect5e }[]}
+   * @returns {EnchantmentProfile[]}
    */
   static getEnchantmentProfiles(item) {
     const enchantActivities = item.system.activities?.getByType("enchant") ?? [];
-    return enchantActivities.filter(activity => !activity.isRider).flatMap(activity => (activity.effects ?? [])
-      .map(profile => ({ activity, effect: item.effects.get(profile._id) }))
-      .filter(profile => profile.effect));
+    const profiles = enchantActivities.filter(activity => !activity.isRider && !activity.enchant.self)
+      .flatMap(activity => (activity.effects ?? [])
+        .map(profile => ({ activity, effect: item.effects.get(profile._id) }))
+        .filter(profile => profile.effect))
+      .map((profile, level) => ({
+        ...profile, level, rarity: EnchantedItemBlueprint.#resolveProfileRarity(item, profile.effect)
+      }))
+      .filter(profile => profile.rarity !== "artifact");
+    return MAIN_PROFILE_ITEMS.has(item.system.identifier) ? profiles.slice(0, 1) : profiles;
   }
 
   /* -------------------------------------------- */
@@ -133,11 +127,46 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
    * @param {ActiveEffect5e} effect
    * @returns {string}
    */
-  static resolveProfileRarity(item, effect) {
+  static #resolveProfileRarity(item, effect) {
     const rarityChange = effect.system.changes?.find(
       change => (change.key === "system.rarity") || (change.key === "system.rarities")
     );
     return rarityChange?.value || itemRarity(item);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Is this item an Enspelled item, which binds a spell into its enchantment?
+   * @param {Item5e} item
+   * @returns {boolean}
+   */
+  static isEnspelledItem(item) {
+    return item.system.identifier in ENSPELLED_ITEMS;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Is this item a template for an enchantment that can be applied to a base item? A base item without a type is
+   * hidden in the item sheet and ignored.
+   * @param {Item5e} item
+   * @returns {boolean}
+   */
+  static isEnchantItem(item) {
+    if ( !EnchantedItemBlueprint.getEnchantmentProfiles(item).length ) return false;
+    if ( EnchantedItemBlueprint.isEnspelledItem(item)
+      || item.system.description?.value?.includes(ENCHANT_TEMPLATE_PAGE_ID) ) return true;
+    if ( NON_TEMPLATE_ITEMS.has(item.system.identifier) ) return false;
+    const { value: typeValue="", subtype, baseItem } = item.system.type ?? {};
+    switch ( item.type ) {
+      case "weapon": return !(typeValue && baseItem);
+      case "equipment":
+        if ( ["light", "medium", "heavy", "shield"].includes(typeValue) ) return !baseItem;
+        return !typeValue || ["ring", "rod", "wand"].includes(typeValue);
+      case "consumable": return (typeValue === "ammo") ? !subtype : (typeValue === "scroll");
+      default: return false;
+    }
   }
 
   /* -------------------------------------------- */
@@ -192,7 +221,7 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
    * @param {string[]} uuids  UUIDs of the candidate base items.
    * @returns {Promise<Item5e|null>}
    */
-  static async pickEnchantableBaseItem(activity, uuids) {
+  static async pickRandomBaseItem(activity, uuids) {
     const pool = [...uuids];
     while ( pool.length ) {
       const [uuid] = pool.splice(Math.floor(Math.random() * pool.length), 1);
@@ -206,12 +235,19 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
 
   /**
    * Resolve an enchant activity's own base-item restriction from its restrictions and description header — either
-   * a fixed list of explicitly named base items, or a type/category filter set for a `CompendiumBrowser` search.
+   * a fixed list of explicitly named base items, including those of `ENCHANT_BASE_ITEMS`, or a type/category filter
+   * set for a `CompendiumBrowser` search.
    * @param {EnchantActivity} activity
    * @returns {Promise<{ explicit: Item5e[], label: string }
    *   |{ types: Set<string>, categoryFilters: object[], filters: object[], label: string }>}
    */
   static async resolveBaseItemCandidates(activity) {
+    const baseIdentifier = ENCHANT_BASE_ITEMS[activity.item.system.identifier];
+    if ( baseIdentifier ) {
+      const [{ item }] = await resolveEntries([{ identifier: baseIdentifier }]);
+      const items = item ? [item] : [];
+      return { explicit: items, label: EnchantedItemBlueprint.#describeExplicit(items) };
+    }
     const restrictionUuids = EnchantedItemBlueprint.#parseRestrictionUuids(activity.item);
     if ( restrictionUuids.length ) {
       const items = (await Promise.all(restrictionUuids.map(uuid => fromUuid(uuid)))).filter(item => item);
@@ -237,7 +273,8 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
 
   /**
    * Resolve the `system.identifier` an enchanted item's synthesis produces for a given base item, enchant
-   * item, effect profile, and bound spell.
+   * item, effect profile, and bound spell. A profile named after a bonus, such as "Weapon +1", is identified by
+   * the base item and the bonus, any other profile by the enchant item and the base item.
    * @param {Item5e} baseItem
    * @param {Item5e} enchantItem
    * @param {ActiveEffect5e} effect
@@ -245,9 +282,9 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
    * @returns {string}
    */
   static resolveIdentifier(baseItem, enchantItem, effect, spell=null) {
-    const bonusChange = effect.system.changes?.find(change => change.key === "system.magicalBonus");
-    const identifier = bonusChange
-      ? `${baseItem.system.identifier}-${bonusChange.value}`
+    const bonus = effect.name.match(/\+(\d+)$/)?.[1];
+    const identifier = bonus
+      ? `${baseItem.system.identifier}-${bonus}`
       : `${enchantItem.system.identifier}-${baseItem.system.identifier}`;
     return spell ? `${identifier}-${spell.identifier}` : identifier;
   }

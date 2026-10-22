@@ -1,12 +1,14 @@
 import { MODULE_ID, SETTING_KEYS } from "../config.mjs";
 import {
   createSpellScroll, deductActorCurrencyChecked, findStack, formatDuration, isCalendarModeActive,
-  maxHoursPerWorkday, resolveEntries, shouldHandleWorldTimeAdvance
+  maxHoursPerWorkday, shouldHandleWorldTimeAdvance
 } from "../utils.mjs";
+import { EnchantedItemBlueprint } from "./enchanted-item-blueprint.mjs";
 import { Recipe } from "./recipe-data.mjs";
+import { ShopItemEntry } from "./shop-data.mjs";
 import ProgressHoursDialog from "../applications/craft/progress-hours-dialog.mjs";
 
-const { ArrayField, DocumentUUIDField, NumberField, SchemaField, StringField } = foundry.data.fields;
+const { ArrayField, DocumentUUIDField, EmbeddedDataField, NumberField, SchemaField, StringField } = foundry.data.fields;
 
 /**
  * @import { InProgressCraftData } from "../_types.mjs";
@@ -54,7 +56,8 @@ export class InProgressCraft extends foundry.abstract.DataModel {
       recipeId: new StringField({ blank: true }),
       targetItem: new SchemaField({
         identifier: new StringField({ blank: true }),
-        uuid: new DocumentUUIDField({ type: "Item", blank: true })
+        uuid: new DocumentUUIDField({ type: "Item", blank: true }),
+        generated: new EmbeddedDataField(EnchantedItemBlueprint, { nullable: true, initial: null })
       }),
       targetQuantity: new NumberField({ required: true, initial: 1, integer: true, min: 1 }),
       remaining: new NumberField({ required: true, initial: 1, integer: true, min: 1 }),
@@ -481,7 +484,13 @@ export class InProgressCraft extends foundry.abstract.DataModel {
       const toCreate = await Item.implementation.createWithContents(copies);
       await actor.createEmbeddedDocuments("Item", toCreate, { keepId: true });
     } else {
-      await actor.createEmbeddedDocuments("Item", [itemData]);
+      const toCreate = [itemData];
+      if ( this.targetItem.generated ) {
+        itemData._id = foundry.utils.randomID();
+        toCreate.push(...await new EnchantedItemBlueprint(this.targetItem.generated)
+          .collectRiderItems(`${actor.uuid}.Item.${itemData._id}`));
+      }
+      await actor.createEmbeddedDocuments("Item", toCreate, { keepId: true });
     }
     if ( this.remaining > 1 ) {
       this.updateSource({ remaining: this.remaining - 1, progress: 0 });
@@ -563,8 +572,8 @@ export class InProgressCraft extends foundry.abstract.DataModel {
       const spell = await fromUuid(this.spellUuid);
       item = spell ? await createSpellScroll(spell, this.scrollValues) : null;
     } else {
-      const [resolved] = await resolveEntries([this.targetItem]);
-      item = resolved.item?.uuid ? await fromUuid(resolved.item.uuid) : null;
+      const [resolved] = await ShopItemEntry.resolveMany([this.targetItem]);
+      item = resolved.item?.uuid ? await fromUuid(resolved.item.uuid) : resolved.item;
     }
     if ( !item ) ui.notifications.error("SIMPLE_SHOP_CRAFT_5E.CraftCard.MissingItem", { localize: true });
     return item;

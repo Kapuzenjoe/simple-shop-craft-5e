@@ -267,6 +267,36 @@ export const SPELL_SCROLL_LEVELS = {
 };
 
 /**
+ * ID of the Foundry References journal page that dnd5e embeds in the description of every enchantment template of
+ * the SRD and the DMG.
+ * @type {string}
+ */
+export const ENCHANT_TEMPLATE_PAGE_ID = "Ok4iCgD25ENgoRxE";
+
+/**
+ * Items with an Enchant Activity that aren't enchantment templates although their data looks like one, by item
+ * identifier. Only consulted for items without the embedded journal page.
+ * @type {Set<string>}
+ */
+export const NON_TEMPLATE_ITEMS = new Set(["helm-of-brilliance"]);
+
+/**
+ * Enchant items by item identifier whose first profile is the item itself and whose further profiles are options
+ * added to it, so that only the first profile is offered.
+ * @type {Set<string>}
+ */
+export const MAIN_PROFILE_ITEMS = new Set(["hammer-of-thunderbolts", "moonblade"]);
+
+/**
+ * Base item of enchant items whose restrictions don't name any, as item identifier by the identifier of the enchant
+ * item.
+ * @type {Record<string, string>}
+ */
+export const ENCHANT_BASE_ITEMS = {
+  "wraps-of-unarmed-power": "unarmed-strike"
+};
+
+/**
  * Spell schools an Enspelled item's bound spell may belong to, per DMG 2024 "Enspelled Armor/Staff/Weapon",
  * keyed by the template's `system.identifier`. `null` allows any school.
  * @type {Record<string, string[]|null>}

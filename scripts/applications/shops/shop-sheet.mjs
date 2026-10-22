@@ -3,9 +3,11 @@ import {
 } from "../../config.mjs";
 import { EnchantedItemBlueprint } from "../../data/enchanted-item-blueprint.mjs";
 import { newEntryStock, Shop, ShopItemEntry } from "../../data/shop-data.mjs";
+import { SpellScrollBlueprint } from "../../data/spell-scroll-blueprint.mjs";
+import { getTidySection, isTidyActive } from "../../integrations/tidy5e.mjs";
 import {
   applyItemSort, applyListControls, applyLoadingTooltip, applyRichTooltip, breakdownCopper, buildItemTableSections,
-  confirmDeleteShop, finalizeGroups, identifierWarning, isCalendarModeActive, isSpellScrollItem, itemRef,
+  confirmDeleteShop, finalizeGroups, identifierWarning, isCalendarModeActive, itemRef,
   openItemSheet, resolveBundleSize, resolveBundleSizes, resolveItemPrice, resolveUnitPrice, selectableActors,
   spotlightShop, toCopper
 } from "../../utils.mjs";
@@ -932,10 +934,9 @@ export default class ShopSheet extends Application5e {
         });
         continue;
       }
-      if ( isSpellScrollItem(item) ) {
+      if ( SpellScrollBlueprint.isSpellScrollItem(item) ) {
         templates.push({ kind: "spellScroll", item });
-      } else if ( EnchantedItemBlueprint.getEnchantmentProfiles(item)
-        .some(p => EnchantedItemBlueprint.resolveProfileRarity(item, p.effect) !== "artifact") ) {
+      } else if ( EnchantedItemBlueprint.isEnchantItem(item) ) {
         templates.push({ kind: "enchant", item });
       } else {
         entries.push({ ...itemRef(item), isService, ...newEntryStock(item, this.shop.stockDefaults) });
@@ -1592,7 +1593,8 @@ async function groupByType({
 /* -------------------------------------------- */
 
 /**
- * Group a selected actor's sellable inventory by item type.
+ * Group a selected actor's sellable inventory by item type, or by the custom sections of Tidy 5e Sheets if it
+ * is active.
  * @param {object} options
  * @param {Item5e[]|Collection} options.items      The actor's items.
  * @param {number} options.sellModifier            Shop's sell-side percent discount/markup.
@@ -1613,6 +1615,8 @@ async function groupSellItems({
   const sellable = Array.from(items).filter(item => CONFIG.Item.dataModels[item.type]?.inventorySection);
   const bundleSizes = await resolveBundleSizes(sellable);
   const groups = new Map();
+  const sections = new Map();
+  const useTidy = isTidyActive();
   for ( const item of sellable ) {
     const price = resolveUnitPrice(item, { fallback: false, bundleSize: bundleSizes.get(item.id) });
     const basePrice = price?.value ?? 0;
@@ -1636,10 +1640,13 @@ async function groupSellItems({
       suppressed,
       weight: resolveWeight(item.system, targetUnit)
     };
-    if ( !groups.has(item.type) ) groups.set(item.type, []);
-    groups.get(item.type).push(row);
+    const section = useTidy ? getTidySection(item) : "";
+    const target = section ? sections : groups;
+    const key = section || item.type;
+    if ( !target.has(key) ) target.set(key, []);
+    target.get(key).push(row);
   }
-  return finalizeGroups(groups);
+  return finalizeGroups(groups, { sections });
 }
 
 /* -------------------------------------------- */

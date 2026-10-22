@@ -1,5 +1,6 @@
 import { PROFICIENCY_MODES, SETTING_KEYS, SPELL_SCROLL_SOURCES, UNLOCK_MODES } from "../config.mjs";
 import { resolveBundleSize, toCopper } from "../utils.mjs";
+import { EnchantedItemBlueprint } from "./enchanted-item-blueprint.mjs";
 import SettingCollectionMixin from "./setting-collection-mixin.mjs";
 
 const {
@@ -65,7 +66,10 @@ export class Recipe extends SettingCollectionMixin(foundry.abstract.DataModel, S
       _id: new DocumentIdField({ initial: () => foundry.utils.randomID() }),
       name: new StringField({ blank: true }),
       img: new FilePathField({ categories: ["IMAGE"], initial: () => Recipe.DEFAULT_ICON }),
-      targetItem: new SchemaField(itemRefSchema()),
+      targetItem: new SchemaField({
+        ...itemRefSchema(),
+        generated: new EmbeddedDataField(EnchantedItemBlueprint, { nullable: true, initial: null })
+      }),
       targetQuantity: new NumberField({ initial: 1, integer: true, min: 1 }),
       materials: new ArrayField(new EmbeddedDataField(RecipeMaterial)),
       allowFreeformMaterials: new BooleanField({ initial: false }),
@@ -140,7 +144,7 @@ export class Recipe extends SettingCollectionMixin(foundry.abstract.DataModel, S
    * @returns {boolean}
    */
   isTargetMissing(targetItem) {
-    return !targetItem && !!(this.targetItem.uuid || this.targetItem.identifier);
+    return !targetItem && !!(this.targetItem.uuid || this.targetItem.identifier || this.targetItem.generated);
   }
 
   /* -------------------------------------------- */

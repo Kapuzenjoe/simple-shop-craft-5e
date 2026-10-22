@@ -1,9 +1,10 @@
 import { CARD_STATUSES, MODULE_ID } from "../config.mjs";
 import { breakdownCopper } from "../utils.mjs";
+import { EnchantedItemBlueprint } from "./enchanted-item-blueprint.mjs";
 import { InProgressCraft } from "./in-progress-craft.mjs";
 
 const {
-  ArrayField, DocumentUUIDField, FilePathField, NumberField, SchemaField, StringField
+  ArrayField, DocumentUUIDField, EmbeddedDataField, FilePathField, NumberField, SchemaField, StringField
 } = foundry.data.fields;
 
 /**
@@ -31,7 +32,8 @@ export class CraftMessageData extends foundry.abstract.DataModel {
       recipeId: new StringField({ blank: true }),
       targetItem: new SchemaField({
         identifier: new StringField({ blank: true }),
-        uuid: new DocumentUUIDField({ type: "Item", blank: true })
+        uuid: new DocumentUUIDField({ type: "Item", blank: true }),
+        generated: new EmbeddedDataField(EnchantedItemBlueprint, { nullable: true, initial: null })
       }),
       targetQuantity: new NumberField({ initial: 1, integer: true, min: 1 }),
       count: new NumberField({ initial: 1, integer: true, min: 1 }),
@@ -104,7 +106,10 @@ export class CraftMessageData extends foundry.abstract.DataModel {
   }) {
     const craft = new CraftMessageData({
       recipeId: recipe._id,
-      targetItem: { identifier: recipe.targetItem.identifier, uuid: recipe.targetItem.uuid },
+      targetItem: {
+        identifier: recipe.targetItem.identifier, uuid: recipe.targetItem.uuid,
+        generated: recipe.targetItem.generated?.toObject() ?? null
+      },
       targetQuantity: recipe.targetQuantity,
       targetName: targetItem.name, targetImg: targetItem.img,
       actorUuid: actor.uuid, actorName: actor.name,

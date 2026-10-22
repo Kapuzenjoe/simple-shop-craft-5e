@@ -103,9 +103,9 @@ async function effectiveCraftCost(item) {
  */
 export async function recipeCraftCost(recipe, targetItem) {
   if ( recipe.spellScroll ) return CONFIG.DND5E.crafting.scrolls[recipe.spellScroll.level] ?? null;
-  if ( !targetItem?.uuid ) return null;
+  if ( !targetItem ) return null;
   try {
-    const fullItem = await fromUuid(targetItem.uuid);
+    const fullItem = targetItem.uuid ? await fromUuid(targetItem.uuid) : targetItem;
     return fullItem?.system?.getCraftCost ? effectiveCraftCost(fullItem) : null;
   } catch ( err ) {
     console.warn(`${MODULE_ID} | Failed to resolve craft cost for ${targetItem.uuid}:`, err);
@@ -396,10 +396,12 @@ export function buildItemTableSections({ groups, emptyLabel, columns, rowTemplat
  * @param {object} [options]
  * @param {(type: string) => string|null} [options.labelFor]  Override for a specific type's label, checked
  *   before the generic `TYPES.Item.<type>Pl` fallback. Return `null`/`undefined` to use the fallback.
+ * @param {Map<string, object[]>} [options.sections]  Map of custom section name → rows. Appended after the
+ *   type groups, sorted by name.
  * @returns {{ type: string, label: string, items: object[] }[]}
  */
-export function finalizeGroups(groups, { labelFor }={}) {
-  return Array.from(groups, ([type, items]) => ({
+export function finalizeGroups(groups, { labelFor, sections }={}) {
+  const typeGroups = Array.from(groups, ([type, items]) => ({
     type,
     label: labelFor?.(type)
       ?? ((type === "unknown") ? _loc("SIMPLE_SHOP_CRAFT_5E.Unknown") : _loc(`TYPES.Item.${type}Pl`)),
@@ -408,6 +410,12 @@ export function finalizeGroups(groups, { labelFor }={}) {
     return (CONFIG.Item.dataModels[a.type]?.inventorySection?.order ?? Infinity)
     - (CONFIG.Item.dataModels[b.type]?.inventorySection?.order ?? Infinity);
   });
+  const sectionGroups = Array.from(sections ?? [], ([name, items]) => ({
+    type: `section:${name}`,
+    label: name,
+    items
+  })).sort((a, b) => a.label.localeCompare(b.label, game.i18n.lang));
+  return typeGroups.concat(sectionGroups);
 }
 
 /* -------------------------------------------- */
@@ -436,17 +444,6 @@ export async function preloadHandlebarsTemplates() {
 
 /* -------------------------------------------- */
 /*  Items                                       */
-/* -------------------------------------------- */
-
-/**
- * Whether an item is dnd5e's generic Spell Scroll item — picking it activates spell-scroll handling.
- * @param {Item5e} item
- * @returns {boolean}
- */
-export function isSpellScrollItem(item) {
-  return (item.system.identifier === "spell-scroll") || /spell scroll/i.test(item.name ?? "");
-}
-
 /* -------------------------------------------- */
 
 /**

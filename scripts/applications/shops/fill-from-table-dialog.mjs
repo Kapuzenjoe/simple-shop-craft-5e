@@ -1,10 +1,15 @@
+import { EnchantedItemBlueprint } from "../../data/enchanted-item-blueprint.mjs";
+import GeneratorProfile from "../../data/generator-profile.mjs";
 import { ShopItemEntry } from "../../data/shop-data.mjs";
+import { SpellScrollBlueprint } from "../../data/spell-scroll-blueprint.mjs";
 import { itemRef, resolveItemPrice, toCopper } from "../../utils.mjs";
+import ConfigureTemplatesDialog from "./configure-templates-dialog.mjs";
 
 const { Dialog5e } = game.dnd5e.applications.api;
 const { DocumentUUIDField, StringField } = foundry.data.fields;
 
 /**
+ * @import { GeneratorCandidate } from "../../_types.mjs";
  * @import ShopSheet from "./shop-sheet.mjs";
  */
 
@@ -75,6 +80,17 @@ export default class FillFromTableDialog extends Dialog5e {
         field: new StringField({ initial: "1", required: true, blank: false }), name: "formula",
         label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.FillFromTableCount"),
         hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.FillFromTableCountHint")
+      },
+      {
+        field: new StringField({
+          choices: {
+            manual: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.FillFromTableTemplatesManual"),
+            random: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.FillFromTableTemplatesRandom")
+          },
+          initial: "manual", required: true, blank: false
+        }), name: "templates",
+        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.FillFromTableTemplates"),
+        hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.FillFromTableTemplatesHint")
       }
     ];
     return context;
@@ -108,6 +124,7 @@ export default class FillFromTableDialog extends Dialog5e {
     const capCP = settlementCap?.value != null ? toCopper(settlementCap.value, settlementCap.denomination) : null;
 
     const counted = new Map();
+    const templates = [];
     let skipped = 0;
     for ( const item of drawnItems ) {
       if ( !CONFIG.Item.dataModels[item?.type]?.inventorySection ) {
@@ -121,6 +138,14 @@ export default class FillFromTableDialog extends Dialog5e {
           continue;
         }
       }
+      if ( SpellScrollBlueprint.isSpellScrollItem(item) ) {
+        templates.push({ kind: "spellScroll", item });
+        continue;
+      }
+      if ( EnchantedItemBlueprint.isEnchantItem(item) ) {
+        templates.push({ kind: "enchant", item });
+        continue;
+      }
       const entry = itemRef(item);
       const key = ShopItemEntry.key(entry, item);
       const existing = counted.get(key);
@@ -129,12 +154,17 @@ export default class FillFromTableDialog extends Dialog5e {
     }
     const rolled = Array.from(counted.values());
 
-    if ( !rolled.length ) {
+    if ( !rolled.length && !templates.length ) {
       ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.FillFromTableNone", { localize: true });
       return;
     }
 
     const inShop = await ShopItemEntry.byKey(this.shopSheet.shop.items.filter(i => !i.isService));
+    if ( templates.length ) await this.#addTemplates(templates, data.templates, new Set(inShop.keys()));
+    if ( !rolled.length ) {
+      await this.close();
+      return;
+    }
     await this.onFilled(rolled.map(({ key, entry, count }) => {
       const existing = inShop.get(key);
       if ( existing ) {
@@ -150,4 +180,65 @@ export default class FillFromTableDialog extends Dialog5e {
     ui.notifications.info(key, { format });
     await this.close();
   }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Add the drawn Spell Scroll and enchantment templates to the shop, either configured manually or resolved at
+   * random. Templates that can't be resolved at random are configured manually instead.
+   * @param {{ kind: "spellScroll"|"enchant", item: Item5e }[]} templates
+   * @param {string} mode                Either `manual` or `random`.
+   * @param {Set<string>} existingKeys   Entry keys already present in the shop's Buy tab.
+   * @returns {Promise<void>}
+   */
+  async #addTemplates(templates, mode, existingKeys) {
+    let manual = templates;
+    if ( mode === "random" ) {
+      manual = [];
+      const profile = new GeneratorProfile();
+      const entries = [];
+      for ( const template of templates ) {
+        const candidates = await getCandidates(template);
+        const [result] = await profile.roll({
+          existingKeys, stockDefaults: this.shopSheet.shop.stockDefaults, pool: { candidates }, count: 1
+        });
+        if ( !result ) {
+          manual.push(template);
+          continue;
+        }
+        existingKeys.add(ShopItemEntry.key(result.entry));
+        entries.push(result.entry);
+      }
+      if ( entries.length ) await this.onFilled(entries);
+      if ( manual.length ) {
+        ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.FillFromTableRandomFailed", { localize: true });
+      }
+    }
+    if ( !manual.length ) return;
+    new ConfigureTemplatesDialog({
+      templates: manual, isService: false, onSubmit: this.onFilled
+    }).render({ force: true });
+  }
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Build the candidates the generator can draw from to resolve a template at random.
+ * @param {{ kind: "spellScroll"|"enchant", item: Item5e }} template
+ * @returns {Promise<GeneratorCandidate[]>}  Empty if the template can't be resolved.
+ */
+async function getCandidates({ kind, item }) {
+  if ( kind === "spellScroll" ) {
+    const [level] = Object.entries(CONFIG.DND5E.spellScrollIds).find(([, uuid]) => uuid === item.uuid) ?? [];
+    if ( level === undefined ) return [];
+    const spells = await GeneratorProfile.fetchEnspelledSpells("spell-scroll", Number(level));
+    return spells.map(index => ({ kind: "spell", index, weight: 1 }));
+  }
+  const profiles = await Promise.all(EnchantedItemBlueprint.getEnchantmentProfiles(item)
+    .map(async profile => ({
+      ...profile, weight: 1, baseItems: await EnchantedItemBlueprint.listEnchantableBaseItems(profile.activity)
+    })));
+  const open = profiles.filter(profile => profile.baseItems.length);
+  return open.length ? [{ kind: "template", item, profiles: open, weight: 1 }] : [];
 }
