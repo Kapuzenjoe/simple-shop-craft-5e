@@ -1,8 +1,8 @@
 import {
-  DEFAULT_STOCK_BY_TYPE, defaultStockKey, LEGACY_IDENTIFIERS, MODULE_ID, SETTING_KEYS, STARTER_PACKS, STARTER_SOURCES
+  DEFAULT_STOCK_BY_TYPE, defaultStockKey, LEGACY_IDENTIFIERS, MODULE_ID, SETTING_KEYS, STARTER_PACKS
 } from "../../config.mjs";
 import { newEntryStock, Shop } from "../../data/shop-data.mjs";
-import { bulkFromUuid, itemRef } from "../../utils.mjs";
+import { bulkFromUuid, getStarterUuids, itemRef } from "../../utils.mjs";
 import ShopSheet from "./shop-sheet.mjs";
 
 const { Dialog5e } = game.dnd5e.applications.api;
@@ -124,27 +124,6 @@ export default class ShopCreateDialog extends Dialog5e {
     new ShopSheet({ shopId: created._id }).render({ force: true, mode: ShopSheet.MODES.EDIT });
     await this.close();
   }
-}
-
-/* -------------------------------------------- */
-
-/**
- * Get the UUIDs of the items offered to starter packs, from the first compendium that has them.
- * @param {boolean} modern  Whether the world uses the modern rules.
- * @returns {Promise<Map<string, string>>}  Identifier of the item mapped to its UUID.
- */
-async function getStarterUuids(modern) {
-  const rules = modern ? "modern" : "legacy";
-  const packs = STARTER_SOURCES[rules].map(name => game.packs.get(name)).filter(_ => _);
-  const byIdentifier = new Map();
-  for ( const pack of packs ) {
-    for ( const entry of await pack.getIndex({ fields: ["system.container", "system.identifier"] }) ) {
-      if ( entry.system?.container || !CONFIG.Item.dataModels[entry.type]?.inventorySection ) continue;
-      const identifier = entry.system?.identifier || game.dnd5e.utils.formatIdentifier(entry.name);
-      if ( !byIdentifier.has(identifier) ) byIdentifier.set(identifier, entry.uuid);
-    }
-  }
-  return byIdentifier;
 }
 
 /* -------------------------------------------- */

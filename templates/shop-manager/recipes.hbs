@@ -30,6 +30,12 @@
                 aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Import' }}">
             <i class="fas fa-file-import" inert></i>
         </button>
+        {{#if isModern}}
+        <button type="button" data-action="importDefaultRecipes" class="gold-button always-interactive" data-tooltip
+                aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.ImportDefaults' }}">
+            <i class="fas fa-book-open" inert></i>
+        </button>
+        {{/if}}
         <button type="button" data-action="createRecipe" class="gold-button always-interactive" data-tooltip
                 aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Create' }}">
             <i class="fas fa-plus" inert></i>

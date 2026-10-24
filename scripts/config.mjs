@@ -372,3 +372,51 @@ export const STARTER_PACKS = {
     items: ["rations", "waterskin"]
   }
 };
+
+/**
+ * Identifiers of the items each tool can craft.
+ * @type {Record<string, string[]>}
+ */
+export const CRAFTING_TOOLS = {
+  alchemist: ["acid", "alchemists-fire", "component-pouch", "oil", "paper", "perfume"],
+  brewer: ["antitoxin"],
+  calligrapher: ["ink"],
+  carpenter: [
+    "club", "greatclub", "quarterstaff", "barrel", "chest", "ladder", "pole", "ram-portable", "torch"
+  ],
+  cartographer: ["map"],
+  cobbler: ["climbers-kit"],
+  cook: ["rations"],
+  glassblower: ["bottle-glass", "magnifying-glass", "spyglass", "vial"],
+  jeweler: ["crystal", "orb", "rod", "staff", "wand", "amulet", "emblem", "reliquary"],
+  leatherworker: [
+    "sling", "whip", "hide-armor", "leather-armor", "studded-leather-armor", "backpack", "case-crossbow-bolt",
+    "case-map-or-scroll", "parchment", "pouch", "quiver", "waterskin"
+  ],
+  mason: ["block-and-tackle"],
+  painter: ["sprig-of-mistletoe", "wooden-staff", "yew-wand", "amulet", "emblem", "reliquary"],
+  potter: ["jug", "lamp"],
+  smith: [
+    "dagger", "handaxe", "javelin", "light-hammer", "mace", "sickle", "spear", "battleaxe", "flail", "glaive",
+    "greataxe", "greatsword", "halberd", "lance", "longsword", "maul", "morningstar", "pike", "rapier", "scimitar",
+    "shortsword", "trident", "war-pick", "warhammer", "breastplate", "chain-shirt", "half-plate-armor", "scale-mail",
+    "chain-mail", "plate-armor", "ring-mail", "splint-armor", "shield", "ball-bearings", "bucket", "caltrops",
+    "chain", "crowbar", "bullets-firearm", "grappling-hook", "pot-iron", "spikes-iron", "bullets-sling"
+  ],
+  tinker: [
+    "musket", "pistol", "bell", "lantern-bullseye", "flask", "lantern-hooded", "hunting-trap", "lock", "manacles",
+    "mirror", "shovel", "signal-whistle", "tinderbox"
+  ],
+  weaver: [
+    "padded-armor", "basket", "bedroll", "blanket", "clothes-fine", "net", "robe", "rope", "sack", "string", "tent",
+    "clothes-travelers"
+  ],
+  woodcarver: [
+    "club", "greatclub", "quarterstaff", "blowgun", "dart", "hand-crossbow", "heavy-crossbow", "light-crossbow",
+    "longbow", "shortbow", "crystal", "orb", "rod", "staff", "wand", "arrows", "bolts", "sprig-of-mistletoe",
+    "wooden-staff", "yew-wand", "ink-pen", "needles"
+  ],
+  disg: ["costume"],
+  herb: ["antitoxin", "candle", "healers-kit", "potion-of-healing"],
+  pois: ["poison-basic"]
+};

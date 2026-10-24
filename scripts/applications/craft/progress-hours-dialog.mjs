@@ -13,14 +13,18 @@ const { Dialog5e } = globalThis.dnd5e.applications.api;
  * @param {number} options.initial      Default hours, split into whole hours and minutes for the fields.
  * @param {number} options.workedToday  Hours already worked toward the daily workday limit today.
  * @param {number} options.dailyMax     The daily workday limit, in hours.
+ * @param {number} options.remainingProgress  Hours of progress the craft still needs.
  * @param {object[]} options.assistants  Characters that can assist, as `{ uuid, name, remaining }`.
  */
 export default class ProgressHoursDialog extends Dialog5e {
-  constructor({ activity, config, max, initial, workedToday, dailyMax, assistants=[], ...options }={}) {
+  constructor({
+    activity, config, max, initial, workedToday, dailyMax, remainingProgress, assistants=[], ...options
+  }={}) {
     super(options);
     this.activity = activity;
     this.config = config;
     this.baseMax = max;
+    this.remainingProgress = remainingProgress;
     this.assistants = assistants;
     const totalMinutes = Math.round(initial * 60);
     this.hours = Math.floor(totalMinutes / 60);
@@ -81,6 +85,14 @@ export default class ProgressHoursDialog extends Dialog5e {
   /* -------------------------------------------- */
 
   /**
+   * Hours of progress the craft still needs, shared by the crafter and the chosen assistants.
+   * @type {number}
+   */
+  remainingProgress;
+
+  /* -------------------------------------------- */
+
+  /**
    * Characters that can assist, with the workday hours each has left.
    * @type {{ uuid: string, name: string, remaining: number }[]}
    */
@@ -97,12 +109,13 @@ export default class ProgressHoursDialog extends Dialog5e {
   /* -------------------------------------------- */
 
   /**
-   * Maximum hours selectable this use, limited by each chosen assistant's remaining workday.
+   * Maximum hours selectable this use, limited by the remaining progress, which the chosen assistants share, and by
+   * each chosen assistant's remaining workday.
    * @type {number}
    */
   get max() {
     const chosen = this.assistants.filter(a => this.assistantUuids.includes(a.uuid));
-    return Math.min(this.baseMax, ...chosen.map(a => a.remaining));
+    return Math.min(this.baseMax, this.remainingProgress / (1 + chosen.length), ...chosen.map(a => a.remaining));
   }
 
   /* -------------------------------------------- */

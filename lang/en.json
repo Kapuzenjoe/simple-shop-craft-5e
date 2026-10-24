@@ -122,6 +122,8 @@
         "ImportUpdated": "Updated: {names}.",
         "ImportFailed": "Failed: {names}.",
         "ImportNone": "No recipes were imported.",
+        "ImportDefaults": "Import Default Recipes",
+        "ImportDefaultsHint": "Create a recipe for each item the tool can craft that has no recipe yet.",
         "Delete": "Delete Recipe",
         "DeleteConfirm": "Delete this recipe? This cannot be undone.",
         "Unlocked": "Unlocked",

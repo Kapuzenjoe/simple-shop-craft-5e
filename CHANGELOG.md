@@ -8,9 +8,12 @@
 - Added giving a character the Additional Items of an enchantment, such as the Clawed Gauntlets of Demon Armor, when it buys the generated item (#16).
 - Added a hint to shop entries that come with Additional Items.
 - Added a hint to the Recipe Editor and the Craft Start dialog when the target item of a recipe can't be found, and a greyed-out entry with a warning for such recipes in the Shop Manager.
+- Added suggesting the tools that can craft the target item when choosing it in the Recipe Editor.
+- Added importing the default recipes of a tool in the Craft tab, one for each item of the Player's Handbook or SRD 5.2 the tool can craft.
 - Changed the warning icons in shops and recipes to yellow for minor issues, such as a sold-out or capped item, and kept red for problems, such as a missing item or identifier.
 - Changed the Craft Start dialog to list every tool and skill option with what is missing, so a tool no longer has to be picked.
 - Fixed the rider activities and effects of generated enchanted items staying active when the enchantment is disabled or removed.
+- Fixed the icon chosen for a generated enchanted item being replaced by the icon of its enchantment.
 - Reworked how enchantment templates are recognized:
   - Added recipes for enchantable items, such as magic weapons and armor, configured like items added to a shop.
   - Changed Fill from Table to configure drawn spell scrolls and enchantable items, by hand or at random, instead of adding them as empty templates.

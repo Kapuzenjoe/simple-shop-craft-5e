@@ -174,7 +174,7 @@ export default class GeneratorProfile extends foundry.abstract.DataModel {
       const results = await game.dnd5e.applications.CompendiumBrowser.fetch(Item, {
         types: new Set([type]), filters, indexFields: new Set([
           "system.source", "system.identifier", "system.properties", "system.price.value", "system.price.denomination",
-          "system.rarity", "system.rarities", "system.type.value", "system.type.baseItem"
+          "system.rarity", "system.rarities", "system.type.value", "system.type.subtype", "system.type.baseItem"
         ])
       });
       for ( const index of results ) {
@@ -187,17 +187,22 @@ export default class GeneratorProfile extends foundry.abstract.DataModel {
     }
 
     const candidates = Array.from(new Map(found.map(index => [itemRefKey(itemRef(index), index), index])).values());
-    const documents = await bulkFromUuid(candidates.map(index => index.uuid));
+    const needsDocument = new Set(candidates.filter(index => {
+      return SpellScrollBlueprint.isSpellScrollItem(index) || EnchantedItemBlueprint.isTemplateCandidate(index);
+    }));
+    const documents = await bulkFromUuid(Array.from(needsDocument, index => index.uuid));
 
     for ( const index of candidates ) {
       const { system } = index;
-      const document = documents.get(index.uuid);
-      if ( document && SpellScrollBlueprint.isSpellScrollItem(document) ) continue;
-      if ( document && EnchantedItemBlueprint.isEnchantItem(document) ) {
-        if ( !this.includeEnspelled && EnchantedItemBlueprint.isEnspelledItem(document) ) continue;
-        const template = await this.#buildTemplate(document, capCP, summary, existingKeys, baseItemCache);
-        if ( template ) pool.push(template);
-        continue;
+      if ( needsDocument.has(index) ) {
+        const document = documents.get(index.uuid);
+        if ( !document || SpellScrollBlueprint.isSpellScrollItem(document) ) continue;
+        if ( EnchantedItemBlueprint.isEnchantItem(document) ) {
+          if ( !this.includeEnspelled && EnchantedItemBlueprint.isEnspelledItem(document) ) continue;
+          const template = await this.#buildTemplate(document, capCP, summary, existingKeys, baseItemCache);
+          if ( template ) pool.push(template);
+          continue;
+        }
       }
       const isMagic = system.properties?.includes("mgc") ?? false;
       const rarity = itemRarity(index);

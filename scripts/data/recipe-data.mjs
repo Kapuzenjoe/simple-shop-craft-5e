@@ -1,5 +1,5 @@
-import { PROFICIENCY_MODES, SETTING_KEYS, SPELL_SCROLL_SOURCES, UNLOCK_MODES } from "../config.mjs";
-import { resolveBundleSize, toCopper } from "../utils.mjs";
+import { CRAFTING_TOOLS, PROFICIENCY_MODES, SETTING_KEYS, SPELL_SCROLL_SOURCES, UNLOCK_MODES } from "../config.mjs";
+import { bulkFromUuid, getCraftingTools, getStarterUuids, itemRef, resolveBundleSize, toCopper } from "../utils.mjs";
 import { EnchantedItemBlueprint } from "./enchanted-item-blueprint.mjs";
 import SettingCollectionMixin from "./setting-collection-mixin.mjs";
 
@@ -94,6 +94,36 @@ export class Recipe extends SettingCollectionMixin(foundry.abstract.DataModel, S
         })
       }, { nullable: true, initial: null })
     };
+  }
+
+  /* -------------------------------------------- */
+  /*  Default Recipes                             */
+  /* -------------------------------------------- */
+
+  /**
+   * Create a recipe for each item a tool can craft that no recipe targets yet.
+   * @param {string} tool  Key of the tool in `CONFIG.DND5E.tools`.
+   * @returns {Promise<string[]>}  Names of the items targeted by the new recipes.
+   */
+  static async createDefaults(tool) {
+    const byIdentifier = await getStarterUuids(true);
+    const uuids = CRAFTING_TOOLS[tool].map(identifier => byIdentifier.get(identifier)).filter(_ => _);
+    const documents = await bulkFromUuid(uuids);
+    const items = uuids.map(uuid => documents.get(uuid)).filter(_ => _);
+    const created = [];
+    await this.updateAll(entries => {
+      const targeted = new Set(entries.flatMap(({ targetItem }) => [targetItem.uuid, targetItem.identifier]));
+      for ( const item of items ) {
+        if ( targeted.has(item.uuid) || targeted.has(item.system.identifier) ) continue;
+        entries.push({
+          targetItem: itemRef(item), targetQuantity: resolveBundleSize(item), img: item.img,
+          toolProficiencies: getCraftingTools(item), unlockMode: "toolProficiency", allowFreeformMaterials: true
+        });
+        created.push(item.name);
+      }
+      return entries;
+    });
+    return created;
   }
 
   /* -------------------------------------------- */

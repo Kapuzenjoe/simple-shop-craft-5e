@@ -262,13 +262,16 @@ where clicking the name of a target item or material opens it.
   to look for.
 - **Proficiencies.** Tools and skills combine by Proficiency Mode: Tool & Skill, Tool or Skill, or Every
   Listed Tool & Skill. With Workshop Override, a character can work in a proper workshop instead of owning
-  the tool.
+  the tool. Choosing a target item suggests the tools that can craft it.
 - **Unlock.** A recipe is open to listed actors only, to everyone, or to every character proficient with its
   tool.
 - **Spell Scrolls.** With a Spell Scroll as its target, the crafter picks a spell of the recipe's level, from
   their prepared or known spells or from any compendium.
 - **Enchantable items.** With an enchantment template as its target, such as a magic weapon or armor, the recipe
   is configured like an item added to a shop, with its profile and base item.
+- **Default recipes.** With the modern rules, Import Default Recipes creates a recipe for each item of the
+  Player's Handbook, or the SRD 5.2 without it, that a chosen tool can craft. Items that already have a recipe
+  are skipped, and the recipes unlock for every character proficient with the tool.
 - **Sharing.** Export recipes to JSON and import them into another world.
 
 <table>

@@ -230,7 +230,7 @@ export class InProgressCraft extends foundry.abstract.DataModel {
     dialogConfig.applicationClass = ProgressHoursDialog;
     dialogConfig.options = {
       max, initial: Math.min(max, craft.hoursPerUse ?? max), workedToday, dailyMax,
-      assistants: craft.#assistants(item.actor)
+      remainingProgress: craft.totalHours - craft.progress, assistants: craft.#assistants(item.actor)
     };
     messageConfig.create = false;
   }

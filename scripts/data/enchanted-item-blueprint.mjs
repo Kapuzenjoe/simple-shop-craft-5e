@@ -60,8 +60,7 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
     const effect = enchantItem?.effects.get(this.effectId);
     const spell = this.spellUuid ? await fromUuid(this.spellUuid) : null;
     if ( !baseItem || !effect || (this.spellUuid && !spell) ) return null;
-    const item = EnchantedItemBlueprint.#synthesize(baseItem, enchantItem, effect, spell);
-    if ( this.img ) item.updateSource({ img: this.img });
+    const item = EnchantedItemBlueprint.#synthesize(baseItem, enchantItem, effect, spell, this.img);
     if ( this.identifier ) item.updateSource({ "system.identifier": this.identifier });
     return item;
   }
@@ -138,7 +137,7 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
 
   /**
    * Is this item an Enspelled item, which binds a spell into its enchantment?
-   * @param {Item5e} item
+   * @param {Item5e|object} item  An item or compendium index entry.
    * @returns {boolean}
    */
   static isEnspelledItem(item) {
@@ -148,13 +147,24 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
   /* -------------------------------------------- */
 
   /**
-   * Is this item a template for an enchantment that can be applied to a base item? A base item without a type is
-   * hidden in the item sheet and ignored.
+   * Is this item a template for an enchantment that can be applied to a base item?
    * @param {Item5e} item
    * @returns {boolean}
    */
   static isEnchantItem(item) {
-    if ( !EnchantedItemBlueprint.getEnchantmentProfiles(item).length ) return false;
+    return EnchantedItemBlueprint.isTemplateCandidate(item)
+      && (EnchantedItemBlueprint.getEnchantmentProfiles(item).length > 0);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Do the identifier and type of this item allow it to be a template for an enchantment? A base item without a
+   * type is hidden in the item sheet and ignored. Its enchantment profiles are not checked.
+   * @param {Item5e|object} item  An item or compendium index entry.
+   * @returns {boolean}
+   */
+  static isTemplateCandidate(item) {
     if ( EnchantedItemBlueprint.isEnspelledItem(item)
       || item.system.description?.value?.includes(ENCHANT_TEMPLATE_PAGE_ID) ) return true;
     if ( NON_TEMPLATE_ITEMS.has(item.system.identifier) ) return false;
@@ -295,21 +305,27 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
 
   /**
    * Build a non-persisted Item combining a base item with a cloned enchantment effect. The rider activities and
-   * effects of the enchantment profile are added and marked as dependent on that effect.
+   * effects of the enchantment profile are added and marked as dependent on that effect. A given icon replaces the
+   * one that the effect would force onto the item.
    * @see dnd5e — EnchantmentData#collectRiders()
    * @param {Item5e} baseItem
    * @param {Item5e} enchantItem
    * @param {ActiveEffect5e} effect
    * @param {Item5e|null} spell  Spell bound into the item, if any.
+   * @param {string} [img]       Icon to give the item.
    * @returns {Item5e}
    */
-  static #synthesize(baseItem, enchantItem, effect, spell) {
+  static #synthesize(baseItem, enchantItem, effect, spell, img="") {
     const itemData = baseItem.toObject();
     delete itemData._id;
     itemData.system.quantity = 1;
     if ( spell ) itemData.name = `${itemData.name} (${spell.name})`;
     const effectData = effect.clone({ origin: effect.parent.uuid, disabled: false }).toObject();
     effectData._id = effect.id;
+    if ( img ) {
+      itemData.img = img;
+      effectData.system.changes = (effectData.system.changes ?? []).filter(change => change.key !== "img");
+    }
     itemData.effects = [...(itemData.effects ?? []), effectData];
 
     const profile = EnchantedItemBlueprint.#findProfile(enchantItem, effect.id)?.profile;

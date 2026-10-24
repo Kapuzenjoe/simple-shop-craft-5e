@@ -27,8 +27,8 @@ export class SpellScrollBlueprint extends foundry.abstract.DataModel {
 
   /**
    * Whether an item is dnd5e's generic Spell Scroll item — picking it activates spell-scroll handling. A scroll
-   * that already holds a spell has Activities and doesn't count.
-   * @param {Item5e} item
+   * that already holds a spell has Activities and doesn't count; an index entry has none to check.
+   * @param {Item5e|object} item  An item or compendium index entry.
    * @returns {boolean}
    */
   static isSpellScrollItem(item) {

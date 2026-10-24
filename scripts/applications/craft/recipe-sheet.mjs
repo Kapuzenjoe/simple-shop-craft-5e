@@ -5,7 +5,7 @@ import { ShopItemEntry } from "../../data/shop-data.mjs";
 import { SpellScrollBlueprint } from "../../data/spell-scroll-blueprint.mjs";
 import {
   applyDropArea, applyLoadingTooltip, breakdownCopper, buildItemTableSections, currencyRows,
-  currencyValueField, goldPoolCurrencies, identifierWarning, itemRef, itemRefKey, matchIdentifier,
+  currencyValueField, getCraftingTools, goldPoolCurrencies, identifierWarning, itemRef, itemRefKey, matchIdentifier,
   openItemSheet, recipeCraftCost, resolveBundleSize, resolveEntries, resolveUnitPrice, subtypeOptions, toCopper
 } from "../../utils.mjs";
 import ConfigureTemplatesDialog from "../shops/configure-templates-dialog.mjs";
@@ -664,8 +664,8 @@ async function toolOptions() {
 function getTargetItemUpdate(item, skillProficiencies, toolProficiencies) {
   const skills = new Set(skillProficiencies);
   const tools = new Set(toolProficiencies);
-  if ( item.system.identifier === "potion-of-healing" ) tools.add("herb");
-  else if ( item.system.properties?.has("mgc") ) skills.add("arc");
+  for ( const tool of getCraftingTools(item) ) tools.add(tool);
+  if ( (item.system.identifier !== "potion-of-healing") && item.system.properties?.has("mgc") ) skills.add("arc");
   let spellScroll = null;
   let proficiencyMode;
   if ( SpellScrollBlueprint.isSpellScrollItem(item) ) {

@@ -147,8 +147,10 @@ export default class ConfigureTemplatesDialog extends Dialog5e {
     const [, prefix, index] = event.target.name?.match(/^(img|identifier|baseItem|spell|profile)-(\d+)$/) ?? [];
     if ( !prefix ) return;
     const row = this.#rows[index];
-    if ( prefix === "img" ) row.imgOverride = event.target.value;
-    else if ( prefix === "identifier" ) row.identifierOverride = event.target.value;
+    if ( prefix === "img" ) {
+      row.imgOverride = event.target.value;
+      this.render({ parts: ["content", "footer"] });
+    } else if ( prefix === "identifier" ) row.identifierOverride = event.target.value;
     else if ( prefix === "baseItem" ) {
       row.baseItem = row.candidates.explicit.find(item => item.uuid === event.target.value) ?? null;
       this.render({ parts: ["content", "footer"] });

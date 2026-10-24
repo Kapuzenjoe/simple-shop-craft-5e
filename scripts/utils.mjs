@@ -1,4 +1,7 @@
-import { ANY_VALUE, EXCLUDED_PACKS, MODULE_ID, NON_BUNDLE_ITEMS, RARITY_DEFAULT_PRICES, SETTING_KEYS } from "./config.mjs";
+import {
+  ANY_VALUE, CRAFTING_TOOLS, EXCLUDED_PACKS, LEGACY_IDENTIFIERS, MODULE_ID, NON_BUNDLE_ITEMS, RARITY_DEFAULT_PRICES,
+  SETTING_KEYS, STARTER_SOURCES
+} from "./config.mjs";
 import { isCalendariaActive } from "./integrations/calendaria.mjs";
 import { isEmberActive } from "./integrations/ember.mjs";
 
@@ -29,6 +32,27 @@ export function excludeFilter(keyPath, values) {
  */
 export function isShopPackSource(uuid) {
   return !EXCLUDED_PACKS.has(foundry.utils.parseUuid(uuid)?.collection?.collection);
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Get the UUIDs of the items offered to starter packs, from the first compendium that has them.
+ * @param {boolean} modern  Whether the world uses the modern rules.
+ * @returns {Promise<Map<string, string>>}  Identifier of the item mapped to its UUID.
+ */
+export async function getStarterUuids(modern) {
+  const rules = modern ? "modern" : "legacy";
+  const packs = STARTER_SOURCES[rules].map(name => game.packs.get(name)).filter(_ => _);
+  const byIdentifier = new Map();
+  for ( const pack of packs ) {
+    for ( const entry of await pack.getIndex({ fields: ["system.container", "system.identifier"] }) ) {
+      if ( entry.system?.container || !CONFIG.Item.dataModels[entry.type]?.inventorySection ) continue;
+      const identifier = entry.system?.identifier || game.dnd5e.utils.formatIdentifier(entry.name);
+      if ( !byIdentifier.has(identifier) ) byIdentifier.set(identifier, entry.uuid);
+    }
+  }
+  return byIdentifier;
 }
 
 /* -------------------------------------------- */
@@ -541,6 +565,24 @@ export function itemRefKey(entry, item) {
 export function itemRef(item) {
   return isDefaultIdentifier(item)
     ? { uuid: item.uuid } : { uuid: item.uuid, identifier: item.system.identifier };
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Get the tools that can craft an item, matched by its identifier or the identifier of its base item.
+ * @param {Item5e} item  The item to craft.
+ * @returns {string[]}   Keys of the tools in `CONFIG.DND5E.tools`.
+ */
+export function getCraftingTools(item) {
+  const { weaponIds, armorIds, shieldIds, ammoIds } = CONFIG.DND5E;
+  const baseId = { ...weaponIds, ...armorIds, ...shieldIds, ...ammoIds }[item.system.type?.baseItem];
+  const baseName = baseId ? game.dnd5e.documents.Trait.getBaseItem(baseId, { indexOnly: true })?.name : null;
+  const identifiers = [item.system.identifier, baseName ? game.dnd5e.utils.formatIdentifier(baseName) : null]
+    .filter(Boolean);
+  return Object.entries(CRAFTING_TOOLS)
+    .filter(([, items]) => items.some(id => identifiers.includes(id) || identifiers.includes(LEGACY_IDENTIFIERS[id])))
+    .map(([key]) => key);
 }
 
 /* -------------------------------------------- */

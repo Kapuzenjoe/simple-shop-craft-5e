@@ -1,4 +1,4 @@
-import { MODULE_ID } from "../config.mjs";
+import { CRAFTING_TOOLS, MODULE_ID } from "../config.mjs";
 import { Recipe } from "../data/recipe-data.mjs";
 import { Shop, ShopItemEntry } from "../data/shop-data.mjs";
 import {
@@ -62,6 +62,7 @@ export default class ShopManager extends Application5e {
       createRecipe: ShopManager.#createRecipe,
       createShop: ShopManager.#createShop,
       editShop: ShopManager.#editShop,
+      importDefaultRecipes: ShopManager.#importDefaultRecipes,
       importRecipes: ShopManager.#importRecipes,
       startCraft: ShopManager.#startCraft,
       toggleActive: ShopManager.#toggleActive
@@ -154,7 +155,8 @@ export default class ShopManager extends Application5e {
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
     context.isGM = game.user.isGM;
-    const shops = Shop.getAll().filter(s => context.isGM || s.active);
+    context.isModern = game.dnd5e.settings.rulesVersion === "modern";
+    const shops =Shop.getAll().filter(s => context.isGM || s.active);
     const byName = (a, b) => a.name.localeCompare(b.name);
     const capCP = shop => shop.settlementCap.value == null
       ? Number.MAX_SAFE_INTEGER
@@ -404,6 +406,39 @@ export default class ShopManager extends Application5e {
     if ( failed.length ) {
       ui.notifications.warn(_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.ImportFailed", { names: failed.join(", ") }));
     }
+    this.render();
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle creating the default recipes of a tool picked in a prompt.
+   * @this {ShopManager}
+   * @returns {Promise<void>}
+   */
+  static async #importDefaultRecipes() {
+    const tools = Object.keys(CRAFTING_TOOLS)
+      .map(value => ({ value, label: game.dnd5e.documents.Trait.keyLabel(value, { trait: "tool" }) }))
+      .sort((a, b) => a.label.localeCompare(b.label, game.i18n.lang));
+    const group = foundry.applications.fields.createFormGroup({
+      label: _loc("SIMPLE_SHOP_CRAFT_5E.Tool"),
+      hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.ImportDefaultsHint"),
+      input: foundry.applications.fields.createSelectInput({ name: "tool", options: tools })
+    }).outerHTML;
+    const tool = await foundry.applications.api.DialogV2.prompt({
+      rejectClose: false,
+      content: `<fieldset>${group}</fieldset>`,
+      window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.ImportDefaults" },
+      ok: {
+        label: "DOCUMENT.ImportData", icon: "fa-solid fa-file-import",
+        callback: (event, button) => button.form.elements.tool.value
+      }
+    });
+    if ( !tool ) return;
+    const created = await Recipe.createDefaults(tool);
+    if ( created.length ) {
+      ui.notifications.info(_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.ImportCreated", { names: created.join(", ") }));
+    } else ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.ImportNone", { localize: true });
     this.render();
   }
 
