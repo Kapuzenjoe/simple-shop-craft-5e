@@ -310,9 +310,7 @@ downtime.
   its progress to chat.
 - **Assistants.** The Progress Craft dialog lets the crafter pick characters to assist. An assistant meets
   the recipe's proficiency requirements, with a workshop standing in for the tool if the recipe allows it,
-  and has hours left in their own workday. Each assistant adds the same hours of progress as the crafter,
-  so the work finishes sooner, and those hours count against the assistant's workday too. One assistant
-  may help by default, a GM has to be online to confirm them, and the progress card names them.
+  and has hours left in their own workday.
 - **Calendar time.** With a calendar source active, a session runs as in-game time passes. It completes on its
   own once the planned hours are done, or the GM ends it early and credits the time spent. Assistants get
   back the hours not worked.
