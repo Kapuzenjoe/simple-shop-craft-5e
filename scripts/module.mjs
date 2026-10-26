@@ -1,4 +1,5 @@
 import { CraftMessageData } from "./data/craft-message.mjs";
+import { HaggleMessageData } from "./data/haggle-message.mjs";
 import { InProgressCraft } from "./data/in-progress-craft.mjs";
 import { ProgressSessionMessageData } from "./data/progress-session-message.mjs";
 import { PurchaseMessageData } from "./data/purchase-message.mjs";
@@ -11,6 +12,7 @@ Hooks.once("init", () => {
   registerSettings();
   Hooks.on("dnd5e.renderChatMessage", PurchaseMessageData.onRender);
   Hooks.on("dnd5e.renderChatMessage", CraftMessageData.onRender);
+  Hooks.on("dnd5e.renderChatMessage", HaggleMessageData.onRender);
   Hooks.on("dnd5e.renderChatMessage", ProgressSessionMessageData.onRender);
   Hooks.on("dnd5e.postUseActivity", InProgressCraft.onPostUseActivity);
   Hooks.on("dnd5e.preUseActivity", InProgressCraft.onPreUseActivity);

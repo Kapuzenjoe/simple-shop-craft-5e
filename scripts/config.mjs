@@ -204,6 +204,13 @@ export const CARD_STATUSES = {
 };
 
 /**
+ * Percentages the GM can choose for a successful haggling roll, and the one preselected.
+ * @type {number[]}
+ */
+export const HAGGLE_PERCENTS = [5, 10, 15, 20, 25];
+export const HAGGLE_DEFAULT_PERCENT = 10;
+
+/**
  * Unlock behaviors for a recipe.
  * @type {Record<string, { label: string }>}
  */

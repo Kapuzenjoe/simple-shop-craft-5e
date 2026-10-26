@@ -1,8 +1,7 @@
 <img src="docs/banner.png" alt="Simple Shop & Craft 5e — Buy, Sell & Services · Random Item Generator · Haggling & Player Discounts · Recipe-Based Downtime Crafting" width="100%">
 
 ![Static Badge](https://img.shields.io/badge/Foundry-v14-informational)
-![Static Badge](https://img.shields.io/badge/Dnd5e-v5.3-informational)
-![Static Badge](https://img.shields.io/badge/Dnd5e-v6.0-informational)
+![Static Badge](https://img.shields.io/badge/Dnd5e-v6-informational)
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/peterlankton86911)
 
@@ -125,8 +124,8 @@ items.
   Sell tab then lists only matching items. Left empty, the shop buys anything. Not available with Purchase
   Only.
 - **Restock.** Reset Stock & Shop Money refills every Normal item and returns the till to Max. On the chosen
-  Restock Days this happens on its own at the next in-game day change, which also lifts failed haggling
-  locks. This needs a calendar source (see [Settings](#settings)).
+  Restock Days this happens on its own at the next in-game day change. This needs a calendar source (see
+  [Settings](#settings)).
 
 <table>
   <tr>
@@ -194,12 +193,16 @@ The GM can grant single players their own deal, and players can try to haggle th
 
 - **Player discounts.** Drop an actor into the Players dialog and give it its own Buy and Sell modifier. It
   adds to the shop's modifier.
-- **Haggling.** The player rolls a Charisma skill against a DC equal to the shopkeeper's Intelligence score,
-  minimum 15. A Friendly shopkeeper grants Advantage, a Hostile one Disadvantage.
-- **Result.** The roll sets no discount on its own. The GM decides what a success is worth and enters it as
-  a player discount.
-- **Cooldown.** After a failed roll, that skill can't be tried again at this shop for 24 hours. The lock lifts
-  at the next in-game day change, or the GM resets it in the Players dialog.
+- **Haggling.** The player picks Buy or Sell as the transaction, then rolls a Charisma skill against a DC
+  equal to the shopkeeper's Intelligence score, minimum 15. A Friendly shopkeeper grants Advantage, a
+  Hostile one Disadvantage.
+- **Result.** On a success, a tray appears under the roll for the GM only. It offers a discount (Buy) or a
+  bonus (Sell) of 5, 10, 15, 20, or 25 percent, with 10 preselected. Apply sets the player's modifier for
+  that side at this shop and replaces the one it had, Reject leaves it alone. The modifier stays until the
+  GM changes it in the Players dialog.
+- **Cooldown.** A failed roll locks that skill on that side of the shop for 24 hours, a success locks every
+  Charisma skill on that side. The lock lifts 24 hours of in-game time after the roll, or the GM resets it
+  in the Players dialog.
 
 <table>
   <tr>
@@ -207,6 +210,14 @@ The GM can grant single players their own deal, and players can try to haggle th
       <strong>Haggle dialog</strong><br>
       <img src="docs/example_haggle_dialog.png" alt="Haggle dialog with a skill and NPC attitude selection">
     </td>
+    <td width="50%">
+      <strong>Haggle result</strong><br>
+      <img src="docs/example_haggle_chat.png" alt="Tray under a successful haggle roll with a choice of 5 to 25 percent and Apply and Reject buttons">
+    </td>
+  </tr>
+</table>
+<table>
+  <tr>
     <td width="50%">
       <strong>Player discounts</strong><br>
       <img src="docs/example_players_discount.png" alt="Per-player buy and sell discount overrides">

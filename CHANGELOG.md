@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.0
+
+- Added choosing whether to haggle on buying or selling, with a separate cooldown after a failed roll for each.
+- Added a tray under successful haggling rolls that lets the GM choose a discount or bonus and apply it to the player's modifier of the shop.
+- Changed the supported dnd5e versions to 6.x, dropping support for 5.3.
+
 ## 1.1.0
 
 - Added grouping the items in the Sell tab by the custom sections of Tidy 5e Sheets, if Tidy 5e Sheets is active (#32).

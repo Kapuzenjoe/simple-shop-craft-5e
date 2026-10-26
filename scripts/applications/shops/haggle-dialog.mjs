@@ -1,3 +1,6 @@
+import { MODULE_ID } from "../../config.mjs";
+import { HaggleMessageData } from "../../data/haggle-message.mjs";
+
 const { Dialog5e } = game.dnd5e.applications.api;
 
 /**
@@ -5,8 +8,8 @@ const { Dialog5e } = game.dnd5e.applications.api;
  */
 
 /**
- * Dialog to pick a Charisma skill and the NPC's attitude, then roll it against the shop NPC's DC for
- * the acting actor.
+ * Dialog to pick the side of the transaction, a Charisma skill, and the NPC's attitude, then roll it against
+ * the shop NPC's DC for the acting actor.
  */
 export default class HaggleDialog extends Dialog5e {
   constructor({ shopSheet, onUpdatePlayerDiscount, ...options }={}) {
@@ -72,6 +75,14 @@ export default class HaggleDialog extends Dialog5e {
 
   /* -------------------------------------------- */
 
+  /**
+   * Side of the shop the haggling is about, kept across re-renders.
+   * @type {"buy"|"sell"}
+   */
+  #side = "buy";
+
+  /* -------------------------------------------- */
+
   /** @inheritDoc */
   async _prepareContentContext(context, options) {
     context = await super._prepareContentContext(context, options);
@@ -91,21 +102,30 @@ export default class HaggleDialog extends Dialog5e {
     context.hint = `${_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.HagglingCurrent")}: `
       + `${_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Buy")} ${effectiveBuy}% / `
       + `${_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Sell")} ${effectiveSell}% (DC ${this.#dc})`;
-    if ( chaSkills.some(([value]) => shop.isHagglingLocked(actorUuid, value)) ) {
+    const isLocked = skill => shop.isHagglingLocked(actorUuid, skill, this.#side);
+    if ( chaSkills.some(([value]) => isLocked(value)) ) {
       context.hint += ` ${_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.HagglingSomeLocked")}`;
     }
-    const unlockedSkill = chaSkills.find(([value]) => !shop.isHagglingLocked(actorUuid, value));
+    const unlockedSkill = chaSkills.find(([value]) => !isLocked(value));
     this.#allSkillsLocked = !unlockedSkill;
     context.fields = [
+      {
+        field: new foundry.data.fields.StringField({ blank: false, required: true }), name: "side",
+        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.HagglingSide"), value: this.#side,
+        options: [
+          { value: "buy", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Buy") },
+          { value: "sell", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.Tabs.Sell") }
+        ]
+      },
       {
         field: new foundry.data.fields.StringField({ blank: false, required: true }), name: "skill",
         label: _loc("DND5E.Skill"),
         value: unlockedSkill?.[0] ?? chaSkills[0]?.[0],
         options: chaSkills.map(([value, s]) => ({
           value,
-          label: shop.isHagglingLocked(actorUuid, value)
+          label: isLocked(value)
             ? `${s.label} (${_loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.HagglingLocked")})` : s.label,
-          disabled: shop.isHagglingLocked(actorUuid, value)
+          disabled: isLocked(value)
         }))
       },
       {
@@ -133,8 +153,19 @@ export default class HaggleDialog extends Dialog5e {
 
   /* -------------------------------------------- */
 
+  /** @inheritDoc */
+  _onChangeForm(formConfig, event) {
+    super._onChangeForm(formConfig, event);
+    if ( event.target.name !== "side" ) return;
+    this.#side = event.target.value;
+    this.render({ parts: ["content", "footer"] });
+  }
+
+  /* -------------------------------------------- */
+
   /**
-   * Handle rolling the haggle check and applying a lock on failure.
+   * Handle rolling the haggle check and locking the side: the rolled skill on a failure, every Charisma skill on
+   * a success.
    * @this {HaggleDialog}
    * @param {Event} event                Triggering submit event.
    * @param {HTMLFormElement} form       The submitted form.
@@ -145,15 +176,23 @@ export default class HaggleDialog extends Dialog5e {
     const actor = fromUuidSync(this.shopSheet.selectedActorUuid);
     if ( !actor ) return;
     const data = foundry.utils.expandObject(formData.object);
-    if ( this.shopSheet.shop.isHagglingLocked(actor.uuid, data.skill) ) return;
+    if ( this.shopSheet.shop.isHagglingLocked(actor.uuid, data.skill, data.side) ) return;
     await this.close();
     const attitudeMod = data.attitude === "friendly" ? { advantage: true }
       : data.attitude === "hostile" ? { disadvantage: true } : {};
-    const rolls = await actor.rollSkill({ skill: data.skill, target: this.#dc, ...attitudeMod });
-    if ( rolls?.[0]?.isFailure ) {
-      const existing = this.shopSheet.shop.playerDiscounts.find(pd => pd.actor === actor.uuid);
-      const hagglingLocks = { ...existing?.hagglingLocks, [data.skill]: game.time.worldTime };
-      await this.onUpdatePlayerDiscount(actor.uuid, { hagglingLocks });
-    }
+    const haggle = new HaggleMessageData({
+      shopId: this.shopSheet.shopId, actorUuid: actor.uuid, side: data.side
+    });
+    const rolls = await actor.rollSkill({ skill: data.skill, target: this.#dc, ...attitudeMod }, {}, {
+      data: { flags: { [MODULE_ID]: { haggle: haggle.toObject() } } }
+    });
+    if ( !rolls?.[0] ) return;
+    const skills = rolls[0].isSuccess
+      ? Object.keys(CONFIG.DND5E.skills).filter(key => CONFIG.DND5E.skills[key].ability === "cha")
+      : [data.skill];
+    const existing = this.shopSheet.shop.playerDiscounts.find(pd => pd.actor === actor.uuid);
+    const hagglingLocks = { ...existing?.hagglingLocks };
+    for ( const skill of skills ) hagglingLocks[`${data.side}-${skill}`] = game.time.worldTime;
+    await this.onUpdatePlayerDiscount(actor.uuid, { hagglingLocks });
   }
 }

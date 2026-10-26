@@ -332,6 +332,7 @@
       "Player": "Player",
       "Haggling": "Haggle",
       "HagglingAttitude": "Attitude",
+      "HagglingSide": "Transaction",
       "HagglingCurrent": "Current Discount",
       "HagglingRoll": "Roll",
       "HagglingLocked": "Locked",
@@ -475,6 +476,13 @@
       "MissingActor": "The buying character could no longer be found.",
       "MissingShop": "The shop this purchase belongs to could no longer be found.",
       "MissingItem": "One of the purchased items could no longer be resolved."
+    },
+    "HaggleTray": {
+      "Discount": "Discount",
+      "Bonus": "Bonus",
+      "Current": "Current Modifier",
+      "MissingShop": "The shop could no longer be found — haggling not applied.",
+      "MissingActor": "The haggling character could no longer be found — haggling not applied."
     },
     "CraftStart": {
       "NoActor": "Select a character above to continue.",

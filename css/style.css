@@ -132,6 +132,10 @@
     color: var(--dnd5e-chat-status-failure, var(--color-level-error));
   }
 
+  &.haggle-tray .percent-options {
+    margin-inline-start: auto;
+  }
+
   .icon-picker-preview {
     flex: none;
     width: 32px;

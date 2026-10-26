@@ -327,28 +327,29 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
   /* -------------------------------------------- */
 
   /**
-   * Whether an actor is currently locked out from Haggling with a specific Charisma skill for this shop,
-   * after failing an Influence check "in the same way" within the last 24 hours.
+   * Whether an actor is currently locked out from Haggling on one side of this shop with a specific Charisma
+   * skill, after failing an Influence check "in the same way" within the last 24 hours.
    * @param {string} [actorUuid]
    * @param {string} skill
+   * @param {"buy"|"sell"} side
    * @returns {boolean}
    */
-  isHagglingLocked(actorUuid, skill) {
+  isHagglingLocked(actorUuid, skill, side) {
     const locks = actorUuid ? this.playerDiscounts.find(pd => pd.actor === actorUuid)?.hagglingLocks : null;
-    const lock = locks?.[skill];
+    const lock = locks?.[`${side}-${skill}`];
     return (lock != null) && ((game.time.worldTime - lock) < secondsPerDay());
   }
 
   /* -------------------------------------------- */
 
   /**
-   * Whether an actor has any currently active Haggling lock for this shop, regardless of skill.
+   * Whether an actor has any currently active Haggling lock for this shop, regardless of side or skill.
    * @param {string} [actorUuid]
    * @returns {boolean}
    */
   hasHagglingLocks(actorUuid) {
     const locks = actorUuid ? this.playerDiscounts.find(pd => pd.actor === actorUuid)?.hagglingLocks : null;
-    return Object.keys(locks ?? {}).some(skill => this.isHagglingLocked(actorUuid, skill));
+    return Object.values(locks ?? {}).some(lock => (game.time.worldTime - lock) < secondsPerDay());
   }
 
   /* -------------------------------------------- */

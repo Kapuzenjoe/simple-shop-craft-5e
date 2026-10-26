@@ -5,7 +5,8 @@
  *                                             the shop's buyModifier. `null` = no override.
  * @property {number|null} sellModifier        Percent discount (negative) or markup (positive) override, replacing
  *                                             the shop's sellModifier. `null` = no override.
- * @property {Record<string, number>} hagglingLocks  Map of Charisma skill id to the world time
+ * @property {Record<string, number>} hagglingLocks  Map of `<side>-<skill>`, with side `buy` or `sell` and the
+ *                                                    Charisma skill id, to the world time
  *                                                    (`game.time.worldTime`) its Influence check last failed.
  */
 
@@ -366,6 +367,16 @@
  * @property {PurchaseSellLine[]} sellLines Items being sold to the shop.
  * @property {CurrencyPart[]} total         Net transaction total, broken down by denomination.
  * @property {number} netCP                 Net total in copper; negative = actor owes, positive = actor is owed.
+ */
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef HaggleMessageCardData
+ * @property {string} status      Status of the pending haggling: "pending", "accepted", or "rejected".
+ * @property {string} shopId      Id of the shop that was haggled with.
+ * @property {string} actorUuid   UUID of the haggling actor.
+ * @property {string} side        Side of the transaction haggled over: "buy" or "sell".
  */
 
 /* -------------------------------------------- */
