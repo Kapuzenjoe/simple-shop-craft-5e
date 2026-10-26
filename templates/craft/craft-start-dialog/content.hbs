@@ -29,7 +29,7 @@
         </li>
     </ol>
     {{#unless targetItem}}
-    <p class="hint warning">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SuppressedNotFound" }}</p>
+    <p class="hint error">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SuppressedNotFound" }}</p>
     {{/unless}}
     {{#if countField}}
     {{> "dnd5e.fieldlist" countField}}
@@ -120,21 +120,21 @@
 </fieldset>
 
 {{#unless requiredAvailable}}
-<p class="hint warning">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.RequiredMissing" }}</p>
+<p class="hint error">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.RequiredMissing" }}</p>
 {{/unless}}
 
 {{#unless recipe.ignoreCraftValue}}
 <fieldset class="card-tray">
     <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.MaterialValue" }}</legend>
     {{#unless materialsMet}}
-    <p class="hint warning">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.ValueMissing" }}</p>
+    <p class="hint error">{{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.ValueMissing" }}</p>
     {{/unless}}
 
     <p class="hint">
         {{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.Supplied" }}:
         {{> "modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs" parts=suppliedParts }}
     </p>
-    <p class="hint{{#unless materialsMet}} warning{{/unless}}">
+    <p class="hint{{#unless materialsMet}} error{{/unless}}">
         {{ localize "SIMPLE_SHOP_CRAFT_5E.CraftStart.Threshold" }}:
         {{> "modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs" parts=thresholdParts }}
     </p>

@@ -365,7 +365,7 @@
  * @property {PurchaseBuyLine[]} buyLines   Items being bought from the shop.
  * @property {PurchaseSellLine[]} sellLines Items being sold to the shop.
  * @property {CurrencyPart[]} total         Net transaction total, broken down by denomination.
- * @property {number} netCP                 Net transaction total, in copper (positive = actor pays).
+ * @property {number} netCP                 Net total in copper; negative = actor owes, positive = actor is owed.
  */
 
 /* -------------------------------------------- */

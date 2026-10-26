@@ -124,6 +124,14 @@
     color: var(--color-level-warning);
   }
 
+  .hint.warning {
+    color: var(--color-level-warning);
+  }
+
+  .hint.error {
+    color: var(--dnd5e-chat-status-failure, var(--color-level-error));
+  }
+
   .icon-picker-preview {
     flex: none;
     width: 32px;
@@ -467,10 +475,6 @@
 
   .item-price {
     min-width: 120px;
-  }
-
-  .hint.warning {
-    color: var(--dnd5e-color-failure);
   }
 
   .linked-actor-icon {

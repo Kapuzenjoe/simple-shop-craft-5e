@@ -93,6 +93,7 @@ export function resolveTotalHours(recipe, craftCost, targetItem) {
  * Resolve an item's crafting cost — `CONFIG.DND5E.crafting.exceptions`/`.scrolls` for Potion of Healing
  * and Spell Scrolls, a copper-precise mundane-item calculation for non-magical items, otherwise
  * `item.system.getCraftCost()`.
+ * @see dnd5e — ItemDataModel#getCraftCost()
  * @param {Item5e} item
  * @returns {Promise<{ days: number, gold: number }>}
  */
@@ -130,7 +131,7 @@ export async function recipeCraftCost(recipe, targetItem) {
   if ( !targetItem ) return null;
   try {
     const fullItem = targetItem.uuid ? await fromUuid(targetItem.uuid) : targetItem;
-    return fullItem?.system?.getCraftCost ? effectiveCraftCost(fullItem) : null;
+    return fullItem?.system?.getCraftCost ? await effectiveCraftCost(fullItem) : null;
   } catch ( err ) {
     console.warn(`${MODULE_ID} | Failed to resolve craft cost for ${targetItem.uuid}:`, err);
     return null;
@@ -1114,6 +1115,7 @@ export function applyDropArea(element, onDrop) {
 /**
  * Build the markup for a loading tooltip section, displayed as a spinner while a document's rich
  * tooltip content is fetched.
+ * @see dnd5e — utils#loadingTooltip()
  * @param {string} uuid  UUID of the document whose rich tooltip should be displayed.
  * @returns {string}
  */

@@ -25,7 +25,7 @@
     {{> "dnd5e.fieldlist" targetQuantityField}}
     {{else}}
     {{#if (or recipe.targetItem.uuid recipe.targetItem.identifier recipe.targetItem.generated)}}
-    <p class="hint warning">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SuppressedNotFound" }}</p>
+    <p class="hint error">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SuppressedNotFound" }}</p>
     {{/if}}
     <button type="button" data-action="editTargetItem">
         {{ localize "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.PickTargetItem" }}
