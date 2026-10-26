@@ -1,10 +1,10 @@
-import { MODULE_ID } from "../config.mjs";
+import { CRAFTING_TOOLS, MODULE_ID } from "../config.mjs";
 import { Recipe } from "../data/recipe-data.mjs";
-import { Shop } from "../data/shop-data.mjs";
+import { Shop, ShopItemEntry } from "../data/shop-data.mjs";
 import {
   applyItemSort, applyListControls, applyLoadingTooltip, breakdownCopper, buildItemTableSections,
-  confirmDeleteShop, finalizeGroups, formatDuration, promptImportFiles, recipeCraftCost, resolveEntries,
-  resolveTotalHours, selectableActors, spotlightShop, toCopper
+  confirmDeleteShop, finalizeGroups, formatDuration, promptImportFiles, recipeCraftCost, resolveTotalHours,
+  selectableActors, spotlightShop, toCopper
 } from "../utils.mjs";
 import CraftStartDialog from "./craft/craft-start-dialog.mjs";
 import RecipeSheet from "./craft/recipe-sheet.mjs";
@@ -33,6 +33,15 @@ const RECIPE_SORT_MODES = {
 };
 
 /**
+ * Cycle-able Recipes-list grouping modes, in cycle order.
+ * @type {Record<string, { icon: string, label: string }>}
+ */
+const RECIPE_GROUP_MODES = {
+  type: { icon: "fa-solid fa-layer-group", label: "DND5E.FilterGroupCategory" },
+  tool: { icon: "fa-solid fa-hammer", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.GroupByTool" }
+};
+
+/**
  * GM-facing application for managing shops.
  */
 export default class ShopManager extends Application5e {
@@ -53,6 +62,7 @@ export default class ShopManager extends Application5e {
       createRecipe: ShopManager.#createRecipe,
       createShop: ShopManager.#createShop,
       editShop: ShopManager.#editShop,
+      importDefaultRecipes: ShopManager.#importDefaultRecipes,
       importRecipes: ShopManager.#importRecipes,
       startCraft: ShopManager.#startCraft,
       toggleActive: ShopManager.#toggleActive
@@ -130,6 +140,14 @@ export default class ShopManager extends Application5e {
   #recipeSort = "name";
 
   /* -------------------------------------------- */
+
+  /**
+   * Current grouping mode for the recipes list, a key of {@link RECIPE_GROUP_MODES}.
+   * @type {"type"|"tool"}
+   */
+  #recipeGroup = "type";
+
+  /* -------------------------------------------- */
   /*  Rendering                                   */
   /* -------------------------------------------- */
 
@@ -137,7 +155,8 @@ export default class ShopManager extends Application5e {
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
     context.isGM = game.user.isGM;
-    const shops = Shop.getAll().filter(s => context.isGM || s.active);
+    context.isModern = game.dnd5e.settings.rulesVersion === "modern";
+    const shops =Shop.getAll().filter(s => context.isGM || s.active);
     const byName = (a, b) => a.name.localeCompare(b.name);
     const capCP = shop => shop.settlementCap.value == null
       ? Number.MAX_SAFE_INTEGER
@@ -183,7 +202,7 @@ export default class ShopManager extends Application5e {
     const visibleRecipes = context.isGM
       ? recipes
       : recipes.filter(r => (r.unlockMode === "all") || actors.some(actor => r.canCraft(actor)));
-    const targetResolved = await resolveEntries(visibleRecipes.map(r => r.targetItem));
+    const targetResolved = await ShopItemEntry.resolveMany(visibleRecipes.map(r => r.targetItem));
     const craftCosts = await Promise.all(
       targetResolved.map(({ item }, index) => recipeCraftCost(visibleRecipes[index], item))
     );
@@ -210,6 +229,7 @@ export default class ShopManager extends Application5e {
           toolProfTooltip: Array.from(recipe.toolProficiencies).map(toolLabel).filter(Boolean).join("\n"),
           skillProfTooltip: Array.from(recipe.skillProficiencies).map(skillLabel).filter(Boolean).join("\n"),
           type: item?.type ?? "unknown",
+          targetMissing: recipe.isTargetMissing(item),
           bundleSize: (recipe.targetQuantity > 1) ? recipe.targetQuantity : null,
           materialValueCP,
           materialValueDisplay: recipe.ignoreCraftValue ? null : breakdownCopper(materialValueCP),
@@ -222,8 +242,28 @@ export default class ShopManager extends Application5e {
       if ( !recipeGroups.has(row.type) ) recipeGroups.set(row.type, []);
       recipeGroups.get(row.type).push(row);
     }
+    const typeGroups = finalizeGroups(recipeGroups);
+    context.recipeTypes = typeGroups.map(({ type, label }) => ({ type, label }));
+    let groups = typeGroups;
+    if ( this.#recipeGroup === "tool" ) {
+      const toolGroups = new Map();
+      for ( const row of recipeRows ) {
+        const keys = Array.from(row.recipe.toolProficiencies);
+        for ( const key of keys.length ? keys : ["none"] ) {
+          if ( !toolGroups.has(key) ) toolGroups.set(key, []);
+          toolGroups.get(key).push(row);
+        }
+      }
+      groups = Array.from(toolGroups, ([type, items]) => ({
+        type, items,
+        label: (type === "none") ? _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.NoTool") : toolLabel(type)
+      })).sort((a, b) => {
+        if ( (a.type === "none") !== (b.type === "none") ) return (a.type === "none") ? 1 : -1;
+        return a.label.localeCompare(b.label);
+      });
+    }
     context.recipeTable = buildItemTableSections({
-      groups: finalizeGroups(recipeGroups),
+      groups,
       emptyLabel: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.None",
       columns: [
         { id: "materialValue", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.MaterialValue" },
@@ -291,6 +331,18 @@ export default class ShopManager extends Application5e {
         onSort: () => this.render()
       });
       if ( content ) applyItemSort(this.#recipeSort, content);
+
+      const groupButton = htmlElement.querySelector(".group-control");
+      if ( groupButton ) {
+        const { icon, label } = RECIPE_GROUP_MODES[this.#recipeGroup];
+        groupButton.querySelector("i").className = icon;
+        groupButton.setAttribute("aria-label", _loc(label));
+        groupButton.addEventListener("click", () => {
+          const modes = Object.keys(RECIPE_GROUP_MODES);
+          this.#recipeGroup = modes[(modes.indexOf(this.#recipeGroup) + 1) % modes.length];
+          this.render();
+        });
+      }
     }
   }
 
@@ -354,6 +406,39 @@ export default class ShopManager extends Application5e {
     if ( failed.length ) {
       ui.notifications.warn(_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.ImportFailed", { names: failed.join(", ") }));
     }
+    this.render();
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle creating the default recipes of a tool picked in a prompt.
+   * @this {ShopManager}
+   * @returns {Promise<void>}
+   */
+  static async #importDefaultRecipes() {
+    const tools = Object.keys(CRAFTING_TOOLS)
+      .map(value => ({ value, label: game.dnd5e.documents.Trait.keyLabel(value, { trait: "tool" }) }))
+      .sort((a, b) => a.label.localeCompare(b.label, game.i18n.lang));
+    const group = foundry.applications.fields.createFormGroup({
+      label: _loc("SIMPLE_SHOP_CRAFT_5E.Tool"),
+      hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.ImportDefaultsHint"),
+      input: foundry.applications.fields.createSelectInput({ name: "tool", options: tools })
+    }).outerHTML;
+    const tool = await foundry.applications.api.DialogV2.prompt({
+      rejectClose: false,
+      content: `<fieldset>${group}</fieldset>`,
+      window: { title: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.ImportDefaults" },
+      ok: {
+        label: "DOCUMENT.ImportData", icon: "fa-solid fa-file-import",
+        callback: (event, button) => button.form.elements.tool.value
+      }
+    });
+    if ( !tool ) return;
+    const created = await Recipe.createDefaults(tool);
+    if ( created.length ) {
+      ui.notifications.info(_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.ImportCreated", { names: created.join(", ") }));
+    } else ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.ImportNone", { localize: true });
     this.render();
   }
 

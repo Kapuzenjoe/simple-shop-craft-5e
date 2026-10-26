@@ -1,4 +1,7 @@
-import { ANY_VALUE, EXCLUDED_PACKS, MODULE_ID, NON_BUNDLE_ITEMS, RARITY_DEFAULT_PRICES, SETTING_KEYS } from "./config.mjs";
+import {
+  ANY_VALUE, CRAFTING_TOOLS, EXCLUDED_PACKS, LEGACY_IDENTIFIERS, MODULE_ID, NON_BUNDLE_ITEMS, RARITY_DEFAULT_PRICES,
+  SETTING_KEYS, STARTER_SOURCES
+} from "./config.mjs";
 import { isCalendariaActive } from "./integrations/calendaria.mjs";
 import { isEmberActive } from "./integrations/ember.mjs";
 
@@ -29,6 +32,27 @@ export function excludeFilter(keyPath, values) {
  */
 export function isShopPackSource(uuid) {
   return !EXCLUDED_PACKS.has(foundry.utils.parseUuid(uuid)?.collection?.collection);
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Get the UUIDs of the items offered to starter packs, from the first compendium that has them.
+ * @param {boolean} modern  Whether the world uses the modern rules.
+ * @returns {Promise<Map<string, string>>}  Identifier of the item mapped to its UUID.
+ */
+export async function getStarterUuids(modern) {
+  const rules = modern ? "modern" : "legacy";
+  const packs = STARTER_SOURCES[rules].map(name => game.packs.get(name)).filter(_ => _);
+  const byIdentifier = new Map();
+  for ( const pack of packs ) {
+    for ( const entry of await pack.getIndex({ fields: ["system.container", "system.identifier"] }) ) {
+      if ( entry.system?.container || !CONFIG.Item.dataModels[entry.type]?.inventorySection ) continue;
+      const identifier = entry.system?.identifier || game.dnd5e.utils.formatIdentifier(entry.name);
+      if ( !byIdentifier.has(identifier) ) byIdentifier.set(identifier, entry.uuid);
+    }
+  }
+  return byIdentifier;
 }
 
 /* -------------------------------------------- */
@@ -69,6 +93,7 @@ export function resolveTotalHours(recipe, craftCost, targetItem) {
  * Resolve an item's crafting cost — `CONFIG.DND5E.crafting.exceptions`/`.scrolls` for Potion of Healing
  * and Spell Scrolls, a copper-precise mundane-item calculation for non-magical items, otherwise
  * `item.system.getCraftCost()`.
+ * @see dnd5e — ItemDataModel#getCraftCost()
  * @param {Item5e} item
  * @returns {Promise<{ days: number, gold: number }>}
  */
@@ -103,10 +128,10 @@ async function effectiveCraftCost(item) {
  */
 export async function recipeCraftCost(recipe, targetItem) {
   if ( recipe.spellScroll ) return CONFIG.DND5E.crafting.scrolls[recipe.spellScroll.level] ?? null;
-  if ( !targetItem?.uuid ) return null;
+  if ( !targetItem ) return null;
   try {
-    const fullItem = await fromUuid(targetItem.uuid);
-    return fullItem?.system?.getCraftCost ? effectiveCraftCost(fullItem) : null;
+    const fullItem = targetItem.uuid ? await fromUuid(targetItem.uuid) : targetItem;
+    return fullItem?.system?.getCraftCost ? await effectiveCraftCost(fullItem) : null;
   } catch ( err ) {
     console.warn(`${MODULE_ID} | Failed to resolve craft cost for ${targetItem.uuid}:`, err);
     return null;
@@ -396,10 +421,12 @@ export function buildItemTableSections({ groups, emptyLabel, columns, rowTemplat
  * @param {object} [options]
  * @param {(type: string) => string|null} [options.labelFor]  Override for a specific type's label, checked
  *   before the generic `TYPES.Item.<type>Pl` fallback. Return `null`/`undefined` to use the fallback.
+ * @param {Map<string, object[]>} [options.sections]  Map of custom section name → rows. Appended after the
+ *   type groups, sorted by name.
  * @returns {{ type: string, label: string, items: object[] }[]}
  */
-export function finalizeGroups(groups, { labelFor }={}) {
-  return Array.from(groups, ([type, items]) => ({
+export function finalizeGroups(groups, { labelFor, sections }={}) {
+  const typeGroups = Array.from(groups, ([type, items]) => ({
     type,
     label: labelFor?.(type)
       ?? ((type === "unknown") ? _loc("SIMPLE_SHOP_CRAFT_5E.Unknown") : _loc(`TYPES.Item.${type}Pl`)),
@@ -408,6 +435,12 @@ export function finalizeGroups(groups, { labelFor }={}) {
     return (CONFIG.Item.dataModels[a.type]?.inventorySection?.order ?? Infinity)
     - (CONFIG.Item.dataModels[b.type]?.inventorySection?.order ?? Infinity);
   });
+  const sectionGroups = Array.from(sections ?? [], ([name, items]) => ({
+    type: `section:${name}`,
+    label: name,
+    items
+  })).sort((a, b) => a.label.localeCompare(b.label, game.i18n.lang));
+  return typeGroups.concat(sectionGroups);
 }
 
 /* -------------------------------------------- */
@@ -439,17 +472,6 @@ export async function preloadHandlebarsTemplates() {
 /* -------------------------------------------- */
 
 /**
- * Whether an item is dnd5e's generic Spell Scroll item — picking it activates spell-scroll handling.
- * @param {Item5e} item
- * @returns {boolean}
- */
-export function isSpellScrollItem(item) {
-  return (item.system.identifier === "spell-scroll") || /spell scroll/i.test(item.name ?? "");
-}
-
-/* -------------------------------------------- */
-
-/**
  * Whether an item's identifier is still the unedited default the system assigns at creation — the
  * slugified type label, from an item whose name was never changed away from it.
  * @param {Item5e} item
@@ -472,6 +494,20 @@ export function isDefaultIdentifier(item) {
  */
 export function itemRarity(item) {
   return Array.from(item.system?.rarities ?? [])[0] ?? item.system?.rarity ?? "";
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Mark the source data of an activity, effect, or item as dependent on an active effect. A dependent is
+ * suppressed while that effect is inactive and removed together with it.
+ * @param {object} data     Source data of the dependent document.
+ * @param {string} effect   ID of an effect on the same item, or UUID of an effect.
+ * @returns {object}        The provided source data.
+ */
+export function setDependentOn(data, effect) {
+  foundry.utils.setProperty(data, "flags.dnd5e.dependentOn", effect);
+  return data;
 }
 
 /* -------------------------------------------- */
@@ -530,6 +566,24 @@ export function itemRefKey(entry, item) {
 export function itemRef(item) {
   return isDefaultIdentifier(item)
     ? { uuid: item.uuid } : { uuid: item.uuid, identifier: item.system.identifier };
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Get the tools that can craft an item, matched by its identifier or the identifier of its base item.
+ * @param {Item5e} item  The item to craft.
+ * @returns {string[]}   Keys of the tools in `CONFIG.DND5E.tools`.
+ */
+export function getCraftingTools(item) {
+  const { weaponIds, armorIds, shieldIds, ammoIds } = CONFIG.DND5E;
+  const baseId = { ...weaponIds, ...armorIds, ...shieldIds, ...ammoIds }[item.system.type?.baseItem];
+  const baseName = baseId ? game.dnd5e.documents.Trait.getBaseItem(baseId, { indexOnly: true })?.name : null;
+  const identifiers = [item.system.identifier, baseName ? game.dnd5e.utils.formatIdentifier(baseName) : null]
+    .filter(Boolean);
+  return Object.entries(CRAFTING_TOOLS)
+    .filter(([, items]) => items.some(id => identifiers.includes(id) || identifiers.includes(LEGACY_IDENTIFIERS[id])))
+    .map(([key]) => key);
 }
 
 /* -------------------------------------------- */
@@ -934,17 +988,18 @@ export function matchesTypeFilter(types, type, subtype) {
 /* -------------------------------------------- */
 
 /**
- * Show or hide item rows within an `.items-list` by name match and/or selected type, hiding a type section
- * entirely once every row within it is filtered out. Leaves already-suppressed (`[hidden]`) rows untouched.
+ * Show or hide item rows within an `.items-list` by name match and/or selected type, hiding a section
+ * entirely once every row within it is filtered out. A row's type is its own `data-type`, falling back to
+ * the one of its section. Leaves already-suppressed (`[hidden]`) rows untouched.
  * @param {RegExp} rgx
  * @param {string} typeFilter  Selected type, or "" for no filter.
  * @param {HTMLElement} content
  */
 function applyItemFilters(rgx, typeFilter, content) {
   for ( const section of content.querySelectorAll(".items-section") ) {
-    const typeMatches = !typeFilter || (section.dataset.type === typeFilter);
     let matched = false;
     for ( const row of section.querySelectorAll(".item:not([hidden])") ) {
+      const typeMatches = !typeFilter || ((row.dataset.type ?? section.dataset.type) === typeFilter);
       const match = typeMatches && foundry.applications.ux.SearchFilter.testQuery(rgx, row.dataset.name);
       if ( match ) matched = true;
       row.style.display = match ? "" : "none";
@@ -1060,6 +1115,7 @@ export function applyDropArea(element, onDrop) {
 /**
  * Build the markup for a loading tooltip section, displayed as a spinner while a document's rich
  * tooltip content is fetched.
+ * @see dnd5e — utils#loadingTooltip()
  * @param {string} uuid  UUID of the document whose rich tooltip should be displayed.
  * @returns {string}
  */

@@ -568,6 +568,11 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
       } else {
         itemData.system.quantity = totalQuantity;
         itemsToCreate.push(itemData);
+        if ( line.generated ) {
+          itemData._id = foundry.utils.randomID();
+          itemsToCreate.push(...await new EnchantedItemBlueprint(line.generated)
+            .collectRiderItems(`${actor.uuid}.Item.${itemData._id}`));
+        }
       }
     }
 

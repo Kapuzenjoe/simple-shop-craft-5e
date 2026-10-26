@@ -1,4 +1,3 @@
-import { ENSPELLED_ITEMS } from "../../config.mjs";
 import { EnchantedItemBlueprint } from "../../data/enchanted-item-blueprint.mjs";
 import GeneratorProfile from "../../data/generator-profile.mjs";
 import { createSpellScroll } from "../../utils.mjs";
@@ -22,9 +21,7 @@ export default class ConfigureTemplatesDialog extends Dialog5e {
       ? { kind: "spellScroll", item: t.item, spell: null, previewScroll: null, imgOverride: "", identifierOverride: "" }
       : {
         kind: "enchant", item: t.item,
-        profiles: EnchantedItemBlueprint.getEnchantmentProfiles(t.item)
-          .map((profile, level) => ({ ...profile, level }))
-          .filter(p => EnchantedItemBlueprint.resolveProfileRarity(t.item, p.effect) !== "artifact"),
+        profiles: EnchantedItemBlueprint.getEnchantmentProfiles(t.item),
         profileIndex: 0, candidates: null, baseItem: null, spell: null, spellOptions: [],
         imgOverride: "", identifierOverride: ""
       });
@@ -150,8 +147,10 @@ export default class ConfigureTemplatesDialog extends Dialog5e {
     const [, prefix, index] = event.target.name?.match(/^(img|identifier|baseItem|spell|profile)-(\d+)$/) ?? [];
     if ( !prefix ) return;
     const row = this.#rows[index];
-    if ( prefix === "img" ) row.imgOverride = event.target.value;
-    else if ( prefix === "identifier" ) row.identifierOverride = event.target.value;
+    if ( prefix === "img" ) {
+      row.imgOverride = event.target.value;
+      this.render({ parts: ["content", "footer"] });
+    } else if ( prefix === "identifier" ) row.identifierOverride = event.target.value;
     else if ( prefix === "baseItem" ) {
       row.baseItem = row.candidates.explicit.find(item => item.uuid === event.target.value) ?? null;
       this.render({ parts: ["content", "footer"] });
@@ -189,7 +188,8 @@ export default class ConfigureTemplatesDialog extends Dialog5e {
   /* -------------------------------------------- */
 
   /**
-   * Handle picking a base item for an Enchant row.
+   * Handle picking a base item for an Enchant row. If no base item matches the template, the Compendium Browser
+   * opens unfiltered.
    * @this {ConfigureTemplatesDialog}
    * @param {Event} event
    * @param {HTMLElement} target
@@ -199,8 +199,9 @@ export default class ConfigureTemplatesDialog extends Dialog5e {
     if ( !row.candidates ) return;
     const { activity } = row.profiles[row.profileIndex];
     const { types, filters } = row.candidates;
+    const hasBaseItems = (await EnchantedItemBlueprint.listEnchantableBaseItems(activity)).length > 0;
     const uuid = await game.dnd5e.applications.CompendiumBrowser.selectOne({
-      tab: "physical", filters: { locked: { types, arbitrary: filters } }
+      tab: "physical", filters: { locked: hasBaseItems ? { types, arbitrary: filters } : {} }
     });
     const picked = uuid ? await fromUuid(uuid) : null;
     if ( picked && (activity.canEnchant(picked) !== true) ) {
@@ -285,5 +286,5 @@ export default class ConfigureTemplatesDialog extends Dialog5e {
  * @returns {boolean}
  */
 function isEnspelled(row) {
-  return (row.kind === "enchant") && (row.item.system.identifier in ENSPELLED_ITEMS);
+  return (row.kind === "enchant") && EnchantedItemBlueprint.isEnspelledItem(row.item);
 }

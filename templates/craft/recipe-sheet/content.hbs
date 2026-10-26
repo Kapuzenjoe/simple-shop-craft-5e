@@ -10,7 +10,7 @@
                     {{> "modules/simple-shop-craft-5e/templates/shared/item-avatar-name.hbs"
                         img=recipe.img name=targetItem.name }}
                     {{#if targetIdentifierWarning}}
-                    <i class="fa-solid fa-triangle-exclamation warning" data-tooltip="{{ targetIdentifierWarning }}"></i>
+                    <i class="fa-solid fa-triangle-exclamation error" data-tooltip="{{ targetIdentifierWarning }}"></i>
                     {{/if}}
                 </div>
                 <div class="item-detail item-controls always-visible">
@@ -24,6 +24,9 @@
     </ol>
     {{> "dnd5e.fieldlist" targetQuantityField}}
     {{else}}
+    {{#if (or recipe.targetItem.uuid recipe.targetItem.identifier recipe.targetItem.generated)}}
+    <p class="hint error">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SuppressedNotFound" }}</p>
+    {{/if}}
     <button type="button" data-action="editTargetItem">
         {{ localize "SIMPLE_SHOP_CRAFT_5E.RecipeEditor.PickTargetItem" }}
     </button>

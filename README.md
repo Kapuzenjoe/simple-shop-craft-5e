@@ -65,11 +65,13 @@ Each shop opens in its own sheet with four tabs. The header shows the shop's own
 Sell modifiers, and the coin in its till.
 
 - **Buy.** The GM adds items from the Compendium Browser, by UUID, or by dragging them in. Fill from Table
-  draws stock from a RollTable, and Generate Item rolls up new wares (see
+  draws stock from a RollTable, configuring drawn Spell Scrolls and enchantment items by hand or at random,
+  and Generate Item rolls up new wares (see
   [Random Item Generator](#random-item-generator)).
 - **Sell.** Lists the items of the buying character that the shop accepts (see
   [Stock & Restock](#stock--restock)). Items bought as a bundle, such as arrows, are sold back one piece at
-  a time.
+  a time. With Tidy 5e Sheets active, the items are grouped by the custom sections of the character's
+  inventory instead of by item type.
 - **Services.** Holds Lodging and Hirelings, along with any Buy item marked as a Service. A service costs
   coin but hands over no item.
 - **Description.** The shop's location, opening hours, restock days, and a description of the place.
@@ -222,6 +224,8 @@ Generate Item rolls up new stock for a shop. The GM reviews every result before 
   and magic.
 - **Genuine magic items.** Enchantment templates become the real thing, so a "+1 Weapon" rolled for a Dagger
   arrives as a true +1 Dagger.
+- **Additional Items.** The Additional Items of an enchantment, such as the Clawed Gauntlets of Demon Armor,
+  are listed next to the item in the Buy tab and go to the buying character along with it.
 - **Spell Scrolls.** Each scroll carries a real spell, filtered by school, class, level, or rituals.
 - **Enspelled Items.** Enspelled Staffs, Weapons, and Armor come bound to a random spell of the level their
   rarity allows.
@@ -245,9 +249,10 @@ Generate Item rolls up new stock for a shop. The GM reviews every result before 
 
 ### Recipes
 
-The Craft tab lists every recipe by the type of item it makes, with its material value, duration, and
-required proficiencies. Click a recipe to start crafting it. The GM writes recipes in the Recipe Editor,
-where clicking the name of a target item or material opens it.
+The Craft tab lists every recipe with its material value, duration, and required proficiencies, grouped by
+the type of item it makes. The group button above the list switches to grouping by tool proficiency, with
+recipes that need no tool under No Tool. Click a recipe to start crafting it. The GM writes recipes in the
+Recipe Editor, where clicking the name of a target item or material opens it.
 
 - **Target item.** The item a recipe makes and how many per craft. Cost and duration follow the item's
   crafting value, or the GM sets a custom duration. A recipe can also skip the crafting value and rely on its
@@ -260,11 +265,19 @@ where clicking the name of a target item or material opens it.
   to look for.
 - **Proficiencies.** Tools and skills combine by Proficiency Mode: Tool & Skill, Tool or Skill, or Every
   Listed Tool & Skill. With Workshop Override, a character can work in a proper workshop instead of owning
-  the tool.
+  the tool. Choosing a target item suggests the tools that can craft it.
 - **Unlock.** A recipe is open to listed actors only, to everyone, or to every character proficient with its
   tool.
 - **Spell Scrolls.** With a Spell Scroll as its target, the crafter picks a spell of the recipe's level, from
   their prepared or known spells or from any compendium.
+- **Enchantable items.** With an enchantment template as its target, such as a magic weapon or armor, the recipe
+  is configured like an item added to a shop, with its profile and base item. The Additional Items of the
+  enchantment come with the finished item.
+- **Default recipes.** With the modern rules, Import Default Recipes creates a recipe for each item of the
+  Player's Handbook, or the SRD 5.2 without it, that a chosen tool can craft. Items that already have a recipe
+  are skipped, and the recipes unlock for every character proficient with the tool.
+- **Missing items.** A recipe whose target item can't be found, for example because its compendium is
+  inactive, is greyed out with a warning for the GM and hidden from players.
 - **Sharing.** Export recipes to JSON and import them into another world.
 
 <table>
@@ -285,9 +298,9 @@ where clicking the name of a target item or material opens it.
 A player starts a craft from the Craft tab. Once the GM approves, the work goes on through the character's
 downtime.
 
-- **Start Craft.** Choose the character and tool, then add owned materials. Any value still missing can be
-  paid in gold. For a Spell Scroll, pick the spell and set its save DC and attack bonus, which default to
-  the crafter's own.
+- **Start Craft.** Choose the character. The Requirements list every tool and skill the recipe asks for and
+  what is still missing. Then add owned materials, and pay any value still missing in gold. For a Spell
+  Scroll, pick the spell and set its save DC and attack bonus, which default to the crafter's own.
 - **Quantity.** Craft the recipe several times in a row. Materials and cost multiply, and each run takes its
   own crafting time. Quantity isn't offered for containers.
 - **Approval.** The order goes to the GM as a chat card. On acceptance, materials and gold are spent and an
@@ -295,8 +308,12 @@ downtime.
 - **Working.** Use the Progress Craft activity of the in-progress item and enter the hours to work. A
   character works up to 8 hours a day by default, and the count resets on a Long Rest. Each session posts
   its progress to chat.
+- **Assistants.** The Progress Craft dialog lets the crafter pick characters to assist. An assistant meets
+  the recipe's proficiency requirements, with a workshop standing in for the tool if the recipe allows it,
+  and has hours left in their own workday.
 - **Calendar time.** With a calendar source active, a session runs as in-game time passes. It completes on its
-  own once the planned hours are done, or the GM ends it early and credits the time spent.
+  own once the planned hours are done, or the GM ends it early and credits the time spent. Assistants get
+  back the hours not worked.
 - **Completion.** When a run's work is done, the finished items go into the character's inventory and stack
   onto a matching item the character already owns. The in-progress item is removed after the last run.
 
@@ -327,7 +344,8 @@ Three menus and two settings in the module settings hold world-wide options.
 
 - **Configure Defaults.** The Buy and Sell modifiers, shop money, Magical Items rule, and default stock per
   item type that every new shop starts with.
-- **Configure Homebrew.** Max Hours per Workday for crafting, 8 by default, and the Calendar Mode.
+- **Configure Homebrew.** Max Hours per Workday for crafting, 8 by default, Crafting Assistants on or off,
+  Maximum Assistants (one by default, no limit when empty), and the Calendar Mode.
 - **Calendar Mode.** Restock days, haggling cooldowns, and crafting sessions can follow Foundry's world
   calendar. Calendar Mode turns on by itself when a world clearly keeps its calendar in use: Calendaria or
   Ember is active, or dnd5e's Daily Recovery Mode is set to Calendar Recovery. Set it to Always On or Always

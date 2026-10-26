@@ -1,11 +1,14 @@
-import { MODULE_ID } from "../config.mjs";
+import { MODULE_ID, SETTING_KEYS } from "../config.mjs";
 import {
   createSpellScroll, deductActorCurrencyChecked, findStack, formatDuration, isCalendarModeActive,
-  maxHoursPerWorkday, resolveEntries, shouldHandleWorldTimeAdvance
+  maxHoursPerWorkday, shouldHandleWorldTimeAdvance
 } from "../utils.mjs";
+import { EnchantedItemBlueprint } from "./enchanted-item-blueprint.mjs";
+import { Recipe } from "./recipe-data.mjs";
+import { ShopItemEntry } from "./shop-data.mjs";
 import ProgressHoursDialog from "../applications/craft/progress-hours-dialog.mjs";
 
-const { DocumentUUIDField, NumberField, SchemaField, StringField } = foundry.data.fields;
+const { ArrayField, DocumentUUIDField, EmbeddedDataField, NumberField, SchemaField, StringField } = foundry.data.fields;
 
 /**
  * @import { InProgressCraftData } from "../_types.mjs";
@@ -30,6 +33,13 @@ const PROGRESS_BLOCK_REGEX = /<div class="simple-shop-craft-5e craft-progress">[
 const PROGRESS_TEMPLATE = "modules/simple-shop-craft-5e/templates/chat/progress-card.hbs";
 
 /**
+ * Round a number of hours to the nearest minute.
+ * @param {number} value
+ * @returns {number}
+ */
+const roundToMinute = value => Math.round(value * 60) / 60;
+
+/**
  * A data model that represents a craft in progress, tracked via a consumable item's own flags.
  * @extends {foundry.abstract.DataModel<InProgressCraftData>}
  * @mixes InProgressCraftData
@@ -46,7 +56,8 @@ export class InProgressCraft extends foundry.abstract.DataModel {
       recipeId: new StringField({ blank: true }),
       targetItem: new SchemaField({
         identifier: new StringField({ blank: true }),
-        uuid: new DocumentUUIDField({ type: "Item", blank: true })
+        uuid: new DocumentUUIDField({ type: "Item", blank: true }),
+        generated: new EmbeddedDataField(EnchantedItemBlueprint, { nullable: true, initial: null })
       }),
       targetQuantity: new NumberField({ required: true, initial: 1, integer: true, min: 1 }),
       remaining: new NumberField({ required: true, initial: 1, integer: true, min: 1 }),
@@ -60,7 +71,8 @@ export class InProgressCraft extends foundry.abstract.DataModel {
       progress: new NumberField({ required: true, initial: 0 }),
       pendingStart: new NumberField({ initial: null, nullable: true }),
       pendingHours: new NumberField({ initial: null, nullable: true }),
-      pendingMessageId: new StringField({ blank: true })
+      pendingMessageId: new StringField({ blank: true }),
+      pendingAssistants: new ArrayField(new DocumentUUIDField({ type: "Actor" }))
     };
   }
 
@@ -137,6 +149,63 @@ export class InProgressCraft extends foundry.abstract.DataModel {
   /* -------------------------------------------- */
 
   /**
+   * Check the assistants of a progress session against the craft's recipe and their remaining workday, then charge
+   * each of them the hours worked. Runs on a GM client, as a player cannot write the flags of an actor they don't own.
+   * @param {string} itemUuid           UUID of the in-progress craft item.
+   * @param {string[]} assistantUuids   UUIDs of the assisting actors.
+   * @param {number} hours              Hours each assistant works this session.
+   * @param {User} user                 The user starting the session.
+   * @returns {Promise<boolean>}        Whether every assistant is eligible and has been charged.
+   */
+  static async chargeAssistants(itemUuid, assistantUuids, hours, user) {
+    const item = fromUuidSync(itemUuid);
+    const flag = item?.getFlag(MODULE_ID, "craft");
+    const recipe = Recipe.get(flag?.recipeId);
+    if ( !recipe || !item.actor.testUserPermission(user, "OWNER") ) return false;
+
+    const craft = new InProgressCraft(flag);
+    const assistants = assistantUuids.map(uuid => fromUuidSync(uuid));
+    const eligible = assistants.every(actor => {
+      if ( !recipe.checkProficiency(actor, { workshopClaimed: true }).eligible ) return false;
+      return roundToMinute(hours) <= roundToMinute(craft.#remainingBudget(actor).remainingToday);
+    });
+    if ( !eligible ) return false;
+
+    await Promise.all(assistants.map(actor => {
+      const workedToday = actor.getFlag(MODULE_ID, "hoursWorkedToday") ?? 0;
+      return actor.setFlag(MODULE_ID, "hoursWorkedToday", roundToMinute(workedToday + hours));
+    }));
+    return true;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Ask a GM client to charge the assistants of a progress session, notifying the user if that fails.
+   * @param {Item5e} item               The in-progress craft item.
+   * @param {string[]} assistantUuids   UUIDs of the assisting actors.
+   * @param {number} hours              Hours each assistant works this session.
+   * @returns {Promise<boolean>}        Whether the assistants have been charged.
+   */
+  static async #requestCharge(item, assistantUuids, hours) {
+    const gm = game.users.activeGM;
+    if ( !gm ) {
+      ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoActiveGM", { localize: true });
+      return false;
+    }
+    let charged = false;
+    try {
+      charged = await gm.query(`${MODULE_ID}.chargeAssistants`, { itemUuid: item.uuid, assistantUuids, hours });
+    } catch ( err ) {
+      console.error(err);
+    }
+    if ( !charged ) ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.Craft.AssistantsUnavailable", { localize: true });
+    return charged;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
    * Handle configuring a use of the "Progress Craft" activity: replace dnd5e's own usage dialog with one
    * that lets the player choose how many hours of progress this use contributes.
    * @param {Activity} activity
@@ -159,7 +228,10 @@ export class InProgressCraft extends foundry.abstract.DataModel {
     const { dailyMax, workedToday, max } = craft.#remainingBudget(item.actor);
     usageConfig.scaling = 0;
     dialogConfig.applicationClass = ProgressHoursDialog;
-    dialogConfig.options = { max, initial: Math.min(max, craft.hoursPerUse ?? max), workedToday, dailyMax };
+    dialogConfig.options = {
+      max, initial: Math.min(max, craft.hoursPerUse ?? max), workedToday, dailyMax,
+      remainingProgress: craft.totalHours - craft.progress, assistants: craft.#assistants(item.actor)
+    };
     messageConfig.create = false;
   }
 
@@ -179,22 +251,29 @@ export class InProgressCraft extends foundry.abstract.DataModel {
 
     const craft = new InProgressCraft(flag);
     const requested = usageConfig.simpleShopCraft5e?.hoursThisUse ?? craft.hoursPerUse ?? maxHoursPerWorkday();
-    const hoursThisUse = Math.min(requested, craft.#remainingBudget(item.actor).max);
+    const assistantUuids = usageConfig.simpleShopCraft5e?.assistantUuids ?? [];
+    const share = 1 + assistantUuids.length;
+    const { remainingToday } = craft.#remainingBudget(item.actor);
+    const hoursThisUse = Math.min(requested, remainingToday, (craft.totalHours - craft.progress) / share);
     if ( hoursThisUse <= 0 ) return;
 
-    if ( ((craft.progress + hoursThisUse) >= craft.totalHours) && !(await craft.#resolveTarget()) ) return;
+    if ( ((craft.progress + (hoursThisUse * share)) >= craft.totalHours) && !(await craft.#resolveTarget()) ) return;
+    if ( assistantUuids.length && !(await InProgressCraft.#requestCharge(item, assistantUuids, hoursThisUse)) ) return;
+
+    const assistants = assistantUuids.map(uuid => fromUuidSync(uuid));
 
     if ( isCalendarModeActive() ) {
       const { ProgressSessionMessageData } = await import("./progress-session-message.mjs");
-      const message = await ProgressSessionMessageData.create(item, item.actor, hoursThisUse);
+      const message = await ProgressSessionMessageData.create(item, item.actor, hoursThisUse, assistants);
       craft.updateSource({
-        pendingStart: game.time.worldTime, pendingHours: hoursThisUse, pendingMessageId: message.id
+        pendingStart: game.time.worldTime, pendingHours: hoursThisUse, pendingMessageId: message.id,
+        pendingAssistants: assistantUuids
       });
       await item.update({ [`flags.${MODULE_ID}.craft`]: craft.toObject() });
       return;
     }
 
-    await craft.creditProgress(item, hoursThisUse);
+    await craft.creditProgress(item, hoursThisUse, assistants);
   }
 
   /* -------------------------------------------- */
@@ -203,13 +282,13 @@ export class InProgressCraft extends foundry.abstract.DataModel {
    * Credit progress hours toward this craft, post a progress-update chat message (or complete the craft
    * once its total is reached), and persist the result. Nothing is credited if the craft would complete
    * but its target item can't be found.
-   * @param {Item5e} item   The in-progress craft item.
-   * @param {number} hours  Hours of progress to credit.
+   * @param {Item5e} item                 The in-progress craft item.
+   * @param {number} hours                Hours worked by the crafter. Each assistant adds the same hours of progress.
+   * @param {Actor5e[]} [assistants=[]]   Actors assisting the crafter.
    * @returns {Promise<void>}
    */
-  async creditProgress(item, hours) {
-    const roundToMinute = value => Math.round(value * 60) / 60;
-    const progress = roundToMinute(this.progress + hours);
+  async creditProgress(item, hours, assistants=[]) {
+    const progress = roundToMinute(this.progress + (hours * (1 + assistants.length)));
     if ( (progress >= this.totalHours) && !(await this.#resolveTarget()) ) {
       await this.#saveProgress(item);
       return;
@@ -225,8 +304,12 @@ export class InProgressCraft extends foundry.abstract.DataModel {
     await ChatMessage.create({
       content: await foundry.applications.handlebars.renderTemplate(PROGRESS_TEMPLATE, {
         itemImg: item.img, itemName: item.name, actorName: actor?.name ?? "",
-        hoursWorkedLabel: _loc("SIMPLE_SHOP_CRAFT_5E.Craft.ProgressCard.HoursWorked", {
-          hours: formatDuration(hours, { days: false })
+        assistantNames: assistants.map(a => a.name).join(", "),
+        hoursWorkedLabel: _loc(assistants.length
+          ? "SIMPLE_SHOP_CRAFT_5E.Craft.ProgressCard.HoursWorkedAssisted"
+          : "SIMPLE_SHOP_CRAFT_5E.Craft.ProgressCard.HoursWorked", {
+          hours: formatDuration(hours, { days: false }),
+          progress: formatDuration(hours * (1 + assistants.length), { days: false })
         }),
         progressLabel: this.#progressLabel()
       }),
@@ -258,9 +341,17 @@ export class InProgressCraft extends foundry.abstract.DataModel {
     try {
       const elapsedHours = Math.max(0, (game.time.worldTime - this.pendingStart) / 3600);
       const hours = early ? Math.min(this.pendingHours, elapsedHours) : this.pendingHours;
+      const unusedHours = this.pendingHours - hours;
+      const assistants = this.pendingAssistants.map(uuid => fromUuidSync(uuid)).filter(Boolean);
       const messageId = this.pendingMessageId;
-      this.updateSource({ pendingStart: null, pendingHours: null, pendingMessageId: "" });
-      await this.creditProgress(item, hours);
+      this.updateSource({ pendingStart: null, pendingHours: null, pendingMessageId: "", pendingAssistants: [] });
+      await this.creditProgress(item, hours, assistants);
+      if ( unusedHours > 0 ) {
+        await Promise.all(assistants.map(assistant => {
+          const workedToday = assistant.getFlag(MODULE_ID, "hoursWorkedToday") ?? 0;
+          return assistant.setFlag(MODULE_ID, "hoursWorkedToday", Math.max(0, roundToMinute(workedToday - unusedHours)));
+        }));
+      }
       const { ProgressSessionMessageData } = await import("./progress-session-message.mjs");
       await ProgressSessionMessageData.resolve(messageId);
     } finally {
@@ -393,7 +484,13 @@ export class InProgressCraft extends foundry.abstract.DataModel {
       const toCreate = await Item.implementation.createWithContents(copies);
       await actor.createEmbeddedDocuments("Item", toCreate, { keepId: true });
     } else {
-      await actor.createEmbeddedDocuments("Item", [itemData]);
+      const toCreate = [itemData];
+      if ( this.targetItem.generated ) {
+        itemData._id = foundry.utils.randomID();
+        toCreate.push(...await new EnchantedItemBlueprint(this.targetItem.generated)
+          .collectRiderItems(`${actor.uuid}.Item.${itemData._id}`));
+      }
+      await actor.createEmbeddedDocuments("Item", toCreate, { keepId: true });
     }
     if ( this.remaining > 1 ) {
       this.updateSource({ remaining: this.remaining - 1, progress: 0 });
@@ -448,6 +545,24 @@ export class InProgressCraft extends foundry.abstract.DataModel {
   /* -------------------------------------------- */
 
   /**
+   * List the characters that can assist this craft: those meeting its recipe's proficiency requirements who have
+   * workday hours left. Empty if assistants are disabled.
+   * @param {Actor5e} crafter  The crafting actor.
+   * @returns {{ uuid: string, name: string, remaining: number }[]}
+   */
+  #assistants(crafter) {
+    const recipe = Recipe.get(this.recipeId);
+    if ( !recipe || !game.settings.get(MODULE_ID, SETTING_KEYS.ASSISTANTS_ENABLED) ) return [];
+    return game.actors
+      .filter(a => (a.type === "character") && (a !== crafter) && a.visible
+        && recipe.checkProficiency(a, { workshopClaimed: true }).eligible)
+      .map(a => ({ uuid: a.uuid, name: a.name, remaining: this.#remainingBudget(a).remainingToday }))
+      .filter(a => a.remaining > 0);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
    * Resolve the item this craft produces, notifying the user if it can't be found.
    * @returns {Promise<Item5e|null>}  The target item, or a scroll of the chosen spell.
    */
@@ -457,8 +572,8 @@ export class InProgressCraft extends foundry.abstract.DataModel {
       const spell = await fromUuid(this.spellUuid);
       item = spell ? await createSpellScroll(spell, this.scrollValues) : null;
     } else {
-      const [resolved] = await resolveEntries([this.targetItem]);
-      item = resolved.item?.uuid ? await fromUuid(resolved.item.uuid) : null;
+      const [resolved] = await ShopItemEntry.resolveMany([this.targetItem]);
+      item = resolved.item?.uuid ? await fromUuid(resolved.item.uuid) : resolved.item;
     }
     if ( !item ) ui.notifications.error("SIMPLE_SHOP_CRAFT_5E.CraftCard.MissingItem", { localize: true });
     return item;

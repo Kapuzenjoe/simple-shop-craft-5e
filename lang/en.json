@@ -122,6 +122,8 @@
         "ImportUpdated": "Updated: {names}.",
         "ImportFailed": "Failed: {names}.",
         "ImportNone": "No recipes were imported.",
+        "ImportDefaults": "Import Default Recipes",
+        "ImportDefaultsHint": "Create a recipe for each item the tool can craft that has no recipe yet.",
         "Delete": "Delete Recipe",
         "DeleteConfirm": "Delete this recipe? This cannot be undone.",
         "Unlocked": "Unlocked",
@@ -129,6 +131,8 @@
         "SearchRecipes": "Search Recipes",
         "MaterialValue": "Material Value",
         "SortByMaterialValue": "Sort by Material Value",
+        "GroupByTool": "Group by Tool Proficiency",
+        "NoTool": "No Tool",
         "Locked": "You haven't unlocked this recipe yet."
       }
     },
@@ -214,6 +218,14 @@
           "Default": "Default (Auto-Detect)",
           "On": "Always On",
           "Off": "Always Off"
+        },
+        "Assistants": {
+          "Name": "Crafting Assistants",
+          "Hint": "Allow other characters to assist a crafting session and share its crafting time."
+        },
+        "MaxAssistants": {
+          "Name": "Maximum Assistants",
+          "Hint": "Number of characters that may assist a single crafting session. The rules normally allow one. Leave empty for no limit."
         }
       },
       "Transactions": {
@@ -304,6 +316,11 @@
       "FillFromTableResult": "Added {name}.",
       "FillFromTableResultMultiple": "Added {count} items.",
       "FillFromTablePartial": "Added {count} items ({skipped} results weren't usable items).",
+      "FillFromTableTemplates": "Templates",
+      "FillFromTableTemplatesHint": "Spell Scrolls and enchantment items need a spell or a base item before they can be sold.",
+      "FillFromTableTemplatesManual": "Configure manually",
+      "FillFromTableTemplatesRandom": "Pick randomly",
+      "FillFromTableRandomFailed": "No spell or base item could be picked at random for some templates. Choose one manually.",
       "Tabs": {
         "Buy": "Buy",
         "Sell": "Sell",
@@ -394,6 +411,7 @@
       "MarkedAsService": "Moved to the Services tab.",
       "UnmarkedAsService": "Moved to the Buy tab.",
       "DuplicateEntryWarning": "This item is listed more than once in this shop — bought copies stack together.",
+      "RiderItems": "Additional Items: {names}",
       "ConfigureTemplates": "Configure Templates",
       "PickSpell": "Pick Spell",
       "EnchantProfile": "Enchantment",
@@ -466,9 +484,12 @@
       "NoEligibleSpell": "No eligible spell available at this level.",
       "CraftingMaterials": "Crafting Materials",
       "MaterialsNone": "No materials required.",
-      "NotProficient": "You are not proficient with this tool.",
-      "ToolMissing": "You don't own this tool.",
-      "SkillMissing": "You lack the required skill proficiency for this recipe.",
+      "OneNeeded": "one needed",
+      "AllNeeded": "all needed",
+      "AtLeastOne": "At least one requirement must be met.",
+      "NotProficient": "Not proficient",
+      "NotInInventory": "Not in inventory",
+      "Workshop": "Workshop",
       "WorkshopAccess": "Workshop Access",
       "MaterialMissing": "Not in your inventory.",
       "MaterialInsufficient": "Only {owned} of {required} available.",
@@ -486,6 +507,7 @@
     },
     "CraftCard": {
       "Crafter": "Crafter",
+      "AssistedBy": "Assisted by",
       "MissingActor": "The crafting character could no longer be found.",
       "MissingMaterial": "One of the contributed materials could no longer be found — craft not started.",
       "MissingItem": "The crafted item could no longer be resolved — craft not completed."
@@ -497,9 +519,11 @@
       "ProgressActivityFlavorBatch": "The crafting progresses ({progress}/{total}), {remaining} left.",
       "CompleteMessage": "{name} is finished and has been added to {actor}'s inventory.",
       "NoWorkdayRemaining": "You have no workday hours remaining today for crafting.",
+      "AssistantsUnavailable": "An assistant can no longer help with this craft — no progress was added.",
       "SessionPending": "A crafting session is already in progress for this item.",
       "ProgressCard": {
-        "HoursWorked": "Worked {hours}."
+        "HoursWorked": "Worked {hours}.",
+        "HoursWorkedAssisted": "Worked {hours} each, adding {progress} of progress."
       },
       "ProgressSession": {
         "Started": "Started crafting — planned {hours}.",
@@ -509,6 +533,7 @@
         "Title": "Progress Craft",
         "Confirm": "Confirm",
         "Progress": "Progress",
+        "Assistants": "Assistants",
         "NoAmountSelected": "Enter at least some progress time.",
         "HoursHint": "Progress this use contributes toward the craft ({worked} of {daily} worked today)."
       }
@@ -519,6 +544,7 @@
     "Recipe": "Recipe",
     "Unknown": "Unknown",
     "NewRecipePlaceholder": "New Recipe",
+    "ItemNotFound": "Item not found",
     "RemoveMaterial": "Remove Material",
     "MaterialRule": "Material Rule",
     "Tool": "Tool",

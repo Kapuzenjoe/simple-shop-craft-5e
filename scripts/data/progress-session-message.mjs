@@ -28,6 +28,7 @@ export class ProgressSessionMessageData extends foundry.abstract.DataModel {
       itemUuid: new DocumentUUIDField({ type: "Item" }),
       actorUuid: new DocumentUUIDField({ type: "Actor" }),
       actorName: new StringField(),
+      assistantNames: new StringField(),
       itemName: new StringField(),
       itemImg: new FilePathField({ categories: ["IMAGE"] }),
       pendingHours: new NumberField()
@@ -41,11 +42,13 @@ export class ProgressSessionMessageData extends foundry.abstract.DataModel {
    * @param {Item5e} item          The in-progress craft item.
    * @param {Actor5e} actor        The crafting actor.
    * @param {number} pendingHours  Hours planned for this session.
+   * @param {Actor5e[]} [assistants=[]]  Actors assisting the crafter.
    * @returns {Promise<ChatMessage>}
    */
-  static async create(item, actor, pendingHours) {
+  static async create(item, actor, pendingHours, assistants=[]) {
     const session = new ProgressSessionMessageData({
       itemUuid: item.uuid, actorUuid: actor.uuid, actorName: actor.name,
+      assistantNames: assistants.map(a => a.name).join(", "),
       itemName: item.name, itemImg: item.img, pendingHours
     });
 

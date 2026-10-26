@@ -1,3 +1,4 @@
+import { MODULE_ID, SETTING_KEYS } from "../../config.mjs";
 import { formatDuration } from "../../utils.mjs";
 
 const { Dialog5e } = globalThis.dnd5e.applications.api;
@@ -12,13 +13,19 @@ const { Dialog5e } = globalThis.dnd5e.applications.api;
  * @param {number} options.initial      Default hours, split into whole hours and minutes for the fields.
  * @param {number} options.workedToday  Hours already worked toward the daily workday limit today.
  * @param {number} options.dailyMax     The daily workday limit, in hours.
+ * @param {number} options.remainingProgress  Hours of progress the craft still needs.
+ * @param {object[]} options.assistants  Characters that can assist, as `{ uuid, name, remaining }`.
  */
 export default class ProgressHoursDialog extends Dialog5e {
-  constructor({ activity, config, max, initial, workedToday, dailyMax, ...options }={}) {
+  constructor({
+    activity, config, max, initial, workedToday, dailyMax, remainingProgress, assistants=[], ...options
+  }={}) {
     super(options);
     this.activity = activity;
     this.config = config;
-    this.max = max;
+    this.baseMax = max;
+    this.remainingProgress = remainingProgress;
+    this.assistants = assistants;
     const totalMinutes = Math.round(initial * 60);
     this.hours = Math.floor(totalMinutes / 60);
     this.minutes = totalMinutes % 60;
@@ -70,10 +77,56 @@ export default class ProgressHoursDialog extends Dialog5e {
   /* -------------------------------------------- */
 
   /**
-   * Maximum hours selectable this use.
+   * Maximum hours selectable this use before accounting for assistants.
    * @type {number}
    */
-  max;
+  baseMax;
+
+  /* -------------------------------------------- */
+
+  /**
+   * Hours of progress the craft still needs, shared by the crafter and the chosen assistants.
+   * @type {number}
+   */
+  remainingProgress;
+
+  /* -------------------------------------------- */
+
+  /**
+   * Characters that can assist, with the workday hours each has left.
+   * @type {{ uuid: string, name: string, remaining: number }[]}
+   */
+  assistants;
+
+  /* -------------------------------------------- */
+
+  /**
+   * UUIDs of the assistants currently chosen.
+   * @type {string[]}
+   */
+  assistantUuids = [];
+
+  /* -------------------------------------------- */
+
+  /**
+   * Maximum hours selectable this use, limited by the remaining progress, which the chosen assistants share, and by
+   * each chosen assistant's remaining workday.
+   * @type {number}
+   */
+  get max() {
+    const chosen = this.assistants.filter(a => this.assistantUuids.includes(a.uuid));
+    return Math.min(this.baseMax, this.remainingProgress / (1 + chosen.length), ...chosen.map(a => a.remaining));
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Maximum number of assistants that can be chosen. Unlimited if the setting is empty.
+   * @type {number}
+   */
+  get limit() {
+    return game.settings.get(MODULE_ID, SETTING_KEYS.MAX_ASSISTANTS) ?? this.assistants.length;
+  }
 
   /* -------------------------------------------- */
 
@@ -136,11 +189,40 @@ export default class ProgressHoursDialog extends Dialog5e {
       });
     context.hours = this.hours;
     context.minutes = this.minutes;
+    context.assistantField = this.assistants.length ? [{
+      field: new foundry.data.fields.SetField(new foundry.data.fields.StringField()), name: "assistants",
+      label: _loc("SIMPLE_SHOP_CRAFT_5E.Craft.ProgressHoursDialog.Assistants"),
+      value: this.assistantUuids, options: this.assistants.map(a => ({ value: a.uuid, label: a.name }))
+    }] : null;
     return context;
   }
 
   /* -------------------------------------------- */
   /*  Event Listeners and Handlers                */
+  /* -------------------------------------------- */
+
+  /**
+   * Clamp the entered hours and minutes to the current maximum.
+   */
+  #clampAmount() {
+    const maxMinutes = Math.round(this.max * 60);
+    const maxHours = Math.floor(maxMinutes / 60);
+    this.hours = Math.clamp(this.hours, 0, maxHours);
+    const minutesCap = (this.hours >= maxHours) ? (maxMinutes % 60) : 59;
+    this.minutes = Math.clamp(this.minutes, 0, minutesCap);
+  }
+
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  _onChangeForm(formConfig, event) {
+    super._onChangeForm(formConfig, event);
+    if ( event.target.name !== "assistants" ) return;
+    this.assistantUuids = event.target.value.slice(0, this.limit);
+    this.#clampAmount();
+    this.render();
+  }
+
   /* -------------------------------------------- */
 
   /**
@@ -150,13 +232,10 @@ export default class ProgressHoursDialog extends Dialog5e {
    * @param {HTMLElement} target  Button that was clicked.
    */
   static #stepAmount(event, target) {
-    const maxMinutes = Math.round(this.max * 60);
-    const maxHours = Math.floor(maxMinutes / 60);
     const step = Number(target.dataset.step);
-    if ( target.dataset.field === "hours" ) this.hours = Math.clamp(this.hours + step, 0, maxHours);
+    if ( target.dataset.field === "hours" ) this.hours += step;
     else this.minutes += step;
-    const minutesCap = (this.hours >= maxHours) ? (maxMinutes % 60) : 59;
-    this.minutes = Math.clamp(this.minutes, 0, minutesCap);
+    this.#clampAmount();
     this.render();
   }
 
@@ -180,7 +259,7 @@ export default class ProgressHoursDialog extends Dialog5e {
       ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.Craft.ProgressHoursDialog.NoAmountSelected", { localize: true });
       return;
     }
-    this.config.simpleShopCraft5e = { hoursThisUse };
+    this.config.simpleShopCraft5e = { hoursThisUse, assistantUuids: this.assistantUuids };
     this.#used = true;
     await this.close();
   }

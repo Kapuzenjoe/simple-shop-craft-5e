@@ -151,6 +151,7 @@
  * @property {object} targetItem
  * @property {string} [targetItem.identifier]    Fallback `system.identifier` reference, used if there is no `uuid`.
  * @property {string} [targetItem.uuid]          UUID of the item this recipe produces.
+ * @property {EnchantedItemBlueprintData|null} [targetItem.generated]  Blueprint of the enchanted item it produces.
  * @property {number} targetQuantity              Units produced per craft (e.g. 20 for a stack of arrows).
  * @property {RecipeMaterialData[]} materials    Fixed materials required by this recipe.
  * @property {boolean} allowFreeformMaterials    Whether players may substitute any sufficiently valuable item.
@@ -181,11 +182,23 @@
 /* -------------------------------------------- */
 
 /**
+ * @typedef RecipeProficiencyResult
+ * @property {{ key: string, proficient: boolean, owned: boolean, met: boolean }[]} toolStatuses
+ *                                         Proficiency, ownership, and whether the requirement is met for each
+ *                                         listed tool.
+ * @property {{ key: string, proficient: boolean }[]} skillStatuses  Proficiency in each listed skill.
+ * @property {boolean} eligible            Whether the requirements are met for the recipe's proficiency mode.
+ */
+
+/* -------------------------------------------- */
+
+/**
  * @typedef InProgressCraftData
  * @property {string} recipeId                 Id of the recipe this craft was started from.
  * @property {object} targetItem
  * @property {string} [targetItem.identifier]  Fallback `system.identifier` reference, used if there is no `uuid`.
  * @property {string} [targetItem.uuid]        UUID of the item this craft produces.
+ * @property {EnchantedItemBlueprintData|null} [targetItem.generated]  Blueprint of the enchanted item it produces.
  * @property {number} targetQuantity           Units to produce when this craft completes.
  * @property {number} remaining                Runs of this craft still to finish, including the current one.
  * @property {string} spellUuid                Chosen spell UUID for a spell-scroll craft, or blank.
@@ -199,6 +212,8 @@
  * @property {number|null} pendingHours        Hours planned for the current calendar-mode progress session.
  * @property {string} pendingMessageId         Id of the chat message announcing the pending session, so it
  *                                             can be marked resolved once the session ends.
+ * @property {string[]} pendingAssistants      UUIDs of the actors assisting the current calendar-mode progress
+ *                                             session.
  */
 
 /* -------------------------------------------- */
@@ -263,6 +278,7 @@
  * @property {object} targetItem
  * @property {string} [targetItem.identifier]     Fallback `system.identifier` reference, used if there is no `uuid`.
  * @property {string} [targetItem.uuid]           UUID of the produced item.
+ * @property {EnchantedItemBlueprintData|null} [targetItem.generated]  Blueprint of the enchanted item it produces.
  * @property {number} targetQuantity              Units to produce when this craft completes.
  * @property {number} count                       Runs of the recipe started by this craft.
  * @property {string} targetName                  Display name of the produced item.
@@ -271,7 +287,6 @@
  * @property {{ dc: number, bonus: number }|null} scrollValues  Save DC/attack bonus for the crafted scroll.
  * @property {string} actorUuid                   UUID of the crafting actor.
  * @property {string} actorName                   Display name of the crafting actor.
- * @property {string|null} toolKey                Tool proficiency key used, or `null` if none required.
  * @property {CraftMaterialLine[]} materialLines   Materials contributed toward this craft.
  * @property {number} goldCP                      Copper amount filled in from the actor's own currency.
  * @property {number} totalHours                  Total progress hours needed to finish the craft.
@@ -292,6 +307,7 @@
  * @property {string} itemUuid      UUID of the in-progress craft item this session belongs to.
  * @property {string} actorUuid     UUID of the crafting actor.
  * @property {string} actorName     Display name of the crafting actor.
+ * @property {string} assistantNames  Comma-separated display names of the assisting actors, or blank.
  * @property {string} itemName      Display name of the in-progress craft item.
  * @property {string} itemImg       Image path of the in-progress craft item.
  * @property {number} pendingHours  Hours planned for this session.
@@ -349,7 +365,7 @@
  * @property {PurchaseBuyLine[]} buyLines   Items being bought from the shop.
  * @property {PurchaseSellLine[]} sellLines Items being sold to the shop.
  * @property {CurrencyPart[]} total         Net transaction total, broken down by denomination.
- * @property {number} netCP                 Net transaction total, in copper (positive = actor pays).
+ * @property {number} netCP                 Net total in copper; negative = actor owes, positive = actor is owed.
  */
 
 /* -------------------------------------------- */
@@ -366,13 +382,25 @@
 /* -------------------------------------------- */
 
 /**
- * @typedef GeneratorTemplateProfile
- * @property {EnchantActivity} activity  The enchant Activity offering the profile.
- * @property {ActiveEffect5e} effect  The profile's enchantment effect.
- * @property {number} level  Position of the profile among all of the item's profiles.
- * @property {string} rarity  Rarity given by the profile's enchantment.
+ * @typedef EnchantmentProfile
+ * @property {EnchantActivity} activity  Enchant activity that offers the profile.
+ * @property {ActiveEffect5e} effect     Enchantment effect of the profile.
+ * @property {number} level              Position among the item's profiles, before artifact ones are left out.
+ * @property {string} rarity             Rarity given by the enchantment.
+ */
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef _GeneratorTemplateProfile
  * @property {string[]} baseItems  UUIDs of the base items the profile can be applied to.
- * @property {number} weight  How likely the profile is drawn, relative to the item's other profiles.
+ * @property {number} weight       How likely the profile is drawn, relative to the item's other profiles.
+ */
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef {EnchantmentProfile & _GeneratorTemplateProfile} GeneratorTemplateProfile
  */
 
 /* -------------------------------------------- */

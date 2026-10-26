@@ -5,6 +5,7 @@ import {
 } from "../utils.mjs";
 import { EnchantedItemBlueprint } from "./enchanted-item-blueprint.mjs";
 import { newEntryStock, ShopItemEntry } from "./shop-data.mjs";
+import { SpellScrollBlueprint } from "./spell-scroll-blueprint.mjs";
 
 const { BooleanField, NumberField, SchemaField, SetField, StringField, TypedObjectField } = foundry.data.fields;
 
@@ -161,7 +162,6 @@ export default class GeneratorProfile extends foundry.abstract.DataModel {
     const pool = [];
     const found = [];
     const baseItemCache = new Map();
-    const excluded = ["spell-scroll", ...(this.includeEnspelled ? [] : Object.keys(ENSPELLED_ITEMS))];
 
     for ( const type of Object.keys(this.types) ) {
       const filters = [
@@ -169,13 +169,12 @@ export default class GeneratorProfile extends foundry.abstract.DataModel {
           { k: "system.rarity", o: "in", v: ["artifact"] },
           { k: "system.rarities", o: "hasany", v: ["artifact"] }
         ] } },
-        excludeFilter("system.type.value", ["natural"]),
-        excludeFilter("system.identifier", excluded)
+        excludeFilter("system.type.value", ["natural"])
       ];
       const results = await game.dnd5e.applications.CompendiumBrowser.fetch(Item, {
         types: new Set([type]), filters, indexFields: new Set([
           "system.source", "system.identifier", "system.properties", "system.price.value", "system.price.denomination",
-          "system.rarity", "system.rarities", "system.type.value", "system.type.baseItem"
+          "system.rarity", "system.rarities", "system.type.value", "system.type.subtype", "system.type.baseItem"
         ])
       });
       for ( const index of results ) {
@@ -188,20 +187,22 @@ export default class GeneratorProfile extends foundry.abstract.DataModel {
     }
 
     const candidates = Array.from(new Map(found.map(index => [itemRefKey(itemRef(index), index), index])).values());
-    const uuids = candidates
-      .filter(index => (index.system.identifier in ENSPELLED_ITEMS)
-        || (EnchantedItemBlueprint.canBeTemplate(index) && !index.system.type?.baseItem))
-      .map(index => index.uuid);
-    const documents = await bulkFromUuid(uuids);
+    const needsDocument = new Set(candidates.filter(index => {
+      return SpellScrollBlueprint.isSpellScrollItem(index) || EnchantedItemBlueprint.isTemplateCandidate(index);
+    }));
+    const documents = await bulkFromUuid(Array.from(needsDocument, index => index.uuid));
 
     for ( const index of candidates ) {
       const { system } = index;
-      const document = documents.get(index.uuid);
-      if ( document && ((system.identifier in ENSPELLED_ITEMS)
-        || document.system.activities?.some(a => a.type === "enchant")) ) {
-        const template = await this.#buildTemplate(document, capCP, summary, existingKeys, baseItemCache);
-        if ( template ) pool.push(template);
-        continue;
+      if ( needsDocument.has(index) ) {
+        const document = documents.get(index.uuid);
+        if ( !document || SpellScrollBlueprint.isSpellScrollItem(document) ) continue;
+        if ( EnchantedItemBlueprint.isEnchantItem(document) ) {
+          if ( !this.includeEnspelled && EnchantedItemBlueprint.isEnspelledItem(document) ) continue;
+          const template = await this.#buildTemplate(document, capCP, summary, existingKeys, baseItemCache);
+          if ( template ) pool.push(template);
+          continue;
+        }
       }
       const isMagic = system.properties?.includes("mgc") ?? false;
       const rarity = itemRarity(index);
@@ -283,10 +284,9 @@ export default class GeneratorProfile extends foundry.abstract.DataModel {
   async #buildTemplate(item, capCP, summary, existingKeys, baseItemCache) {
     const { rarities, weighting } = this;
     const open = [];
-    for ( const [level, profile] of EnchantedItemBlueprint.getEnchantmentProfiles(item).entries() ) {
-      const rarity = EnchantedItemBlueprint.resolveProfileRarity(item, profile.effect);
-      if ( (rarity === "artifact") || (rarities.size && !rarities.has(rarity)) ) continue;
-      const { activity } = profile;
+    for ( const profile of EnchantedItemBlueprint.getEnchantmentProfiles(item) ) {
+      const { activity, rarity } = profile;
+      if ( rarities.size && !rarities.has(rarity) ) continue;
       const baseType = activity.restrictions.type || item.type;
       const { allowMagical, categories, properties } = activity.restrictions;
       const header = EnchantedItemBlueprint.getRestrictionHeader(item);
@@ -298,7 +298,7 @@ export default class GeneratorProfile extends foundry.abstract.DataModel {
       }
       const baseItems = baseItemCache.get(key);
       if ( !baseItems.length ) continue;
-      open.push({ ...profile, level, rarity, baseItems, weight: (weighting === "combination") ? baseItems.length : 1 });
+      open.push({ ...profile, baseItems, weight: (weighting === "combination") ? baseItems.length : 1 });
     }
 
     const profiles = [];
@@ -440,10 +440,10 @@ export default class GeneratorProfile extends foundry.abstract.DataModel {
         .filter(profile => profile.baseItems.length);
       if ( !open.length ) continue;
       const chosen = open[GeneratorProfile.#pickWeighted(open)];
-      const baseItem = await EnchantedItemBlueprint.pickEnchantableBaseItem(chosen.activity, chosen.baseItems);
+      const baseItem = await EnchantedItemBlueprint.pickRandomBaseItem(chosen.activity, chosen.baseItems);
       if ( !baseItem ) continue;
       const generated = { baseItemUuid: baseItem.uuid, enchantItemUuid: item.uuid, effectId: chosen.effect.id };
-      if ( item.system.identifier in ENSPELLED_ITEMS ) {
+      if ( EnchantedItemBlueprint.isEnspelledItem(item) ) {
         const spells = await GeneratorProfile.fetchEnspelledSpells(item.system.identifier, chosen.level);
         if ( !spells.length ) continue;
         generated.spellUuid = spells[Math.floor(Math.random() * spells.length)].uuid;

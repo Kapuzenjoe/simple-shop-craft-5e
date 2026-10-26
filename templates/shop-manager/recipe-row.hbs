@@ -1,10 +1,16 @@
-<li class="item" data-id="{{ recipe._id }}" data-recipe-id="{{ recipe._id }}" data-name="{{ displayName }}"
-    data-material-value="{{ materialValueCP }}">
+<li class="item{{#if targetMissing}} suppressed{{/if}}" data-id="{{ recipe._id }}" data-recipe-id="{{ recipe._id }}"
+    data-name="{{ displayName }}" data-type="{{ type }}" data-material-value="{{ materialValueCP }}"
+    {{#if targetMissing}}{{#unless @root.isGM}}hidden{{/unless}}{{/if}}>
     <div class="item-row">
-        <div class="item-name item-tooltip rollable" data-action="startCraft" role="button"
-             data-recipe-id="{{ recipe._id }}" {{#if itemUuid}}data-uuid="{{ itemUuid }}"{{/if}}>
+        <div class="item-name{{#unless targetMissing}} item-tooltip rollable{{/unless}}"
+             {{#unless targetMissing}}data-action="startCraft" role="button" data-recipe-id="{{ recipe._id }}"
+             {{#if itemUuid}}data-uuid="{{ itemUuid }}"{{/if}}{{/unless}}>
             {{> "modules/simple-shop-craft-5e/templates/shared/item-avatar-name.hbs"
                 img=recipe.img name=displayName bundleSize=bundleSize }}
+            {{#if targetMissing}}
+            <i class="fa-solid fa-triangle-exclamation error"
+               data-tooltip="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.SuppressedNotFound' }}"></i>
+            {{/if}}
             {{#if toolProfTooltip}}
             <i class="fa-solid fa-hammer proficiency-icon" data-tooltip="{{ toolProfTooltip }}"
                data-tooltip-class="simple-shop-craft-5e stacked-tooltip"></i>

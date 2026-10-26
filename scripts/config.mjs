@@ -20,6 +20,8 @@ export const SETTING_KEYS = {
   DEFAULT_STOCK_MAGIC_RULE: "defaultStockMagicRule",
   MAX_HOURS_PER_WORKDAY: "maxHoursPerWorkday",
   CALENDAR_MODE: "calendarMode",
+  ASSISTANTS_ENABLED: "assistantsEnabled",
+  MAX_ASSISTANTS: "maxAssistants",
   TRANSACTIONS: "transactions",
   LOG_TRANSACTIONS: "logTransactions",
   TRANSACTION_LIMIT: "transactionLimit"
@@ -265,6 +267,36 @@ export const SPELL_SCROLL_LEVELS = {
 };
 
 /**
+ * ID of the Foundry References journal page that dnd5e embeds in the description of every enchantment template of
+ * the SRD and the DMG.
+ * @type {string}
+ */
+export const ENCHANT_TEMPLATE_PAGE_ID = "Ok4iCgD25ENgoRxE";
+
+/**
+ * Items with an Enchant Activity that aren't enchantment templates although their data looks like one, by item
+ * identifier. Only consulted for items without the embedded journal page.
+ * @type {Set<string>}
+ */
+export const NON_TEMPLATE_ITEMS = new Set(["helm-of-brilliance"]);
+
+/**
+ * Enchant items by item identifier whose first profile is the item itself and whose further profiles are options
+ * added to it, so that only the first profile is offered.
+ * @type {Set<string>}
+ */
+export const MAIN_PROFILE_ITEMS = new Set(["hammer-of-thunderbolts", "moonblade"]);
+
+/**
+ * Base item of enchant items whose restrictions don't name any, as item identifier by the identifier of the enchant
+ * item.
+ * @type {Record<string, string>}
+ */
+export const ENCHANT_BASE_ITEMS = {
+  "wraps-of-unarmed-power": "unarmed-strike"
+};
+
+/**
  * Spell schools an Enspelled item's bound spell may belong to, per DMG 2024 "Enspelled Armor/Staff/Weapon",
  * keyed by the template's `system.identifier`. `null` allows any school.
  * @type {Record<string, string[]|null>}
@@ -339,4 +371,52 @@ export const STARTER_PACKS = {
     label: "SIMPLE_SHOP_CRAFT_5E.StarterPack.Tavern",
     items: ["rations", "waterskin"]
   }
+};
+
+/**
+ * Identifiers of the items each tool can craft.
+ * @type {Record<string, string[]>}
+ */
+export const CRAFTING_TOOLS = {
+  alchemist: ["acid", "alchemists-fire", "component-pouch", "oil", "paper", "perfume"],
+  brewer: ["antitoxin"],
+  calligrapher: ["ink"],
+  carpenter: [
+    "club", "greatclub", "quarterstaff", "barrel", "chest", "ladder", "pole", "ram-portable", "torch"
+  ],
+  cartographer: ["map"],
+  cobbler: ["climbers-kit"],
+  cook: ["rations"],
+  glassblower: ["bottle-glass", "magnifying-glass", "spyglass", "vial"],
+  jeweler: ["crystal", "orb", "rod", "staff", "wand", "amulet", "emblem", "reliquary"],
+  leatherworker: [
+    "sling", "whip", "hide-armor", "leather-armor", "studded-leather-armor", "backpack", "case-crossbow-bolt",
+    "case-map-or-scroll", "parchment", "pouch", "quiver", "waterskin"
+  ],
+  mason: ["block-and-tackle"],
+  painter: ["sprig-of-mistletoe", "wooden-staff", "yew-wand", "amulet", "emblem", "reliquary"],
+  potter: ["jug", "lamp"],
+  smith: [
+    "dagger", "handaxe", "javelin", "light-hammer", "mace", "sickle", "spear", "battleaxe", "flail", "glaive",
+    "greataxe", "greatsword", "halberd", "lance", "longsword", "maul", "morningstar", "pike", "rapier", "scimitar",
+    "shortsword", "trident", "war-pick", "warhammer", "breastplate", "chain-shirt", "half-plate-armor", "scale-mail",
+    "chain-mail", "plate-armor", "ring-mail", "splint-armor", "shield", "ball-bearings", "bucket", "caltrops",
+    "chain", "crowbar", "bullets-firearm", "grappling-hook", "pot-iron", "spikes-iron", "bullets-sling"
+  ],
+  tinker: [
+    "musket", "pistol", "bell", "lantern-bullseye", "flask", "lantern-hooded", "hunting-trap", "lock", "manacles",
+    "mirror", "shovel", "signal-whistle", "tinderbox"
+  ],
+  weaver: [
+    "padded-armor", "basket", "bedroll", "blanket", "clothes-fine", "net", "robe", "rope", "sack", "string", "tent",
+    "clothes-travelers"
+  ],
+  woodcarver: [
+    "club", "greatclub", "quarterstaff", "blowgun", "dart", "hand-crossbow", "heavy-crossbow", "light-crossbow",
+    "longbow", "shortbow", "crystal", "orb", "rod", "staff", "wand", "arrows", "bolts", "sprig-of-mistletoe",
+    "wooden-staff", "yew-wand", "ink-pen", "needles"
+  ],
+  disg: ["costume"],
+  herb: ["antitoxin", "candle", "healers-kit", "potion-of-healing"],
+  pois: ["poison-basic"]
 };
