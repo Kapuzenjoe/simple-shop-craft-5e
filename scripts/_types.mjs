@@ -350,6 +350,7 @@
  * @property {string} img              Image path of the sold item.
  * @property {number} quantity         Quantity sold.
  * @property {number} priceCP          Price per unit, in copper.
+ * @property {boolean} fullPrice       Whether the line is sold at its full price instead of the shop's sell modifier.
  * @property {CurrencyPart[]} subtotal Line subtotal, broken down by denomination.
  */
 

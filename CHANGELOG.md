@@ -4,7 +4,8 @@
 
 - Added choosing whether to haggle on buying or selling, with a separate cooldown after a failed roll for each.
 - Added a tray under successful haggling rolls that lets the GM choose a discount or bonus and apply it to the player's modifier of the shop.
-- Changed the supported dnd5e versions to 6.x, dropping support for 5.3.
+- Added selling items at their full price for characters with the Ember "Passionate Trader" feat.
+- Changed the default Fixed-Value Loot Types of new shops to include Trade Goods.
 
 ## 1.1.0
 

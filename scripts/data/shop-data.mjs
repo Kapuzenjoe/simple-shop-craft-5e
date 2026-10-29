@@ -196,7 +196,7 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
       active: new BooleanField({ initial: false }),
       buyModifier: new NumberField({ required: true, initial: 0, integer: true, min: -100, max: 1000 }),
       sellModifier: new NumberField({ required: true, initial: -50, integer: true, min: -100, max: 1000 }),
-      fixedValueLootTypes: new SetField(new StringField(), { initial: ["gem", "art"] }),
+      fixedValueLootTypes: new SetField(new StringField(), { initial: ["gem", "art", "trade"] }),
       sellTypes: new TypedObjectField(new SetField(new StringField())),
       playerDiscounts: new ArrayField(new EmbeddedDataField(ShopPlayerDiscount)),
       npc: new DocumentUUIDField({ type: "Actor", blank: true }),

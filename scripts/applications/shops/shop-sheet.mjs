@@ -146,7 +146,8 @@ export default class ShopSheet extends Application5e {
       openLinkedActor: ShopSheet.#openLinkedActor,
       resetShop: ShopSheet.#resetShop,
       spotlight: ShopSheet.#spotlight,
-      toggleActive: ShopSheet.#toggleActive
+      toggleActive: ShopSheet.#toggleActive,
+      toggleFullPrice: ShopSheet.#toggleFullPrice
     }
   };
 
@@ -272,6 +273,14 @@ export default class ShopSheet extends Application5e {
    * @type {Map<string, number>}
    */
   sellCart = new Map();
+
+  /* -------------------------------------------- */
+
+  /**
+   * Ids of the actor-owned items marked to be sold at their full price. Per-user, not persisted across sessions.
+   * @type {Set<string>}
+   */
+  sellFullPrice = new Set();
 
   /* -------------------------------------------- */
 
@@ -419,6 +428,8 @@ export default class ShopSheet extends Application5e {
     const playerOverride = context.shop.resolvePlayerOverride(this.selectedActorUuid);
     const hasCrafterFeat = (game.dnd5e.settings.rulesVersion === "modern")
       && !!context.actor?.items.some(i => (i.type === "feat") && (i.system.identifier === "crafter"));
+    const hasPassionateTraderFeat = !!context.actor?.items
+      .some(i => (i.type === "feat") && (i.system.identifier === "passionate-trader"));
 
     const { items } = context.shop;
     let cached = this.#resolvedEntries;
@@ -448,6 +459,7 @@ export default class ShopSheet extends Application5e {
     context.sellGroups = context.shop.goldPool.sellDisabled ? [] : await groupSellItems({
       items: (context.actor?.items ?? []).filter(item => context.shop.acceptsSellItem(item)),
       sellModifier: context.shop.sellModifier, sellCart: this.sellCart,
+      sellFullPrice: this.sellFullPrice, passionateTrader: hasPassionateTraderFeat,
       fixedValueLootTypes: context.shop.fixedValueLootTypes, playerSellModifier: playerOverride.sell,
       actorName: context.actor?.name, settlementCap: context.shop.settlementCap
     });
@@ -747,6 +759,7 @@ export default class ShopSheet extends Application5e {
         event.stopPropagation();
         this.selectedActorUuid = event.target.value;
         this.sellCart.clear();
+        this.sellFullPrice.clear();
         await this.render();
         if ( this.#cartApp?.rendered ) this.#cartApp.render();
       });
@@ -1046,6 +1059,22 @@ export default class ShopSheet extends Application5e {
     const next = Math.clamp((this.sellCart.get(itemId) ?? 0) + delta, 0, max);
     if ( next === 0 ) this.sellCart.delete(itemId);
     else this.sellCart.set(itemId, next);
+    await this.render();
+    if ( this.#cartApp?.rendered ) this.#cartApp.render();
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle marking or unmarking a sell row to be sold at its full price.
+   * @this {ShopSheet}
+   * @param {Event} event         Triggering click event.
+   * @param {HTMLElement} target  Button that was clicked.
+   */
+  static async #toggleFullPrice(event, target) {
+    const itemId = target.dataset.itemId;
+    if ( this.sellFullPrice.has(itemId) ) this.sellFullPrice.delete(itemId);
+    else this.sellFullPrice.add(itemId);
     await this.render();
     if ( this.#cartApp?.rendered ) this.#cartApp.render();
   }
@@ -1599,15 +1628,19 @@ async function groupByType({
  * @param {Item5e[]|Collection} options.items      The actor's items.
  * @param {number} options.sellModifier            Shop's sell-side percent discount/markup.
  * @param {Map<string, number>} options.sellCart   Selected sell quantities, keyed by item id.
+ * @param {Set<string>} options.sellFullPrice      Ids of the items marked to be sold at full price.
  * @param {Set<string>} options.fixedValueLootTypes
  * @param {number|null} [options.playerSellModifier]  Acting actor's sell-side override, if configured.
  * @param {string} [options.actorName]  Acting actor's name, used to label the player row.
+ * @param {boolean} [options.passionateTrader]  Whether the acting actor has the Passionate Trader feat, which lets
+ *   it mark items to be sold at full price.
  * @param {{ value: number|null, denomination: string, appliesToSell: boolean }} [options.settlementCap]
  *   Blocks selling an item for more than this value, if `appliesToSell` is set.
  * @returns {Promise<{ type: string, label: string, items: object[] }[]>}
  */
 async function groupSellItems({
-  items, sellModifier, sellCart, fixedValueLootTypes, playerSellModifier, actorName, settlementCap
+  items, sellModifier, sellCart, sellFullPrice, fixedValueLootTypes, playerSellModifier, actorName, passionateTrader,
+  settlementCap
 }) {
   const targetUnit = game.dnd5e.utils.defaultUnits("weight");
   const capCP = (settlementCap?.value != null) && settlementCap.appliesToSell
@@ -1617,15 +1650,21 @@ async function groupSellItems({
   const groups = new Map();
   const sections = new Map();
   const useTidy = isTidyActive();
+  const fullPriceLabel = _loc("SIMPLE_SHOP_CRAFT_5E.PassionateTrader");
   for ( const item of sellable ) {
     const price = resolveUnitPrice(item, { fallback: false, bundleSize: bundleSizes.get(item.id) });
     const basePrice = price?.value ?? 0;
     const denomination = price?.denomination ?? CONFIG.DND5E.defaultCurrency;
     const rowIsFixedValue = isFixedValue(item, fixedValueLootTypes);
-    const { percent: discountPercent, sources } = resolveDiscountSources({
+    const standard = resolveDiscountSources({
       itemOverride: null, isFixedValue: rowIsFixedValue, shopModifier: sellModifier,
       playerModifier: playerSellModifier, actorName
     });
+    const canFullPrice = !!passionateTrader && (standard.percent < 0);
+    const fullPrice = canFullPrice && sellFullPrice.has(item.id);
+    const { percent: discountPercent, sources } = fullPrice
+      ? { percent: 0, sources: [{ label: fullPriceLabel, value: "0%", type: "override" }] }
+      : standard;
     const finalValue = basePrice * (1 + (discountPercent / 100));
     const priceCP = toCopper(finalValue, denomination);
     const suppressed = (capCP != null) && (priceCP > capCP);
@@ -1635,6 +1674,8 @@ async function groupSellItems({
       discountPercent,
       discountTooltip: await renderAttribution(sources, `${discountPercent}%`),
       sellQuantity: sellCart.get(item.id) ?? 0,
+      canFullPrice,
+      fullPrice,
       owned: item.system.quantity ?? 1,
       priceCP,
       suppressed,
@@ -1652,8 +1693,8 @@ async function groupSellItems({
 /* -------------------------------------------- */
 
 /**
- * Items of the shop's configured fixed-value loot subtypes (default: Gemstones and Art Objects) have a
- * fixed market value — never subject to any buy/sell discount or markup.
+ * Items of the shop's configured fixed-value loot subtypes (default: Gemstones, Art Objects, and Trade Goods)
+ * have a fixed market value — never subject to any buy/sell discount or markup.
  * @param {Item5e|object} [item]
  * @param {Set<string>} fixedValueLootTypes
  * @returns {boolean}

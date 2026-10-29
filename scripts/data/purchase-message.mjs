@@ -49,7 +49,8 @@ export class PurchaseMessageData extends foundry.abstract.DataModel {
       sellLines: new ArrayField(new SchemaField({
         itemId: new StringField(),
         name: new StringField(), img: new FilePathField({ categories: ["IMAGE"] }),
-        quantity: new NumberField(), priceCP: new NumberField(), subtotal: currencyPartsField()
+        quantity: new NumberField(), priceCP: new NumberField(), fullPrice: new BooleanField(),
+        subtotal: currencyPartsField()
       })),
       total: currencyPartsField(),
       netCP: new NumberField({ initial: 0 })
@@ -91,7 +92,7 @@ export class PurchaseMessageData extends foundry.abstract.DataModel {
       sellLines: sellLines.map(row => ({
         itemId: row.item.id,
         name: row.item.name, img: row.item.img, quantity: row.sellQuantity, priceCP: row.priceCP,
-        subtotal: row.subtotal
+        fullPrice: row.fullPrice, subtotal: row.subtotal
       })),
       total: totalParts, netCP
     });

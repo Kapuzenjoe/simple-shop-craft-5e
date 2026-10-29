@@ -15,8 +15,8 @@
           "hint": "Percentage adjustment applied to item prices in this shop's Sell tab. Negative values lower the price, positive values raise it."
         },
         "fixedValueLootTypes": {
-          "label": "Fixed-Value Item Types",
-          "hint": "Loot subtypes never subject to the Buy/Sell modifiers above (e.g. gemstones, art objects always sell at their listed value)."
+          "label": "Fixed-Value Loot Types",
+          "hint": "Items of these loot types are bought and sold at their listed price, ignoring all price modifiers."
         },
         "goldPool": {
           "unlimited": { "label": "Unlimited" },
@@ -451,6 +451,7 @@
       "IncreaseQuantity": "Increase Quantity",
       "DecreaseQuantity": "Decrease Quantity",
       "NoSellableItems": "Nothing to sell.",
+      "SellFullPrice": "Sell at Full Price",
       "SuppressedStock": "Out of Stock",
       "SuppressedCap": "Exceeds Settlement Cap",
       "SuppressedNotFound": "Item not found — check that the compendium or module it comes from is active",
@@ -548,6 +549,7 @@
     },
     "Shop": "Shop",
     "CrafterFeat": "Crafter Feat",
+    "PassionateTrader": "Passionate Trader",
     "Owner": "Owner",
     "Recipe": "Recipe",
     "Unknown": "Unknown",

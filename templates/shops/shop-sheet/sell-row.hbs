@@ -32,6 +32,15 @@
         <div class="item-detail item-quantity">
             <span>{{ owned }}</span>
         </div>
-        <div class="item-detail item-controls"></div>
+        <div class="item-detail item-controls always-visible">
+            {{#if canFullPrice}}
+            <button type="button" class="unbutton config-button item-control always-interactive{{#if fullPrice}} active{{/if}}"
+                    data-action="toggleFullPrice" data-item-id="{{ item.id }}" data-tooltip
+                    aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.SellFullPrice' }}"
+                    aria-pressed="{{ fullPrice }}">
+                <i class="fa-solid fa-sack-dollar" inert></i>
+            </button>
+            {{/if}}
+        </div>
     </div>
 </li>

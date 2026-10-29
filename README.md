@@ -171,10 +171,12 @@ shows which modifiers applied.
 - **Shop modifiers.** A Buy and a Sell modifier apply to every trade, by default +0% and −50%.
 - **Item overrides.** The GM can give a single item its own price, or its own modifier in place of the
   shop's.
-- **Fixed-Value items.** Gemstones and art objects keep their full value, bought or sold. The list of loot
-  types is set per shop.
+- **Fixed-Value items.** Gemstones, art objects, and trade goods keep their full value, bought or sold. The
+  list of loot types is set per shop.
 - **Crafter.** With the 2024 rules, a character with the Crafter feat pays 20% less for nonmagical items,
   but not for services.
+- **Passionate Trader.** A character with the Passionate Trader feat of the Ember module can mark items in
+  the Sell tab to sell them at their full price.
 - **Settlement Cap.** A village, town, or city only deals in items up to 20, 2,000, or 200,000 GP, or up to a
   custom cap. Pricier items stay hidden from players, and the cap can apply to selling as well.
 

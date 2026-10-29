@@ -146,6 +146,7 @@ export default class ShopCart extends Dialog5e {
       ui.notifications.info("SIMPLE_SHOP_CRAFT_5E.ShopCart.PurchaseRequested", { localize: true });
       this.shopSheet.cart.clear();
       this.shopSheet.sellCart.clear();
+      this.shopSheet.sellFullPrice.clear();
     } finally {
       this.#submitting = false;
     }
