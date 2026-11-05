@@ -1,5 +1,6 @@
 import {
-  DEFAULT_STOCK_BY_TYPE, MAGIC_EXEMPT_TYPES, MODULE_ID, RESTOCK_MODES, SETTING_KEYS, STOCK_MAGIC_RULES
+  ACTIVATION_MODES, DEFAULT_STOCK_BY_TYPE, MAGIC_EXEMPT_TYPES, MODULE_ID, RESTOCK_MODES, SETTING_KEYS,
+  STOCK_MAGIC_RULES
 } from "../config.mjs";
 import { calendariaDayOfWeek, isCalendariaActive } from "../integrations/calendaria.mjs";
 import {
@@ -20,7 +21,7 @@ const {
 } = foundry.data.fields;
 
 /**
- * @import { ShopPlayerDiscountData, ShopItemEntryData, ShopData } from "../_types.mjs";
+ * @import { ShopPlayerDiscountData, ShopItemEntryData, ShopData, ShopOwner } from "../_types.mjs";
  */
 
 /**
@@ -200,7 +201,10 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
       sellTypes: new TypedObjectField(new SetField(new StringField())),
       playerDiscounts: new ArrayField(new EmbeddedDataField(ShopPlayerDiscount)),
       npc: new DocumentUUIDField({ type: "Actor", blank: true }),
+      npcName: new StringField({ blank: true }),
       location: new StringField({ blank: true }),
+      scenes: new SetField(new DocumentUUIDField({ type: "Scene" })),
+      activationMode: new StringField({ initial: "manual", choices: Object.keys(ACTIVATION_MODES), required: true }),
       openHour: new NumberField({ initial: null, nullable: true, integer: true, min: 0, max: 23 }),
       openMinute: new NumberField({ required: true, initial: 0, integer: true, min: 0, max: 59 }),
       closeHour: new NumberField({ initial: null, nullable: true, integer: true, min: 0, max: 23 }),
@@ -278,6 +282,37 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
     } catch ( err ) {
       console.warn(`${MODULE_ID} | Failed to remove the transaction log entries of shop ${id}:`, err);
     }
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * The owner of this shop, or `null` if it has none.
+   * @type {ShopOwner|null}
+   */
+  get owner() {
+    if ( !this.npc && !this.npcName ) return null;
+    let actor = null;
+    if ( this.npc ) {
+      try {
+        actor = fromUuidSync(this.npc);
+      } catch ( err ) {
+        console.warn(`${MODULE_ID} | Failed to resolve shop NPC ${this.npc}:`, err);
+      }
+    }
+    return { name: this.npcName || actor?.name || "—", actor, broken: Boolean(this.npc) && !actor };
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * The icon shown for this shop: its own icon, or the portrait of the owner's actor if it has none, or the default
+   * icon.
+   * @type {string}
+   */
+  get displayImg() {
+    if ( this.img && (this.img !== Shop.DEFAULT_ICON) ) return this.img;
+    return this.owner?.actor?.img || Shop.DEFAULT_ICON;
   }
 
   /* -------------------------------------------- */
@@ -674,6 +709,46 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
       ? null
       : Array.from({ length: midnights }, (_, i) => (dayOfWeek - i + weekLength) % weekLength);
     await Shop.handleDayChange(weekdaysPassed);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle Foundry's `updateScene` hook, syncing the shops that follow scenes once the active scene changes.
+   * @param {Scene} scene
+   * @param {object} changed
+   * @returns {Promise<void>}
+   */
+  static async onUpdateScene(scene, changed) {
+    if ( !("active" in changed) || !game.user.isActiveGM ) return;
+    await Shop.syncSceneActivation();
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle Foundry's `deleteScene` hook, syncing the shops that follow scenes after the active scene was deleted.
+   * @returns {Promise<void>}
+   */
+  static async onDeleteScene() {
+    if ( !game.user.isActiveGM ) return;
+    await Shop.syncSceneActivation();
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Activate the shops that follow the active scene and deactivate those that follow other scenes. Shops that
+   * follow scenes but have none assigned stay as they are.
+   * @returns {Promise<void>}
+   */
+  static async syncSceneActivation() {
+    const uuid = game.scenes.active?.uuid;
+    await Shop.updateAll(entries => entries.map(entry => {
+      if ( (entry.activationMode !== "scene") || !entry.scenes.length ) return entry;
+      const active = entry.scenes.includes(uuid);
+      return (entry.active === active) ? entry : { ...entry, active };
+    }));
   }
 }
 

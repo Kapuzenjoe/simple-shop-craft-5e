@@ -7,6 +7,11 @@
     width: 120px;
   }
 
+  li[data-shop-id] .gold-icon {
+    object-fit: contain;
+    object-position: center;
+  }
+
   .item-settlementCap,
   .item-materialValue {
     min-width: 120px;
@@ -26,7 +31,8 @@
     width: 90px;
   }
 
-  .proficiency-icon {
+  .proficiency-icon,
+  .scene-icon {
     margin-left: 4px;
     color: var(--color-text-tertiary);
     cursor: help;
@@ -142,7 +148,12 @@
     height: 32px;
     border: 1px solid var(--dnd5e-color-gold);
     border-radius: 4px;
-    object-fit: cover;
+    object-fit: contain;
+  }
+
+  &.purchase-card .card-header .gold-icon {
+    object-fit: contain;
+    object-position: center;
   }
 
   &.configure-templates-dialog .pill-lg {
@@ -411,6 +422,7 @@
 
   .document-image {
     --dnd5e-document-image-size: 96px;
+    object-fit: contain;
   }
 
   section.currency i.currency {

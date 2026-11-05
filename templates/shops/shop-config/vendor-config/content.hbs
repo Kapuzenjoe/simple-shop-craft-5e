@@ -2,6 +2,17 @@
     <fieldset>
         <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.ShopName" }}</legend>
         {{> "dnd5e.fieldlist" nameFields}}
+        <div class="form-group">
+            <label>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Icon" }}</label>
+            <div class="form-fields">
+                {{ formInput imgField value=img placeholder=previewImg name="img" }}
+                <img class="icon-picker-preview" src="{{ previewImg }}" alt="">
+            </div>
+        </div>
+    </fieldset>
+    <fieldset>
+        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Scenes" }}</legend>
+        {{> "dnd5e.fieldlist" sceneFields}}
     </fieldset>
     <fieldset>
         <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GoldPool" }}</legend>

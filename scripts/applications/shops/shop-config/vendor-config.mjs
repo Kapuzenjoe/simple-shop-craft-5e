@@ -1,11 +1,11 @@
-import { STOCK_MAGIC_RULES } from "../../../config.mjs";
+import { ACTIVATION_MODES, STOCK_MAGIC_RULES } from "../../../config.mjs";
 import { Shop } from "../../../data/shop-data.mjs";
 import { currencyRows, goldPoolCurrencies, parseTypeFilter, typeFilterFields } from "../../../utils.mjs";
 import TransactionLog from "../../transaction-log.mjs";
 import BaseShopConfig from "./base-shop-config.mjs";
 
 /**
- * Dialog to edit a shop's money pool and default stock per item type.
+ * Dialog to edit a shop's icon, scenes, money pool, and default stock per item type.
  * @param {object} options
  * @param {Shop} options.shop
  */
@@ -60,6 +60,17 @@ export default class VendorConfig extends BaseShopConfig {
 
     context.nameFields = [
       { field: Shop.schema.fields.name, name: "name", value: this.shop.name }
+    ];
+    context.imgField = Shop.schema.fields.img;
+    context.img = (this.shop.img === Shop.DEFAULT_ICON) ? "" : this.shop.img;
+    context.previewImg = this.shop.displayImg;
+
+    context.sceneFields = [
+      { field: Shop.schema.fields.scenes, name: "scenes", value: Array.from(this.shop.scenes) },
+      {
+        field: Shop.schema.fields.activationMode, name: "activationMode", value: this.shop.activationMode,
+        options: Object.entries(ACTIVATION_MODES).map(([value, { label }]) => ({ value, label: _loc(label) }))
+      }
     ];
 
     context.moneyFields = [
@@ -116,7 +127,7 @@ export default class VendorConfig extends BaseShopConfig {
   /* -------------------------------------------- */
 
   /**
-   * Handle persisting the new gold pool and default stock settings.
+   * Handle persisting the new icon, scenes, gold pool, and default stock settings.
    * @this {VendorConfig}
    * @param {Event} event                Triggering submit event.
    * @param {HTMLFormElement} form       The submitted form.
@@ -126,6 +137,7 @@ export default class VendorConfig extends BaseShopConfig {
   static async #onSubmit(event, form, formData) {
     const data = foundry.utils.expandObject(formData.object);
     const currentGoldPool = this.shop.goldPool;
+    const { activationMode, scenes } = this.shop;
     const sellDisabled = !!data.sellDisabled;
     const unlimited = sellDisabled ? currentGoldPool.unlimited : !!data.unlimited;
     const max = sellDisabled ? currentGoldPool.max : goldPoolCurrencies().reduce((obj, denom) => {
@@ -143,12 +155,18 @@ export default class VendorConfig extends BaseShopConfig {
 
     await this.onUpdate({
       name: data.name || this.shop.name,
+      img: data.img || Shop.DEFAULT_ICON,
+      scenes: data.scenes ?? [],
+      activationMode: data.activationMode ?? "manual",
       goldPool: { ...currentGoldPool, max, unlimited, sellDisabled },
       stockDefaults: { byType, magicRule: data.magicRule ?? "gear" },
       ...(("types" in data) ? { sellTypes: parseTypeFilter(data) } : {})
     });
+    if ( (this.shop.activationMode !== activationMode) || !this.shop.scenes.equals(scenes) ) {
+      await Shop.syncSceneActivation();
+    }
     const name = event.target?.name;
-    if ( ["sellDisabled", "unlimited", "types"].includes(name) || name?.startsWith("subtypes.") ) {
+    if ( ["img", "sellDisabled", "unlimited", "types"].includes(name) || name?.startsWith("subtypes.") ) {
       this.render({ parts: ["content"] });
     }
   }

@@ -1,4 +1,4 @@
-import { CRAFTING_TOOLS, MODULE_ID } from "../config.mjs";
+import { CRAFTING_TOOLS } from "../config.mjs";
 import { Recipe } from "../data/recipe-data.mjs";
 import { Shop, ShopItemEntry } from "../data/shop-data.mjs";
 import {
@@ -165,17 +165,14 @@ export default class ShopManager extends Application5e {
       ? shops.toSorted((a, b) => (capCP(a) - capCP(b)) || byName(a, b))
       : shops.toSorted(byName);
     const rows = sorted.map(shop => {
-      let npc = null;
-      if ( shop.npc ) {
-        try {
-          npc = fromUuidSync(shop.npc);
-        } catch ( err ) {
-          console.warn(`${MODULE_ID} | Failed to resolve shop NPC ${shop.npc}:`, err);
-        }
-      }
+      const sceneNames = context.isGM && (shop.activationMode === "scene")
+        ? Array.from(shop.scenes, uuid => fromUuidSync(uuid, { strict: false })?.name).filter(name => name)
+        : [];
       return {
-        shop, npc, openingHours: shop.openingHoursDisplay(), subtitle: shop.location,
+        shop, openingHours: shop.openingHoursDisplay(), subtitle: shop.location,
         settlementCapDisplay: (shop.settlementCap.value != null) ? breakdownCopper(capCP(shop)) : null,
+        sceneTooltip: sceneNames.length
+          ? [_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.SceneActivation"), ...sceneNames].join("\n") : "",
         template: "modules/simple-shop-craft-5e/templates/shop-manager/shop-row.hbs"
       };
     });

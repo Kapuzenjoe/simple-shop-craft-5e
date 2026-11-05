@@ -80,7 +80,7 @@ export class PurchaseMessageData extends foundry.abstract.DataModel {
    */
   static async create({ shopSheet, actor, buyLines, sellLines, totalParts, netCP }) {
     const purchase = new PurchaseMessageData({
-      shopId: shopSheet.shopId, shopName: shopSheet.shop.name, shopImg: shopSheet.shop.img,
+      shopId: shopSheet.shopId, shopName: shopSheet.shop.name, shopImg: shopSheet.shop.displayImg,
       actorUuid: actor.uuid, actorName: actor.name,
       buyLines: buyLines.map(row => ({
         _id: row.entry._id, identifier: row.entry.identifier, uuid: row.entry.uuid,

@@ -127,7 +127,10 @@ export default class TransactionLog extends HandlebarsApplicationMixin(Applicati
     if ( !files ) return;
     try {
       const data = JSON.parse(await foundry.utils.readTextFromFile(files[0]));
-      const entries = data.map(raw => new Transaction({ ...raw, shopId: this.#shopId }).toObject());
+      const entries = data.map(raw => {
+        const source = this.#shopId ? { ...raw, shopId: this.#shopId } : raw;
+        return new Transaction(source).toObject();
+      });
       const added = await Transaction.merge(entries);
       if ( added ) ui.notifications.info("SIMPLE_SHOP_CRAFT_5E.TransactionLog.ImportDone", { format: { count: added } });
       else ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.TransactionLog.ImportNone", { localize: true });

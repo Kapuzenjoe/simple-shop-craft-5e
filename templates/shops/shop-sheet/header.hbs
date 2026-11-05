@@ -6,8 +6,7 @@
         <fieldset class="shop-summary">
             <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.Shop" }}</legend>
             <div class="shop-summary-body">
-                <img class="document-image" src="{{ shop.img }}" alt="{{ shop.name }}"
-                     {{#if (and isGM isEditMode)}}data-action="editImage" data-edit="img"{{/if}}>
+                <img class="document-image" src="{{ shop.displayImg }}" alt="{{ shop.name }}">
                 <div class="shop-summary-info card">
                     <div class="info">
                         {{#if isGM}}
@@ -36,7 +35,18 @@
                             </button>
                             {{else}}
                             <span class="value">
-                                {{#if shop.npc}}{{{ dnd5e-linkForUuid shop.npc renderBroken=true }}}{{else}}—{{/if}}
+                                {{#with shop.owner as |owner|}}
+                                {{#if owner.actor}}
+                                <a class="content-link" draggable="true" data-link
+                                   data-uuid="{{ @root.shop.npc }}" data-type="Actor">{{ owner.name }}</a>
+                                {{else}}
+                                {{#if (and owner.broken @root.isGM)}}
+                                <i class="fa-solid fa-triangle-exclamation warning"
+                                   data-tooltip="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.OwnerNotFound' }}"></i>
+                                {{/if}}
+                                {{ owner.name }}
+                                {{/if}}
+                                {{else}}—{{/with}}
                             </span>
                             {{/if}}
                         </div>

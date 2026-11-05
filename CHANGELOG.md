@@ -5,7 +5,15 @@
 - Added choosing whether to haggle on buying or selling, with a separate cooldown after a failed roll for each.
 - Added a tray under successful haggling rolls that lets the GM choose a discount or bonus and apply it to the player's modifier of the shop.
 - Added selling items at their full price for characters with the Ember "Passionate Trader" feat.
+- Added owners of shops without an actor, with a name and an optional linked actor.
+- Added the portrait of a shop's owner as the default icon of the shop.
+- Added assigning scenes to a shop, so it can be activated and deactivated together with them.
 - Changed the default Fixed-Value Loot Types of new shops to include Trade Goods.
+- Changed choosing a shop's icon from clicking it in the shop sheet to the Vendor Settings.
+- Fixed importing a transaction log into the log of all shops removing the shop assignment of every imported transaction.
+- Fixed deprecation warnings about item weights in shops with dnd5e 6.1.
+- Fixed generated enchanted items missing the Additional Items, activities, and effects that an enchantment carries itself with dnd5e 6.1.
+- Fixed shop icons that are not square, such as portraits, being cropped.
 
 ## 1.1.0
 

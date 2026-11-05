@@ -130,7 +130,6 @@ export default class ShopSheet extends Application5e {
       deleteShop: ShopSheet.#deleteShop,
       duplicateShop: ShopSheet.#duplicateShop,
       editDiscount: ShopSheet.#editDiscount,
-      editImage: ShopSheet._onEditImage,
       editMaxStock: ShopSheet.#editMaxStock,
       editModifiers: ShopSheet.#editModifiers,
       editOwner: ShopSheet.#editOwner,
@@ -1109,28 +1108,6 @@ export default class ShopSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
-   * @override
-   * @see dnd5e — BaseApplication5e#_onEditImage()
-   */
-  static async _onEditImage(event, target) {
-    const fp = new foundry.applications.apps.FilePicker.implementation({
-      current: this.shop.img,
-      type: "image",
-      redirectToRoot: [Shop.DEFAULT_ICON],
-      callback: path => {
-        target.src = path;
-        if ( this.options.form.submitOnChange ) {
-          this.form.dispatchEvent(new Event("submit", { cancelable: true }));
-        }
-      },
-      position: { top: this.position.top + 40, left: this.position.left + 10 }
-    });
-    await fp.browse();
-  }
-
-  /* -------------------------------------------- */
-
-  /**
    * Handle opening a small dialog to edit an item's stock max (restock target) and current stock together.
    * @this {ShopSheet}
    * @param {Event} event         Triggering click event.
@@ -1254,7 +1231,7 @@ export default class ShopSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
-   * Handle submitting the shop's inline form fields: item discount overrides, image, location,
+   * Handle submitting the shop's inline form fields: item discount overrides, location,
    * description, and current gold pool.
    * @this {ShopSheet}
    * @param {Event} event                Triggering submit event.
@@ -1265,7 +1242,6 @@ export default class ShopSheet extends Application5e {
   static async #onSubmit(event, form, formData) {
     const data = foundry.utils.expandObject(formData.object);
     const updateData = {};
-    if ( data.img !== undefined ) updateData.img = data.img;
     if ( data.location !== undefined ) updateData.location = data.location;
     if ( data.openHour !== undefined ) updateData.openHour = data.openHour;
     if ( data.openMinute !== undefined ) updateData.openMinute = Math.clamp(Math.round(data.openMinute ?? 0), 0, 59);
@@ -1766,9 +1742,10 @@ function resolveDiscountSources({
  */
 function resolveWeight(itemSystem, targetUnit) {
   if ( !itemSystem?.weight ) return undefined;
-  return {
-    value: game.dnd5e.utils.convertWeight(itemSystem.weight.value, itemSystem.weight.units || targetUnit,
-      targetUnit),
-    unit: targetUnit
-  };
+  const { convertWeight } = game.dnd5e.utils;
+  const from = itemSystem.weight.units || targetUnit;
+  const value = foundry.utils.isNewerVersion("6.1.0", game.system.version)
+    ? convertWeight(itemSystem.weight.value, from, targetUnit)
+    : convertWeight(itemSystem.weight.value, from, { to: targetUnit, legacy: false }).value;
+  return { value, unit: targetUnit };
 }

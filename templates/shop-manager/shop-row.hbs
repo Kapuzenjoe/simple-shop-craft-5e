@@ -2,12 +2,20 @@
     <div class="item-row">
         <div class="item-name rollable" data-action="editShop" role="button" data-shop-id="{{ shop._id }}">
             {{> "modules/simple-shop-craft-5e/templates/shared/item-avatar-name.hbs"
-                img=shop.img name=shop.name subtitle=subtitle }}
-        </div>
-        <div class="item-detail item-npc{{#unless npc}} empty{{/unless}}">
-            {{#if npc}}
-            <span class="title">{{ npc.name }}</span>
+                img=shop.displayImg name=shop.name subtitle=subtitle }}
+            {{#if sceneTooltip}}
+            <i class="fa-solid fa-map scene-icon" data-tooltip="{{ sceneTooltip }}"
+               data-tooltip-class="simple-shop-craft-5e stacked-tooltip"></i>
             {{/if}}
+        </div>
+        <div class="item-detail item-npc{{#unless shop.owner}} empty{{/unless}}">
+            {{#with shop.owner as |owner|}}
+            {{#if (and owner.broken @root.isGM)}}
+            <i class="fa-solid fa-triangle-exclamation warning"
+               data-tooltip="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.OwnerNotFound' }}"></i>
+            {{/if}}
+            <span class="title">{{ owner.name }}</span>
+            {{/with}}
         </div>
         <div class="item-detail item-openingHours">{{ openingHours }}</div>
         <div class="item-detail item-settlementCap">

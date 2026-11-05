@@ -5,6 +5,14 @@
       "FIELDS": {
         "name": { "label": "Shop Name" },
         "location": { "label": "Location" },
+        "scenes": {
+          "label": "Scenes",
+          "hint": "Scenes in which this shop is found."
+        },
+        "activationMode": {
+          "label": "Activation",
+          "hint": "Whether this shop is activated by hand or only while one of its scenes is active."
+        },
         "img": { "label": "Image" },
         "buyModifier": {
           "label": "Buy Modifier",
@@ -101,6 +109,7 @@
         "Status": "Status",
         "Activate": "Activate Shop",
         "Deactivate": "Deactivate Shop",
+        "SceneActivation": "Active while one of these scenes is active:",
         "StarterPack": "Starter Pack",
         "Empty": "Empty",
         "None": "No shops yet.",
@@ -328,6 +337,7 @@
         "Players": "Players"
       },
       "Location": "Location",
+      "Scenes": "Scenes",
       "ActingAs": "Acting As",
       "Player": "Player",
       "Haggling": "Haggle",
@@ -386,6 +396,8 @@
       "RestockModeNormal": "Normal Stock",
       "RestockModeUnlimited": "Unlimited Stock",
       "RestockModeExclude": "Exclude from Stock",
+      "ActivationModeManual": "Manual",
+      "ActivationModeScene": "Scene Active",
       "StockDefaultHint": "Empty means unlimited stock for that type.",
       "StockMagicRuleGear": "Weapons, Armor, Tools & Containers",
       "StockMagicRuleAll": "All Types",
@@ -455,6 +467,7 @@
       "SuppressedStock": "Out of Stock",
       "SuppressedCap": "Exceeds Settlement Cap",
       "SuppressedNotFound": "Item not found — check that the compendium or module it comes from is active",
+      "OwnerNotFound": "Actor not found — check that the compendium or module it comes from is active, or choose another actor",
       "None": "No items yet."
     },
     "ShopCart": {

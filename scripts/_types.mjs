@@ -59,7 +59,10 @@
  *                                          type; an empty set = any subtype.
  * @property {ShopPlayerDiscountData[]} playerDiscounts  Per-actor buy/sell modifier overrides.
  * @property {string} [npc]                  UUID of the NPC actor this shop is assigned to.
+ * @property {string} [npcName]              Name of the owner. Empty uses the name of the NPC actor.
  * @property {string} [location]             Optional free-text location (e.g. "Baldur's Gate").
+ * @property {Set<string>} scenes            UUIDs of the scenes in which this shop is found.
+ * @property {string} activationMode         Whether this shop is activated by hand or with its scenes.
  * @property {object} settlementCap
  * @property {number|null} settlementCap.value        Max. price of the most expensive item this shop sells
  *                                                    (DMG 2024 "Settlements by Size"). `null` = no cap.
@@ -90,6 +93,15 @@
  * @property {number} closeMinute            Minute (0-59) this shop closes each day.
  * @property {string} [description]          Optional shop description.
  * @property {ShopItemEntryData[]} items     Items available in this shop.
+ */
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef ShopOwner
+ * @property {string} name         Name of the owner, or of the linked actor. `—` if neither is set.
+ * @property {Actor5e|null} actor  Linked actor, or `null` if there is none or it can't be resolved.
+ * @property {boolean} broken      Whether an actor is linked but can't be resolved.
  */
 
 /* -------------------------------------------- */

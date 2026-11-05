@@ -1,7 +1,9 @@
 <img src="docs/banner.png" alt="Simple Shop & Craft 5e — Buy, Sell & Services · Random Item Generator · Haggling & Player Discounts · Recipe-Based Downtime Crafting" width="100%">
 
 ![Static Badge](https://img.shields.io/badge/Foundry-v14-informational)
-![Static Badge](https://img.shields.io/badge/Dnd5e-v6-informational)
+![Static Badge](https://img.shields.io/badge/Dnd5e-v5.3-informational)
+![Static Badge](https://img.shields.io/badge/Dnd5e-v6.0-informational)
+![Static Badge](https://img.shields.io/badge/Dnd5e-v6.1-informational)
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/peterlankton86911)
 
@@ -43,7 +45,9 @@ shop starts out Inactive and stays hidden from players until the GM opens it for
 
 The Shops tab lists every shop with its owner, opening hours, Settlement Cap, and status.
 
-- **Active and Inactive.** Shops sit in separate groups, and players only ever see the Active ones.
+- **Active and Inactive.** Shops sit in separate groups, and players only ever see the Active ones. With
+  Activation set to Scene Active in its Vendor Settings, a shop is Active only while one of its scenes is.
+  Toggling it by hand lasts until the active scene changes.
 - **Shop actions.** Right-click a shop to toggle it Active, open its Vendor Settings, duplicate it, or
   delete it.
 - **Show to All Players.** Opens the shop on every connected screen at once, for the moment the party steps

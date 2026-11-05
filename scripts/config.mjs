@@ -146,6 +146,15 @@ export const RESTOCK_MODES = {
 };
 
 /**
+ * Ways a shop is activated and deactivated.
+ * @type {Record<string, { label: string }>}
+ */
+export const ACTIVATION_MODES = {
+  manual: { label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.ActivationModeManual" },
+  scene: { label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.ActivationModeScene" }
+};
+
+/**
  * Nightly lodging tiers and their default price, per PHB 2024 "Food, Drink, and Lodging".
  * @type {Record<string, { label: string, price: { value: number, denomination: string } }>}
  */

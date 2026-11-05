@@ -20,6 +20,8 @@ Hooks.once("init", () => {
   Hooks.on("updateWorldTime", InProgressCraft.onUpdateWorldTime);
   Hooks.on("renderCharacterActorSheet", InProgressCraft.onRenderCharacterActorSheet);
   Hooks.on("updateWorldTime", Shop.onUpdateWorldTime);
+  Hooks.on("updateScene", Shop.onUpdateScene);
+  Hooks.on("deleteScene", Shop.onDeleteScene);
   Hooks.on("updateWorldTime", async (worldTime, dt) => {
     const { default: ShopSheet } = await import("./applications/shops/shop-sheet.mjs");
     ShopSheet.onUpdateWorldTime(worldTime, dt);
