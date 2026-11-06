@@ -383,10 +383,6 @@
     bottom: 60px;
   }
 
-  .item-discount, .item-price, .item-quantity {
-    .config-button i { font-size: var(--font-size-11); }
-  }
-
   .sheet-header {
     display: flex;
     flex-direction: column;
@@ -542,4 +538,10 @@
   .log-sold {
     color: var(--color-level-error);
   }
+}
+
+.simple-shop-craft-5e.config-sheet {
+  max-block-size: 85vh;
+  body.detached & { max-block-size: unset; }
+  .window-content { overflow-y: auto; }
 }

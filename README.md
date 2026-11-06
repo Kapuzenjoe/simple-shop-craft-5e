@@ -115,8 +115,8 @@ Sell modifiers, and the coin in its till.
 
 ### Stock & Restock
 
-Vendor Settings hold the shop's name, its money, the item types it buys, and the default stock for new
-items.
+Vendor Settings hold the shop's name, owner, location, opening hours, and Restock Days, its price
+modifiers and Settlement Cap, its money, the item types it buys, and the default stock for new items.
 
 - **Stock modes.** Each item has Normal Stock, Unlimited Stock, or Exclude from Stock. Excluded items keep
   their count but never restock, for the one-of-a-kind piece.
@@ -173,8 +173,8 @@ Every price starts from the item's own value and passes through the shop's modif
 shows which modifiers applied.
 
 - **Shop modifiers.** A Buy and a Sell modifier apply to every trade, by default +0% and −50%.
-- **Item overrides.** The GM can give a single item its own price, or its own modifier in place of the
-  shop's.
+- **Item overrides.** In Edit mode, the Item Settings of an item give it its own price, or its own
+  modifier in place of the shop's.
 - **Fixed-Value items.** Gemstones, art objects, and trade goods keep their full value, bought or sold. The
   list of loot types is set per shop.
 - **Crafter.** With the 2024 rules, a character with the Crafter feat pays 20% less for nonmagical items,

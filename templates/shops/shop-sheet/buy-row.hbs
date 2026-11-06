@@ -37,39 +37,27 @@
              data-tooltip="{{ discountTooltip }}"
              data-tooltip-class="property-attribution simple-shop-craft-5e"
              data-key="{{ key }}">
-            {{#if (and @root.editable @root.isEditMode)}}
-            <button type="button" class="unbutton config-button item-control item-action" data-action="editDiscount"
-                    data-key="{{ key }}" data-tooltip
-                    aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.DiscountTooltip' }}">
-                <i class="fas fa-cog" inert></i>
-            </button>
-            {{else}}
             <span class="value">{{ discountPercent }}</span>
             <span class="unit">%</span>
-            {{/if}}
         </div>
         <div class="item-detail item-price">
-            {{#if (and @root.editable @root.isEditMode)}}
-            <button type="button" class="unbutton config-button item-control item-action" data-action="editPrice"
-                    data-key="{{ key }}" data-tooltip
-                    aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.PriceTooltip' }}">
-                <i class="fas fa-cog" inert></i>
-            </button>
-            {{else}}
             {{> "modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs" parts=priceDisplay}}
-            {{/if}}
         </div>
         {{#unless entry.isService}}
         {{> "modules/simple-shop-craft-5e/templates/shared/item-weight-cell.hbs" weight=weight }}
         {{/unless}}
+        {{#if (and @root.editable stockTracked)}}
+        <div class="item-detail item-uses">
+            <input type="number" class="always-interactive" name="stock.{{ key }}" data-key="{{ key }}"
+                   value="{{ stockCurrent }}" placeholder="0" min="0" step="1"
+                   aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.StockCurrent' }}">
+            {{#if (eq entry.restockMode "normal")}}
+            <span class="separator">&sol;</span>
+            <span class="max">{{ stockMax }}</span>
+            {{/if}}
+        </div>
+        {{else}}
         <div class="item-detail item-quantity">
-            {{#if (and @root.editable @root.isEditMode)}}
-            <button type="button" class="unbutton config-button item-control item-action" data-action="editMaxStock"
-                    data-key="{{ key }}" data-tooltip
-                    aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.StockTooltip' }}">
-                <i class="fas fa-cog" inert></i>
-            </button>
-            {{else}}
             <div class="stock-display">
                 {{#if stockTracked}}
                 <span class="value">
@@ -79,9 +67,15 @@
                 <i class="fas fa-infinity" inert></i>
                 {{/if}}
             </div>
-            {{/if}}
         </div>
+        {{/if}}
         <div class="item-detail item-controls">
+            {{#if (and @root.editable @root.isEditMode)}}
+            <button type="button" class="unbutton config-button item-control item-action" data-action="editItem"
+                    data-key="{{ key }}" data-tooltip aria-label="{{ localize 'DND5E.ItemEdit' }}">
+                <i class="fa-solid fa-pen-to-square" inert></i>
+            </button>
+            {{/if}}
             {{#if @root.editable}}
             <button type="button" class="unbutton config-button item-control always-interactive" data-context-menu
                     aria-label="{{ localize 'DND5E.AdditionalControls' }}">

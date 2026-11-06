@@ -339,6 +339,18 @@ export function isCalendarModeActive() {
 /* -------------------------------------------- */
 
 /**
+ * Festival options for the active calendar, if it supports festivals. Empty otherwise.
+ * @returns {{ value: string, label: string }[]}
+ */
+export function festivalOptions() {
+  const calendar = game.time.calendar;
+  const festivals = calendar.festivalsArray ?? calendar.festivals ?? [];
+  return festivals.map(f => ({ value: f.name, label: _loc(f.name) }));
+}
+
+/* -------------------------------------------- */
+
+/**
  * Whether a forward `updateWorldTime` change should be handled by this client.
  * @param {number} dt
  * @returns {boolean}

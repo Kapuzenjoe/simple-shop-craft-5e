@@ -211,7 +211,7 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
       closeMinute: new NumberField({ required: true, initial: 0, integer: true, min: 0, max: 59 }),
       settlementCap: new SchemaField({
         value: new NumberField({ initial: null, nullable: true, min: 0 }),
-        denomination: new StringField({ initial: () => CONFIG.DND5E.defaultCurrency }),
+        denomination: new StringField({ required: true, blank: false, initial: () => CONFIG.DND5E.defaultCurrency }),
         appliesToSell: new BooleanField({ initial: true })
       }),
       goldPool: new SchemaField({

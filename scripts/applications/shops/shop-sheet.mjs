@@ -7,7 +7,7 @@ import { SpellScrollBlueprint } from "../../data/spell-scroll-blueprint.mjs";
 import { getTidySection, isTidyActive } from "../../integrations/tidy5e.mjs";
 import {
   applyItemSort, applyListControls, applyLoadingTooltip, applyRichTooltip, breakdownCopper, buildItemTableSections,
-  confirmDeleteShop, finalizeGroups, identifierWarning, isCalendarModeActive, itemRef,
+  confirmDeleteShop, festivalOptions, finalizeGroups, identifierWarning, itemRef,
   openItemSheet, resolveBundleSize, resolveBundleSizes, resolveItemPrice, resolveUnitPrice, selectableActors,
   spotlightShop, toCopper
 } from "../../utils.mjs";
@@ -17,15 +17,10 @@ import FillFromTableDialog from "./fill-from-table-dialog.mjs";
 import GenerateItemDialog from "./generate-item-dialog.mjs";
 import HaggleDialog from "./haggle-dialog.mjs";
 import ShopCart from "./shop-cart.mjs";
-import DiscountConfig from "./shop-config/discount-config.mjs";
 import HirelingConfig from "./shop-config/hireling-config.mjs";
+import ItemConfig from "./shop-config/item-config.mjs";
 import LodgingConfig from "./shop-config/lodging-config.mjs";
-import MaxStockConfig from "./shop-config/max-stock-config.mjs";
-import ModifiersConfig from "./shop-config/modifiers-config.mjs";
-import OwnerConfig from "./shop-config/owner-config.mjs";
 import PlayersConfig from "./shop-config/players-config.mjs";
-import PriceConfig from "./shop-config/price-config.mjs";
-import SettlementCapConfig from "./shop-config/settlement-cap-config.mjs";
 import VendorConfig from "./shop-config/vendor-config.mjs";
 
 const { Application5e } = game.dnd5e.applications.api;
@@ -98,8 +93,6 @@ export default class ShopSheet extends Application5e {
       title: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Title",
       resizable: true,
       controls: [
-        { action: "editVendorSettings", icon: "fa-solid fa-cog", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.VendorSettings",
-          visible: ShopSheet.#isEditable },
         { action: "toggleActive", icon: "fa-solid fa-toggle-on", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Deactivate",
           visible: ShopSheet.#canDeactivate },
         { action: "toggleActive", icon: "fa-solid fa-toggle-off", label: "SIMPLE_SHOP_CRAFT_5E.ShopManager.Shops.Activate",
@@ -129,13 +122,8 @@ export default class ShopSheet extends Application5e {
       changeMode: ShopSheet.#changeMode,
       deleteShop: ShopSheet.#deleteShop,
       duplicateShop: ShopSheet.#duplicateShop,
-      editDiscount: ShopSheet.#editDiscount,
-      editMaxStock: ShopSheet.#editMaxStock,
-      editModifiers: ShopSheet.#editModifiers,
-      editOwner: ShopSheet.#editOwner,
+      editItem: ShopSheet.#editItem,
       editPlayers: ShopSheet.#editPlayers,
-      editPrice: ShopSheet.#editPrice,
-      editSettlementCap: ShopSheet.#editSettlementCap,
       editVendorSettings: ShopSheet.#editVendorSettings,
       fillFromTable: ShopSheet.#fillFromTable,
       generateItem: ShopSheet.#generateItem,
@@ -513,31 +501,20 @@ export default class ShopSheet extends Application5e {
    * @protected
    */
   async _prepareDescriptionContext(context, options) {
-    context.shopFields = Shop.schema.fields;
     context.openingHoursDisplay = context.shop.openingHoursDisplay();
-    context.statusOverrideOptions = [
-      { value: "", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StatusOverrideAuto") },
-      { value: "open", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StatusOverrideOpen") },
-      { value: "closed", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StatusOverrideClosed") }
-    ];
-    context.calendarModeActive = isCalendarModeActive();
-    context.restockWeekdayOptions = game.time.calendar.days.values.map(
+    const weekdayOptions = game.time.calendar.days.values.map(
       (day, value) => ({ value, label: _loc(day.name) })
     );
-    context.restockWeekdays = Array.from(context.shop.restockWeekdays);
-    const selectedNames = context.restockWeekdayOptions
+    const selectedNames = weekdayOptions
       .filter(o => context.shop.restockWeekdays.has(o.value)).map(o => o.label);
     context.restockWeekdaysDisplay = selectedNames.length
       ? selectedNames.join(", ") : _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.AutoRestockNever");
 
-    context.closedWeekdays = Array.from(context.shop.closedWeekdays);
-    const closedWeekdayNames = context.restockWeekdayOptions
+    const closedWeekdayNames = weekdayOptions
       .filter(o => context.shop.closedWeekdays.has(o.value)).map(o => o.label);
     context.closedWeekdaysDisplay = closedWeekdayNames.join(", ");
 
-    context.festivalOptions = festivalOptions();
-    context.closedFestivals = Array.from(context.shop.closedFestivals);
-    const closedFestivalNames = context.festivalOptions
+    const closedFestivalNames = festivalOptions()
       .filter(o => context.shop.closedFestivals.has(o.value)).map(o => o.label);
     context.closedFestivalsDisplay = closedFestivalNames.join(", ");
     context.enrichedDescription = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
@@ -619,14 +596,7 @@ export default class ShopSheet extends Application5e {
       {
         label: "DND5E.ContextMenuActionEdit",
         icon: '<i class="fa-solid fa-pen-to-square fa-fw"></i>',
-        onClick: () => this.#openLodgingConfig(key),
-        visible: !!entry.lodging
-      },
-      {
-        label: "DND5E.ContextMenuActionEdit",
-        icon: '<i class="fa-solid fa-pen-to-square fa-fw"></i>',
-        onClick: () => this.#openHirelingConfig(key),
-        visible: !!entry.hireling
+        onClick: () => this.#openEntryConfig(key)
       },
       {
         label: entry.isService
@@ -646,6 +616,19 @@ export default class ShopSheet extends Application5e {
 
   /* -------------------------------------------- */
   /*  Life-Cycle Handlers                         */
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  _getFrameButtons(options) {
+    const buttons = super._getFrameButtons(options);
+    if ( this.isEditable ) {
+      buttons.push({
+        action: "editVendorSettings", icon: "fa-solid fa-cog", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.VendorSettings"
+      });
+    }
+    return buttons;
+  }
+
   /* -------------------------------------------- */
 
   /** @inheritDoc */
@@ -720,6 +703,7 @@ export default class ShopSheet extends Application5e {
     await super._onRender(context, options);
 
     this._renderModeToggle();
+    this.element.querySelector("prose-mirror button.toggle")?.classList.add("always-interactive");
     if ( this._mode === this.constructor.MODES.PLAY ) this._disableFields();
 
     const canShowActions = context.editable && this.isEditMode;
@@ -976,19 +960,7 @@ export default class ShopSheet extends Application5e {
       price: { value: null, denomination: LODGING_TIERS[tier].price.denomination }
     };
     await this.#mergeItemEntries([entry]);
-    this.#openLodgingConfig(entry._id);
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Open the autosaving editor for a lodging entry.
-   * @param {string} key
-   */
-  #openLodgingConfig(key) {
-    new LodgingConfig({
-      shopSheet: this, entryKey: key, onUpdate: updateData => this.#updateShop(updateData)
-    }).render({ force: true });
+    this.#openEntryConfig(entry._id);
   }
 
   /* -------------------------------------------- */
@@ -1005,17 +977,21 @@ export default class ShopSheet extends Application5e {
       price: { value: null, denomination: HIRELING_TYPES[type].price.denomination }
     };
     await this.#mergeItemEntries([entry]);
-    this.#openHirelingConfig(entry._id);
+    this.#openEntryConfig(entry._id);
   }
 
   /* -------------------------------------------- */
 
   /**
-   * Open the autosaving editor for a hireling entry.
+   * Open the autosaving editor for an item entry, which differs for lodging and hireling entries.
    * @param {string} key
    */
-  #openHirelingConfig(key) {
-    new HirelingConfig({
+  #openEntryConfig(key) {
+    const entry = this.shop.items.find(i => i._id === key);
+    let Config = ItemConfig;
+    if ( entry.lodging ) Config = LodgingConfig;
+    else if ( entry.hireling ) Config = HirelingConfig;
+    new Config({
       shopSheet: this, entryKey: key, onUpdate: updateData => this.#updateShop(updateData)
     }).render({ force: true });
   }
@@ -1092,53 +1068,13 @@ export default class ShopSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
-   * Handle opening a small dialog to edit an item's price-modifier override.
+   * Handle opening the settings of an item entry.
    * @this {ShopSheet}
    * @param {Event} event         Triggering click event.
    * @param {HTMLElement} target  Element that was clicked.
    */
-  static async #editDiscount(event, target) {
-    const playerOverride = this.shop.resolvePlayerOverride(this.selectedActorUuid);
-    await new DiscountConfig({
-      shopSheet: this, entryKey: target.dataset.key, playerOverride,
-      onUpdate: updateData => this.#updateShop(updateData)
-    }).render({ force: true });
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Handle opening a small dialog to edit an item's stock max (restock target) and current stock together.
-   * @this {ShopSheet}
-   * @param {Event} event         Triggering click event.
-   * @param {HTMLElement} target  Element that was clicked.
-   */
-  static async #editMaxStock(event, target) {
-    await new MaxStockConfig({
-      shopSheet: this, entryKey: target.dataset.key, onUpdate: updateData => this.#updateShop(updateData)
-    }).render({ force: true });
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Handle opening a dialog to edit the shop's buy/sell price modifiers.
-   * @this {ShopSheet}
-   */
-  static async #editModifiers() {
-    await new ModifiersConfig({ shopSheet: this, onUpdate: updateData => this.#updateShop(updateData) })
-      .render({ force: true });
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Handle opening a dialog to edit the shop's owner.
-   * @this {ShopSheet}
-   */
-  static async #editOwner() {
-    await new OwnerConfig({ shopSheet: this, onUpdate: updateData => this.#updateShop(updateData) })
-      .render({ force: true });
+  static #editItem(event, target) {
+    this.#openEntryConfig(target.dataset.key);
   }
 
   /* -------------------------------------------- */
@@ -1158,32 +1094,7 @@ export default class ShopSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
-   * Handle opening a small dialog to edit an item's price.
-   * @this {ShopSheet}
-   * @param {Event} event         Triggering click event.
-   * @param {HTMLElement} target  Element that was clicked.
-   */
-  static async #editPrice(event, target) {
-    await new PriceConfig({
-      shopSheet: this, entryKey: target.dataset.key, onUpdate: updateData => this.#updateShop(updateData)
-    }).render({ force: true });
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Handle opening a dialog to edit the shop's settlement cap.
-   * @this {ShopSheet}
-   */
-  static async #editSettlementCap() {
-    await new SettlementCapConfig({ shopSheet: this, onUpdate: updateData => this.#updateShop(updateData) })
-      .render({ force: true });
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Handle opening a dialog to edit the shop's money pool and default stock per item type.
+   * Handle opening a dialog to edit the shop's vendor settings.
    * @this {ShopSheet}
    */
   static async #editVendorSettings() {
@@ -1231,8 +1142,7 @@ export default class ShopSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
-   * Handle submitting the shop's inline form fields: item discount overrides, location,
-   * description, and current gold pool.
+   * Handle submitting the shop's inline form fields: an item's current stock, description, and current gold pool.
    * @this {ShopSheet}
    * @param {Event} event                Triggering submit event.
    * @param {HTMLFormElement} form       The submitted form.
@@ -1241,16 +1151,9 @@ export default class ShopSheet extends Application5e {
    */
   static async #onSubmit(event, form, formData) {
     const data = foundry.utils.expandObject(formData.object);
+    const stockKey = event.target?.dataset.key;
+    if ( stockKey ) return this.#setStock(stockKey, Math.round(data.stock[stockKey] ?? 0));
     const updateData = {};
-    if ( data.location !== undefined ) updateData.location = data.location;
-    if ( data.openHour !== undefined ) updateData.openHour = data.openHour;
-    if ( data.openMinute !== undefined ) updateData.openMinute = Math.clamp(Math.round(data.openMinute ?? 0), 0, 59);
-    if ( data.closeHour !== undefined ) updateData.closeHour = data.closeHour;
-    if ( data.closeMinute !== undefined ) updateData.closeMinute = Math.clamp(Math.round(data.closeMinute ?? 0), 0, 59);
-    if ( data.restockWeekdays !== undefined ) updateData.restockWeekdays = data.restockWeekdays;
-    if ( data.closedWeekdays !== undefined ) updateData.closedWeekdays = data.closedWeekdays;
-    if ( data.closedFestivals !== undefined ) updateData.closedFestivals = data.closedFestivals;
-    if ( data.statusOverride !== undefined ) updateData.statusOverride = data.statusOverride;
     if ( data.description !== undefined ) updateData.description = data.description;
     if ( data.currentGold ) {
       const current = Object.fromEntries(
@@ -1468,8 +1371,27 @@ export default class ShopSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
+   * Persist a new current stock of an item entry, never below zero.
+   * @param {string} key    `_id` of the item entry.
+   * @param {number} value  New current stock.
+   * @returns {Promise<void>}
+   */
+  async #setStock(key, value) {
+    await this.#updateShop(shop => ({
+      items: shop.items.map(i => {
+        const obj = i.toObject();
+        if ( i._id === key ) obj.stock.current = Math.max(0, value);
+        return obj;
+      })
+    }));
+  }
+
+  /* -------------------------------------------- */
+
+  /**
    * Persist a partial update to this shop's data and re-render.
-   * @param {object} updateData  Fields to merge into the shop's current data.
+   * @param {object|function(Shop): object} updateData  Fields to merge into the shop's current data, or a function
+   *                                                    computing them from the freshest persisted shop.
    * @returns {Promise<void>}
    */
   async #updateShop(updateData) {
@@ -1492,18 +1414,6 @@ export default class ShopSheet extends Application5e {
  */
 function additiveSource(label, value) {
   return { label, value: `${Math.abs(value)}%`, type: (value < 0) ? "subtract" : "add", mode: 2, negative: value < 0 };
-}
-
-/* -------------------------------------------- */
-
-/**
- * Festival options for the active calendar, if it supports festivals. Empty otherwise.
- * @returns {{ value: string, label: string }[]}
- */
-function festivalOptions() {
-  const calendar = game.time.calendar;
-  const festivals = calendar.festivalsArray ?? calendar.festivals ?? [];
-  return festivals.map(f => ({ value: f.name, label: _loc(f.name) }));
 }
 
 /* -------------------------------------------- */

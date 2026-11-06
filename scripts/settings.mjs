@@ -191,14 +191,16 @@ export function registerSettings() {
 /* -------------------------------------------- */
 
 /**
- * Re-render any open shop management and transaction log applications after settings change elsewhere.
+ * Re-render any open shop management, transaction log, and shop config applications after settings change.
  * @returns {Promise<void>}
  */
 async function refreshShopApplications() {
   const { default: ShopManager } = await import("./applications/shop-manager.mjs");
   const { default: ShopSheet } = await import("./applications/shops/shop-sheet.mjs");
+  const { default: BaseShopConfig } = await import("./applications/shops/shop-config/base-shop-config.mjs");
   foundry.applications.instances.forEach(app => {
     if ( app instanceof ShopManager ) app.render();
+    if ( app instanceof BaseShopConfig ) app.render();
     if ( app instanceof TransactionLog ) app.render();
     if ( app instanceof ShopSheet ) {
       if ( app.shop ) app.render();

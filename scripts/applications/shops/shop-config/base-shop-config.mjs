@@ -1,5 +1,5 @@
 /**
- * @import { ShopItemEntry } from "../../../data/shop-data.mjs";
+ * @import { Shop, ShopItemEntry } from "../../../data/shop-data.mjs";
  * @import ShopSheet from "../shop-sheet.mjs";
  */
 
@@ -45,7 +45,7 @@ export default class BaseShopConfig extends Application5e {
    * @type {ShopItemEntry}
    */
   get entry() {
-    return this.shopSheet.shop.items.find(i => i._id === this.entryKey);
+    return this.shop.items.find(i => i._id === this.entryKey);
   }
 
   /* -------------------------------------------- */
@@ -56,6 +56,16 @@ export default class BaseShopConfig extends Application5e {
    */
   get entryKey() {
     return this.options.entryKey;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * The shop being configured.
+   * @type {Shop}
+   */
+  get shop() {
+    return this.shopSheet.shop;
   }
 
   /* -------------------------------------------- */
@@ -82,7 +92,7 @@ export default class BaseShopConfig extends Application5e {
 
   /** @override */
   _canRender(options) {
-    if ( this.rendered && this.entryKey && !this.entry ) {
+    if ( this.rendered && (!this.shop || (this.entryKey && !this.entry)) ) {
       this.close();
       return false;
     }

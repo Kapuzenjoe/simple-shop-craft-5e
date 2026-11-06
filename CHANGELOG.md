@@ -8,12 +8,20 @@
 - Added owners of shops without an actor, with a name and an optional linked actor.
 - Added the portrait of a shop's owner as the default icon of the shop.
 - Added assigning scenes to a shop, so it can be activated and deactivated together with them.
+- Added editing the current stock of an item directly in the shop sheet.
 - Changed the default Fixed-Value Loot Types of new shops to include Trade Goods.
 - Changed choosing a shop's icon from clicking it in the shop sheet to the Vendor Settings.
+- Changed editing the description of a shop to an edit button in the Description tab, which the GM can use without Edit mode.
 - Fixed importing a transaction log into the log of all shops removing the shop assignment of every imported transaction.
 - Fixed deprecation warnings about item weights in shops with dnd5e 6.1.
 - Fixed generated enchanted items missing the Additional Items, activities, and effects that an enchantment carries itself with dnd5e 6.1.
 - Fixed shop icons that are not square, such as portraits, being cropped.
+- Reworked the Vendor Settings into tabs:
+  - Added the owner, location, opening hours, restock days, price modifiers, and Settlement Cap to the Vendor Settings, replacing separate dialogs and the editing fields of the Description tab.
+  - Added a Vendor Settings button to the title bar of the shop sheet.
+- Reworked the price, price modifier, and stock of a shop item into one Item Settings dialog:
+  - Added an edit button to the items of the Buy and Services tabs in Edit mode, replacing the buttons in the price, modifier, and stock columns.
+  - Added the price modifier, restock mode, and Max Stock to the settings of lodging and hireling entries.
 
 ## 1.1.0
 
