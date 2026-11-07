@@ -75,6 +75,10 @@
                     data-key="{{ key }}" data-tooltip aria-label="{{ localize 'DND5E.ItemEdit' }}">
                 <i class="fa-solid fa-pen-to-square" inert></i>
             </button>
+            <button type="button" class="unbutton config-button item-control item-action" data-action="deleteItem"
+                    data-key="{{ key }}" data-tooltip aria-label="{{ localize 'DND5E.ItemDelete' }}">
+                <i class="fa-solid fa-trash" inert></i>
+            </button>
             {{/if}}
             {{#if @root.editable}}
             <button type="button" class="unbutton config-button item-control always-interactive" data-context-menu

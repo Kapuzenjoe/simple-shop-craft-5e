@@ -11,6 +11,7 @@ import {
   openItemSheet, resolveBundleSize, resolveBundleSizes, resolveItemPrice, resolveUnitPrice, selectableActors,
   spotlightShop, toCopper
 } from "../../utils.mjs";
+import TransactionLog from "../transaction-log.mjs";
 import AddEntryDialog from "./add-entry-dialog.mjs";
 import ConfigureTemplatesDialog from "./configure-templates-dialog.mjs";
 import FillFromTableDialog from "./fill-from-table-dialog.mjs";
@@ -120,6 +121,7 @@ export default class ShopSheet extends Application5e {
       adjustCartQuantity: ShopSheet.#adjustCartQuantity,
       adjustSellQuantity: ShopSheet.#adjustSellQuantity,
       changeMode: ShopSheet.#changeMode,
+      deleteItem: ShopSheet.#deleteItem,
       deleteShop: ShopSheet.#deleteShop,
       duplicateShop: ShopSheet.#duplicateShop,
       editItem: ShopSheet.#editItem,
@@ -131,6 +133,7 @@ export default class ShopSheet extends Application5e {
       openCart: ShopSheet.#openCart,
       openItemSheet: ShopSheet.#openItemSheet,
       openLinkedActor: ShopSheet.#openLinkedActor,
+      openTransactionLog: ShopSheet.#openTransactionLog,
       resetShop: ShopSheet.#resetShop,
       spotlight: ShopSheet.#spotlight,
       toggleActive: ShopSheet.#toggleActive,
@@ -377,6 +380,16 @@ export default class ShopSheet extends Application5e {
   /* -------------------------------------------- */
 
   /** @inheritDoc */
+  get subtitle() {
+    const { shop } = this;
+    if ( !shop ) return super.subtitle;
+    const hours = ((shop.openHour != null) && (shop.closeHour != null)) ? shop.openingHoursDisplay() : "";
+    return [shop.location, hours].filter(_ => _).join(" · ");
+  }
+
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
   get title() {
     return this.shop?.name ?? super.title;
   }
@@ -388,6 +401,9 @@ export default class ShopSheet extends Application5e {
   /** @inheritDoc */
   _configureRenderOptions(options) {
     super._configureRenderOptions(options);
+    options.window ??= {};
+    options.window.title ||= this.title;
+    options.window.subtitle = this.subtitle;
     this._mode = options.mode ?? this._mode ?? this.constructor.MODES.PLAY;
   }
 
@@ -501,22 +517,13 @@ export default class ShopSheet extends Application5e {
    * @protected
    */
   async _prepareDescriptionContext(context, options) {
-    context.openingHoursDisplay = context.shop.openingHoursDisplay();
     const weekdayOptions = game.time.calendar.days.values.map(
       (day, value) => ({ value, label: _loc(day.name) })
     );
-    const selectedNames = weekdayOptions
-      .filter(o => context.shop.restockWeekdays.has(o.value)).map(o => o.label);
-    context.restockWeekdaysDisplay = selectedNames.length
-      ? selectedNames.join(", ") : _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.AutoRestockNever");
-
-    const closedWeekdayNames = weekdayOptions
-      .filter(o => context.shop.closedWeekdays.has(o.value)).map(o => o.label);
-    context.closedWeekdaysDisplay = closedWeekdayNames.join(", ");
-
-    const closedFestivalNames = festivalOptions()
-      .filter(o => context.shop.closedFestivals.has(o.value)).map(o => o.label);
-    context.closedFestivalsDisplay = closedFestivalNames.join(", ");
+    context.closedWeekdaysDisplay = weekdayOptions
+      .filter(o => context.shop.closedWeekdays.has(o.value)).map(o => o.label).join(", ");
+    context.closedFestivalsDisplay = festivalOptions()
+      .filter(o => context.shop.closedFestivals.has(o.value)).map(o => o.label).join(", ");
     context.enrichedDescription = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
       context.shop.description, { secrets: false }
     );
@@ -624,6 +631,8 @@ export default class ShopSheet extends Application5e {
     if ( this.isEditable ) {
       buttons.push({
         action: "editVendorSettings", icon: "fa-solid fa-cog", label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.VendorSettings"
+      }, {
+        action: "openTransactionLog", icon: "fa-solid fa-scroll", label: "SIMPLE_SHOP_CRAFT_5E.TransactionLog.Open"
       });
     }
     return buttons;
@@ -703,18 +712,16 @@ export default class ShopSheet extends Application5e {
     await super._onRender(context, options);
 
     this._renderModeToggle();
-    this.element.querySelector("prose-mirror button.toggle")?.classList.add("always-interactive");
-    if ( this._mode === this.constructor.MODES.PLAY ) this._disableFields();
 
     const canShowActions = context.editable && this.isEditMode;
     this.element.querySelectorAll(".window-content-actions").forEach(actions => actions.hidden = !canShowActions);
+    if ( this.#cartApp?.rendered ) this.#cartApp.render();
   }
 
   /* -------------------------------------------- */
 
   /**
-   * Handle Foundry's `updateWorldTime` hook, re-rendering the open sheets and carts of shops that opened or
-   * closed.
+   * Handle Foundry's `updateWorldTime` hook, re-rendering the open sheets of shops that opened or closed.
    * @param {number} worldTime
    * @param {number} dt
    * @returns {Promise<void>}
@@ -724,7 +731,6 @@ export default class ShopSheet extends Application5e {
       const shop = sheet.shop;
       if ( sheet.isEditMode || !shop || (shop.isOpen(worldTime) === shop.isOpen(worldTime - dt)) ) return;
       await sheet.render();
-      if ( sheet.#cartApp?.rendered ) sheet.#cartApp.render();
     }));
   }
 
@@ -744,7 +750,6 @@ export default class ShopSheet extends Application5e {
         this.sellCart.clear();
         this.sellFullPrice.clear();
         await this.render();
-        if ( this.#cartApp?.rendered ) this.#cartApp.render();
       });
     }
 
@@ -1014,7 +1019,6 @@ export default class ShopSheet extends Application5e {
     if ( next === 0 ) this.cart.delete(key);
     else this.cart.set(key, next);
     await this.render();
-    if ( this.#cartApp?.rendered ) this.#cartApp.render();
   }
 
   /* -------------------------------------------- */
@@ -1035,7 +1039,6 @@ export default class ShopSheet extends Application5e {
     if ( next === 0 ) this.sellCart.delete(itemId);
     else this.sellCart.set(itemId, next);
     await this.render();
-    if ( this.#cartApp?.rendered ) this.#cartApp.render();
   }
 
   /* -------------------------------------------- */
@@ -1051,7 +1054,6 @@ export default class ShopSheet extends Application5e {
     if ( this.sellFullPrice.has(itemId) ) this.sellFullPrice.delete(itemId);
     else this.sellFullPrice.add(itemId);
     await this.render();
-    if ( this.#cartApp?.rendered ) this.#cartApp.render();
   }
 
   /* -------------------------------------------- */
@@ -1063,6 +1065,18 @@ export default class ShopSheet extends Application5e {
   static async #changeMode() {
     this._mode = this.isEditMode ? this.constructor.MODES.PLAY : this.constructor.MODES.EDIT;
     this.render();
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle deleting an item entry.
+   * @this {ShopSheet}
+   * @param {Event} event         Triggering click event.
+   * @param {HTMLElement} target  Button that was clicked.
+   */
+  static async #deleteItem(event, target) {
+    await this.#removeEntry(target.dataset.key);
   }
 
   /* -------------------------------------------- */
@@ -1209,6 +1223,16 @@ export default class ShopSheet extends Application5e {
       return;
     }
     actor.sheet?.render(true);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle opening the transaction log of this shop.
+   * @this {ShopSheet}
+   */
+  static #openTransactionLog() {
+    new TransactionLog({ shopId: this.shopId }).render({ force: true });
   }
 
   /* -------------------------------------------- */
@@ -1361,11 +1385,8 @@ export default class ShopSheet extends Application5e {
       } catch ( err ) {
         console.error(err);
         ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoActiveGM", { localize: true });
-        return;
       }
     }
-    this.render();
-    if ( this.#cartApp?.rendered ) this.#cartApp.render();
   }
 
   /* -------------------------------------------- */
@@ -1389,7 +1410,7 @@ export default class ShopSheet extends Application5e {
   /* -------------------------------------------- */
 
   /**
-   * Persist a partial update to this shop's data and re-render.
+   * Persist a partial update to this shop's data.
    * @param {object|function(Shop): object} updateData  Fields to merge into the shop's current data, or a function
    *                                                    computing them from the freshest persisted shop.
    * @returns {Promise<void>}
@@ -1397,8 +1418,6 @@ export default class ShopSheet extends Application5e {
   async #updateShop(updateData) {
     if ( !game.user.isGM ) return;
     await Shop.update(this.shopId, updateData);
-    this.render({ window: { title: this.title } });
-    if ( this.#cartApp?.rendered ) this.#cartApp.render();
   }
 }
 

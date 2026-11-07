@@ -65,15 +65,4 @@
         </div>
         {{/if}}
     </fieldset>
-    <fieldset>
-        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.RestockDays" }}</legend>
-        <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.RestockDaysHint" }}</p>
-        {{#unless calendarModeActive}}
-        <p class="note warn">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.AutoRestockNoCalendarHint" }}</p>
-        {{/unless}}
-        {{ formInput shopFields.restockWeekdays value=restockWeekdays options=restockWeekdayOptions classes="full-width" }}
-    </fieldset>
-    <button type="button" data-action="openTransactionLog">
-        <i class="fa-solid fa-scroll" inert></i> {{ localize "SIMPLE_SHOP_CRAFT_5E.TransactionLog.Open" }}
-    </button>
 </section>

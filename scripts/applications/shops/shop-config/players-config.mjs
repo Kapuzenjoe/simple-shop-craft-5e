@@ -123,7 +123,6 @@ export default class PlayersConfig extends BaseShopConfig {
     const uuid = target.closest("li")?.dataset.actorUuid;
     this.#actorUuids = this.#actorUuids.filter(u => u !== uuid);
     await this.#persistPlayerList();
-    this.render({ parts: ["content"] });
   }
 
   /* -------------------------------------------- */
@@ -138,7 +137,6 @@ export default class PlayersConfig extends BaseShopConfig {
   static async #resetHaggling(event, target) {
     const uuid = target.closest("li")?.dataset.actorUuid;
     await this.onUpdatePlayerDiscount(uuid, { hagglingLocks: {} });
-    this.render({ parts: ["content"] });
   }
 
   /* -------------------------------------------- */

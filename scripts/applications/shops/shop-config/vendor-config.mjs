@@ -4,7 +4,6 @@ import {
   currencyRows, currencyValueField, festivalOptions, goldPoolCurrencies, isCalendarModeActive, parseTypeFilter,
   typeFilterFields
 } from "../../../utils.mjs";
-import TransactionLog from "../../transaction-log.mjs";
 import BaseShopConfig from "./base-shop-config.mjs";
 
 /**
@@ -28,8 +27,7 @@ export default class VendorConfig extends BaseShopConfig {
     position: {
       width: 500,
       height: "auto"
-    },
-    actions: { openTransactionLog: VendorConfig.#openTransactionLog }
+    }
   };
 
   /* -------------------------------------------- */
@@ -196,7 +194,8 @@ export default class VendorConfig extends BaseShopConfig {
     if ( !goldPool.sellDisabled ) {
       context.moneyFields.push({
         field: Shop.schema.fields.goldPool.fields.unlimited, name: "unlimited", value: goldPool.unlimited,
-        hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GoldPoolMaxHint")
+        label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.UnlimitedMoney"),
+        hint: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.UnlimitedMoneyHint")
       });
       if ( !goldPool.unlimited ) context.currencyRows = currencyRows(goldPool.max);
       const { typeFields, typeFieldsets } = typeFilterFields(this.shop.sellTypes);
@@ -243,16 +242,6 @@ export default class VendorConfig extends BaseShopConfig {
     if ( event.target.name !== "settlementCapPreset" ) return;
     this.#capPreset = event.target.value;
     this.render({ parts: ["prices"] });
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Handle opening the transaction log of this shop.
-   * @this {VendorConfig}
-   */
-  static #openTransactionLog() {
-    new TransactionLog({ shopId: this.shop._id }).render({ force: true });
   }
 
   /* -------------------------------------------- */

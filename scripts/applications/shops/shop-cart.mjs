@@ -151,7 +151,6 @@ export default class ShopCart extends Dialog5e {
       this.#submitting = false;
     }
     await this.shopSheet.render();
-    this.render();
   }
 }
 

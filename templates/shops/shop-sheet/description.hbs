@@ -1,40 +1,10 @@
 <section class="tab {{ tab.cssClass }}" data-tab="description" data-group="{{ tab.group }}">
-    <fieldset>
-        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Location" }}</legend>
-        <span class="value">{{#if shop.location}}{{ shop.location }}{{else}}—{{/if}}</span>
-    </fieldset>
-    <fieldset>
-        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.OpeningHours" }}</legend>
-        {{#if shop.statusOverride}}
-        <div class="form-group slim">
-            <label>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.StatusOverride" }}</label>
-            <span class="value">
-                {{#if (eq shop.statusOverride "open")}}{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.StatusOverrideOpen" }}
-                {{else}}{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.StatusOverrideClosed" }}{{/if}}
-            </span>
-        </div>
-        {{/if}}
-        <div class="form-group slim">
-            <label>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.OpeningHours" }}</label>
-            <span class="value">{{ openingHoursDisplay }}</span>
-        </div>
-        {{#if closedWeekdaysDisplay}}
-        <div class="form-group slim">
-            <label>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.ClosedWeekdays" }}</label>
-            <span class="value">{{ closedWeekdaysDisplay }}</span>
-        </div>
-        {{/if}}
-        {{#if closedFestivalsDisplay}}
-        <div class="form-group slim">
-            <label>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.ClosedFestivals" }}</label>
-            <span class="value">{{ closedFestivalsDisplay }}</span>
-        </div>
-        {{/if}}
-    </fieldset>
-    <fieldset>
-        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.RestockDays" }}</legend>
-        <span class="value">{{ restockWeekdaysDisplay }}</span>
-    </fieldset>
+    {{#if closedWeekdaysDisplay}}
+    <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.ClosedWeekdays" }}: {{ closedWeekdaysDisplay }}</p>
+    {{/if}}
+    {{#if closedFestivalsDisplay}}
+    <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.ClosedFestivals" }}: {{ closedFestivalsDisplay }}</p>
+    {{/if}}
     {{#if isGM}}
     <prose-mirror name="description" value="{{ shop.description }}" class="always-interactive" toggled>{{{ enrichedDescription }}}</prose-mirror>
     {{else}}

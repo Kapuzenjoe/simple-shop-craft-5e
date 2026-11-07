@@ -1,11 +1,15 @@
 <section class="tab {{ tab.cssClass }}" data-tab="{{ tab.id }}" data-group="{{ tab.group }}">
     <fieldset>
-        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.GoldPool" }}</legend>
+        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.RestockMoney" }}</legend>
         {{> "dnd5e.fieldlist" moneyFields}}
         {{#if currencyRows}}
-        <section class="currency">
-            {{> "modules/simple-shop-craft-5e/templates/shared/currency-inputs.hbs" rows=currencyRows}}
-        </section>
+        <div class="form-group stacked">
+            <label>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.RestockAmount" }}</label>
+            <section class="currency">
+                {{> "modules/simple-shop-craft-5e/templates/shared/currency-inputs.hbs" rows=currencyRows}}
+            </section>
+            <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.RestockAmountHint" }}</p>
+        </div>
         {{/if}}
     </fieldset>
     {{#if typeFilter}}
@@ -16,5 +20,13 @@
     <fieldset>
         <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Stock" }}</legend>
         {{> "dnd5e.fieldlist" stockFields}}
+    </fieldset>
+    <fieldset>
+        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.RestockDays" }}</legend>
+        <p class="hint">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.RestockDaysHint" }}</p>
+        {{#unless calendarModeActive}}
+        <p class="note warn">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.AutoRestockNoCalendarHint" }}</p>
+        {{/unless}}
+        {{ formInput shopFields.restockWeekdays value=restockWeekdays options=restockWeekdayOptions classes="full-width" }}
     </fieldset>
 </section>

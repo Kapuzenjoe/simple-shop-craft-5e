@@ -8,20 +8,9 @@ import ShopSheet from "./shop-sheet.mjs";
 const { Dialog5e } = game.dnd5e.applications.api;
 
 /**
- * @import ShopManager from "../shop-manager.mjs";
- */
-
-/**
  * Dialog to create a new shop: name/starter-pack prompt, then opens the full edit view.
  */
 export default class ShopCreateDialog extends Dialog5e {
-  constructor({ shopManager, ...options }={}) {
-    super(options);
-    this.shopManager = shopManager;
-  }
-
-  /* -------------------------------------------- */
-
   /** @override */
   static DEFAULT_OPTIONS = {
     id: "shop-create-dialog-{id}",
@@ -41,14 +30,6 @@ export default class ShopCreateDialog extends Dialog5e {
     ...super.PARTS,
     content: { template: "modules/simple-shop-craft-5e/templates/shared/config-dialog-content.hbs" }
   };
-
-  /* -------------------------------------------- */
-
-  /**
-   * The shop manager this dialog was opened from.
-   * @type {ShopManager}
-   */
-  shopManager;
 
   /* -------------------------------------------- */
 
@@ -120,7 +101,6 @@ export default class ShopCreateDialog extends Dialog5e {
       items: items.map(item => ({ ...itemRef(item), ...newEntryStock(item, stockDefaults) }))
     };
     const created = await Shop.create(newShop);
-    this.shopManager.render();
     new ShopSheet({ shopId: created._id }).render({ force: true, mode: ShopSheet.MODES.EDIT });
     await this.close();
   }

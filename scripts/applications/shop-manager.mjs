@@ -11,6 +11,7 @@ import RecipeSheet from "./craft/recipe-sheet.mjs";
 import VendorConfig from "./shops/shop-config/vendor-config.mjs";
 import ShopCreateDialog from "./shops/shop-create-dialog.mjs";
 import ShopSheet from "./shops/shop-sheet.mjs";
+import TransactionLog from "./transaction-log.mjs";
 
 const { Application5e } = game.dnd5e.applications.api;
 
@@ -354,7 +355,6 @@ export default class ShopManager extends Application5e {
    */
   static async #createRecipe() {
     const created = await Recipe.create({ name: "" });
-    this.render();
     new RecipeSheet({ recipeId: created._id }).render({ force: true });
   }
 
@@ -403,7 +403,6 @@ export default class ShopManager extends Application5e {
     if ( failed.length ) {
       ui.notifications.warn(_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.ImportFailed", { names: failed.join(", ") }));
     }
-    this.render();
   }
 
   /* -------------------------------------------- */
@@ -436,7 +435,6 @@ export default class ShopManager extends Application5e {
     if ( created.length ) {
       ui.notifications.info(_loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.ImportCreated", { names: created.join(", ") }));
     } else ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.ImportNone", { localize: true });
-    this.render();
   }
 
   /* -------------------------------------------- */
@@ -447,7 +445,7 @@ export default class ShopManager extends Application5e {
    * @returns {Promise<void>}
    */
   static async #createShop() {
-    await new ShopCreateDialog({ shopManager: this }).render({ force: true });
+    await new ShopCreateDialog().render({ force: true });
   }
 
   /* -------------------------------------------- */
@@ -591,6 +589,11 @@ export default class ShopManager extends Application5e {
         onClick: () => this.#editVendorSettings(shop)
       },
       {
+        label: "SIMPLE_SHOP_CRAFT_5E.TransactionLog.Open",
+        icon: '<i class="fa-solid fa-scroll fa-fw"></i>',
+        onClick: () => new TransactionLog({ shopId: shop._id }).render({ force: true })
+      },
+      {
         label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Spotlight",
         icon: '<i class="fa-solid fa-bullhorn fa-fw"></i>',
         onClick: () => spotlightShop(shop._id)
@@ -622,7 +625,6 @@ export default class ShopManager extends Application5e {
     });
     if ( !confirmed ) return;
     await Recipe.delete(recipe._id);
-    this.render();
   }
 
   /* -------------------------------------------- */
@@ -636,7 +638,6 @@ export default class ShopManager extends Application5e {
     const confirmed = await confirmDeleteShop();
     if ( !confirmed ) return;
     await Shop.delete(shop._id);
-    this.render();
   }
 
   /* -------------------------------------------- */
@@ -648,7 +649,6 @@ export default class ShopManager extends Application5e {
    */
   async #duplicateShop(shop) {
     await Shop.duplicate(shop);
-    this.render();
   }
 
   /* -------------------------------------------- */
@@ -658,21 +658,8 @@ export default class ShopManager extends Application5e {
    * @param {Shop} shop
    */
   #editVendorSettings(shop) {
-    new VendorConfig({ shop, onUpdate: updateData => this.#updateVendorSettings(shop, updateData) })
+    new VendorConfig({ shop, onUpdate: updateData => Shop.update(shop._id, updateData) })
       .render({ force: true });
-  }
-
-  /* -------------------------------------------- */
-
-  /**
-   * Persist a Vendor Settings update from the shop list.
-   * @param {Shop} shop
-   * @param {object} updateData
-   * @returns {Promise<void>}
-   */
-  async #updateVendorSettings(shop, updateData) {
-    await Shop.update(shop._id, updateData);
-    this.render();
   }
 
   /* -------------------------------------------- */
@@ -685,6 +672,5 @@ export default class ShopManager extends Application5e {
    */
   async #setShopActive(shop, active) {
     await Shop.update(shop._id, { active });
-    this.render();
   }
 }

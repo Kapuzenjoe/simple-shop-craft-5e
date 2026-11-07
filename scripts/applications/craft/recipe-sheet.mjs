@@ -311,7 +311,6 @@ export default class RecipeSheet extends Application5e {
 
     const materials = [...this.recipe.materials.map(m => m.toObject()), ...newEntries];
     await Recipe.update(this.recipeId, { materials });
-    this.render();
   }
 
   /* -------------------------------------------- */
@@ -326,7 +325,6 @@ export default class RecipeSheet extends Application5e {
       onSubmit: async ({ type, subtype, value }) => {
         const materials = [...this.recipe.materials.map(m => m.toObject()), { criteria: { type, subtype }, value }];
         await Recipe.update(this.recipeId, { materials });
-        this.render();
       }
     }).render({ force: true });
   }
@@ -345,7 +343,6 @@ export default class RecipeSheet extends Application5e {
     const materials = this.recipe.materials.map((m, i) => (i === index)
       ? { ...m.toObject(), required: !m.required } : m.toObject());
     await Recipe.update(this.recipeId, { materials });
-    this.render();
   }
 
   /* -------------------------------------------- */
@@ -363,7 +360,6 @@ export default class RecipeSheet extends Application5e {
     const materials = this.recipe.materials.map((m, i) => (i === index)
       ? { ...m.toObject(), quantity: Math.max(1, m.quantity + step) } : m.toObject());
     await Recipe.update(this.recipeId, { materials });
-    this.render();
   }
 
   /* -------------------------------------------- */
@@ -383,7 +379,6 @@ export default class RecipeSheet extends Application5e {
       this.recipeId,
       getTargetItemUpdate(item, this.recipe.skillProficiencies, this.recipe.toolProficiencies)
     );
-    this.render();
   }
 
   /* -------------------------------------------- */
@@ -402,7 +397,6 @@ export default class RecipeSheet extends Application5e {
           ...getTargetItemUpdate(target, this.recipe.skillProficiencies, this.recipe.toolProficiencies),
           targetItem: { identifier: "", uuid: "", generated }
         });
-        this.render();
       }
     }).render({ force: true });
   }
@@ -514,7 +508,6 @@ export default class RecipeSheet extends Application5e {
             value: { value: data.value ?? null, denomination: data.denomination }
           });
           await Recipe.update(this.recipeId, { materials });
-          this.render();
         }
       }
     });
@@ -554,7 +547,6 @@ export default class RecipeSheet extends Application5e {
           const materials = this.recipe.materials.map((m, i) => (i !== index)
             ? m.toObject() : { ...m.toObject(), uuid: item.uuid, identifierOverride });
           await Recipe.update(this.recipeId, { materials });
-          this.render();
         }
       }
     });
@@ -572,7 +564,6 @@ export default class RecipeSheet extends Application5e {
     const index = Number(target.dataset.index);
     const materials = this.recipe.materials.filter((m, i) => i !== index).map(m => m.toObject());
     await Recipe.update(this.recipeId, { materials });
-    this.render();
   }
 
   /* -------------------------------------------- */
@@ -586,7 +577,6 @@ export default class RecipeSheet extends Application5e {
     await Recipe.update(this.recipeId, {
       targetItem: { identifier: "", uuid: "", generated: null }, img: Recipe.DEFAULT_ICON, spellScroll: null
     });
-    this.render();
   }
 
   /* -------------------------------------------- */
@@ -619,7 +609,6 @@ export default class RecipeSheet extends Application5e {
     if ( (await this.#materialKeys()).has(itemRefKey(entry, item)) ) return;
 
     await Recipe.update(this.recipeId, { materials: [...this.recipe.materials.map(m => m.toObject()), entry] });
-    this.render();
   }
 }
 

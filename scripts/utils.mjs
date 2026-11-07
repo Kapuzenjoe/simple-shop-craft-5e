@@ -275,8 +275,8 @@ export function currencyValueField({
     fields: [
       { field: field.fields.value, name: valueName, value, placeholder, label },
       {
-        field: field.fields.denomination, name: denominationName, value: denomination,
-        label: _loc("DND5E.Currency"), options: getCurrencyOptions({ abbreviated: true })
+        field: field.fields.denomination, name: denominationName, value: denomination || CONFIG.DND5E.defaultCurrency,
+        label: _loc("DND5E.Currency"), options: getCurrencyOptions({ abbreviated: true }), blank: false
       }
     ]
   };
