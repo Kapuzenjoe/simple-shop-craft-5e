@@ -826,7 +826,7 @@ async function fetchEntries(entries) {
 async function findCatalogItems(identifiers) {
   const items = new Map();
   if ( !identifiers.size ) return items;
-  const rules = (game.dnd5e.settings.rulesVersion === "modern") ? "2024" : "2014";
+  const rules = (game.settings.get("dnd5e", "rulesVersion") === "modern") ? "2024" : "2014";
   const index = await game.dnd5e.applications.CompendiumBrowser.fetch(Item, {
     filters: [{ k: "system.identifier", o: "in", v: identifiers }],
     indexFields: new Set(["system.quantity", "system.source"]),
@@ -1000,9 +1000,10 @@ export function matchesTypeFilter(types, type, subtype) {
 /* -------------------------------------------- */
 
 /**
- * Show or hide item rows within an `.items-list` by name match and/or selected type, hiding a section
+ * Show or hide item rows within an `.items-list` by search match and/or selected type, hiding a section
  * entirely once every row within it is filtered out. A row's type is its own `data-type`, falling back to
- * the one of its section. Leaves already-suppressed (`[hidden]`) rows untouched.
+ * the one of its section. A row matches the search by its `data-search`, falling back to `data-name`. Leaves
+ * already-suppressed (`[hidden]`) rows untouched.
  * @param {RegExp} rgx
  * @param {string} typeFilter  Selected type, or "" for no filter.
  * @param {HTMLElement} content
@@ -1012,7 +1013,8 @@ function applyItemFilters(rgx, typeFilter, content) {
     let matched = false;
     for ( const row of section.querySelectorAll(".item:not([hidden])") ) {
       const typeMatches = !typeFilter || ((row.dataset.type ?? section.dataset.type) === typeFilter);
-      const match = typeMatches && foundry.applications.ux.SearchFilter.testQuery(rgx, row.dataset.name);
+      const query = row.dataset.search ?? row.dataset.name;
+      const match = typeMatches && foundry.applications.ux.SearchFilter.testQuery(rgx, query);
       if ( match ) matched = true;
       row.style.display = match ? "" : "none";
     }
@@ -1157,6 +1159,7 @@ export function applyLoadingTooltip(el) {
 
 /**
  * Wire a synthesized tooltip onto an element, rendered from the same layout as dnd5e's own item tooltips.
+ * @see dnd5e — ItemDataModel#richTooltip()
  * @param {HTMLElement} el
  * @param {object} data
  * @param {string} data.name

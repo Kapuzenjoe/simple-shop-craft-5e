@@ -3,12 +3,13 @@ import {
 } from "../../config.mjs";
 import { newEntryStock, Shop } from "../../data/shop-data.mjs";
 import { bulkFromUuid, getStarterUuids, itemRef } from "../../utils.mjs";
+import VendorConfig from "./shop-config/vendor-config.mjs";
 import ShopSheet from "./shop-sheet.mjs";
 
 const { Dialog5e } = game.dnd5e.applications.api;
 
 /**
- * Dialog to create a new shop: name/starter-pack prompt, then opens the full edit view.
+ * Dialog to create a new shop: name/starter-pack prompt, then opens the full edit view and the Vendor Settings.
  */
 export default class ShopCreateDialog extends Dialog5e {
   /** @override */
@@ -67,7 +68,7 @@ export default class ShopCreateDialog extends Dialog5e {
   /* -------------------------------------------- */
 
   /**
-   * Handle creating the shop and opening its full edit view.
+   * Handle creating the shop and opening its full edit view and Vendor Settings.
    * @this {ShopCreateDialog}
    * @param {Event} event                Triggering submit event.
    * @param {HTMLFormElement} form       The submitted form.
@@ -77,7 +78,7 @@ export default class ShopCreateDialog extends Dialog5e {
   static async #onSubmit(event, form, formData) {
     const data = foundry.utils.expandObject(formData.object);
     const packs = getStarterPackOptions();
-    const modern = game.dnd5e.settings.rulesVersion === "modern";
+    const modern = game.settings.get("dnd5e", "rulesVersion") === "modern";
     const identifiers = (STARTER_PACKS[data.starterPack]?.items ?? [])
       .map(identifier => modern ? identifier : (LEGACY_IDENTIFIERS[identifier] ?? identifier));
     const byIdentifier = identifiers.length ? await getStarterUuids(modern) : new Map();
@@ -101,7 +102,9 @@ export default class ShopCreateDialog extends Dialog5e {
       items: items.map(item => ({ ...itemRef(item), ...newEntryStock(item, stockDefaults) }))
     };
     const created = await Shop.create(newShop);
-    new ShopSheet({ shopId: created._id }).render({ force: true, mode: ShopSheet.MODES.EDIT });
+    await new ShopSheet({ shopId: created._id }).render({ force: true, mode: ShopSheet.MODES.EDIT });
+    new VendorConfig({ shop: created, onUpdate: updateData => Shop.update(created._id, updateData) })
+      .render({ force: true });
     await this.close();
   }
 }

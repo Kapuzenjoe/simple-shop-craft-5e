@@ -85,14 +85,15 @@ export default class ItemConfig extends BaseShopConfig {
    */
   _getEntryUpdate(data, entry) {
     const restockMode = data.restockMode ?? "normal";
+    const max = (restockMode === "normal") ? (data.max ?? null) : (entry.stock.max ?? null);
     return {
       price: { value: data.value ?? null, denomination: data.denomination },
       bundleSize: data.bundleSize ?? null,
       discount: data.discount ?? null,
       restockMode,
       stock: {
-        max: (restockMode === "normal") ? (data.max ?? null) : (entry.stock.max ?? null),
-        current: (restockMode === "unlimited") ? null : (entry.stock.current ?? 0)
+        max,
+        current: (restockMode === "unlimited") ? null : (entry.stock.current ?? max ?? 1)
       }
     };
   }

@@ -14,11 +14,12 @@
 
 /**
  * @typedef ShopItemEntryData
+ * @property {string} _id                Unique id of this entry.
  * @property {string} [identifier]       Fallback `system.identifier` reference, used if there is no `uuid`.
  * @property {string} [uuid]             UUID of the referenced item.
  * @property {string} [img]              Icon shown instead of the referenced item's own, for normal entries.
  * @property {object} stock
- * @property {number|null} stock.max      Maximum stock, or `null` for unlimited.
+ * @property {number|null} stock.max      Maximum stock, or `null` to use the shop's default for the item type.
  * @property {number|null} stock.current  Current stock, or `null` for unlimited.
  * @property {number|null} discount      Percent discount (negative) or markup (positive). `null` inherits the
  *                                       shop's buyModifier.
@@ -29,13 +30,8 @@
  * @property {string} price.denomination      Currency denomination of the override.
  * @property {number|null} bundleSize    Override for how many individual items the listed price buys
  *                                       (e.g. 20 for a bundle of arrows). `null` = quantity of the compendium item.
- * @property {object|null} generated     Recipe for a generated magic item, `null` for normal entries.
- * @property {string} generated.baseItemUuid      UUID of the base item the enchantment is applied to.
- * @property {string} generated.enchantItemUuid   UUID of the item granting the enchantment.
- * @property {string} generated.effectId          Id of the specific enchantment effect applied.
- * @property {string} generated.spellUuid         UUID of the spell bound into an Enspelled item, empty otherwise.
- * @property {object|null} spellScroll   Recipe for a generated spell scroll, `null` for normal entries.
- * @property {string} spellScroll.spellUuid       UUID of the spell the scroll casts.
+ * @property {EnchantedItemBlueprintData|null} generated  Generated magic item blueprint, `null` for normal entries.
+ * @property {SpellScrollBlueprintData|null} spellScroll  Spell scroll blueprint, `null` for normal entries.
  * @property {boolean} isService         Whether this entry is a service (Services tab) instead of a normal item.
  * @property {LodgingBlueprintData|null} lodging  Lodging blueprint, `null` for non-lodging entries.
  * @property {HirelingBlueprintData|null} hireling  Hireling blueprint, `null` for non-hireling entries.

@@ -205,7 +205,7 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
 
     const { types, categoryFilters, filters } = candidates;
     const itemType = activity.restrictions.type || activity.item.type;
-    const rules = game.dnd5e.settings.rulesVersion === "modern" ? "2024" : "2014";
+    const rules = game.settings.get("dnd5e", "rulesVersion") === "modern" ? "2024" : "2014";
     const restrictions = [
       wantedSubtypes && { k: "system.type.value", o: "in", v: wantedSubtypes },
       wantedBaseItems && { k: "system.type.baseItem", o: "in", v: wantedBaseItems }

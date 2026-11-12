@@ -113,6 +113,13 @@
     }
   }
 
+  .title .bundle-size {
+    font-size: var(--font-size-10);
+    color: var(--color-text-secondary);
+    font-weight: normal;
+    margin-left: 4px;
+  }
+
   .item.suppressed {
     opacity: .5;
   }
@@ -477,13 +484,6 @@
     width: 70px;
     justify-content: space-evenly;
     gap: 4px;
-  }
-
-  .title .bundle-size {
-    font-size: var(--font-size-10);
-    color: var(--color-text-secondary);
-    font-weight: normal;
-    margin-left: 4px;
   }
 
   .item-price {

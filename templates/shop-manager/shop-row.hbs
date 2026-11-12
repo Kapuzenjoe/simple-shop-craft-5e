@@ -1,4 +1,5 @@
-<li class="item" data-id="{{ shop._id }}" data-shop-id="{{ shop._id }}" data-name="{{ shop.name }}">
+<li class="item" data-id="{{ shop._id }}" data-shop-id="{{ shop._id }}" data-name="{{ shop.name }}"
+    data-search="{{ shop.name }} {{ shop.location }} {{ shop.owner.name }}">
     <div class="item-row">
         <div class="item-name rollable" data-action="editShop" role="button" data-shop-id="{{ shop._id }}">
             {{> "modules/simple-shop-craft-5e/templates/shared/item-avatar-name.hbs"

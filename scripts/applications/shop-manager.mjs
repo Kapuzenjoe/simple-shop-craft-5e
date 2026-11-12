@@ -156,7 +156,7 @@ export default class ShopManager extends Application5e {
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
     context.isGM = game.user.isGM;
-    context.isModern = game.dnd5e.settings.rulesVersion === "modern";
+    context.isModern = game.settings.get("dnd5e", "rulesVersion") === "modern";
     const shops =Shop.getAll().filter(s => context.isGM || s.active);
     const byName = (a, b) => a.name.localeCompare(b.name);
     const capCP = shop => shop.settlementCap.value == null

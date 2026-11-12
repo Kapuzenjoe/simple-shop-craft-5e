@@ -119,7 +119,7 @@
         "Create": "New Shop",
         "Delete": "Delete Shop",
         "Duplicate": "Duplicate Shop",
-        "SearchShops": "Search Shops",
+        "SearchShops": "Search by Name, Location, or Owner",
         "SortBySettlementCap": "Sort by Settlement Cap",
         "DeleteConfirm": "Delete this shop? This cannot be undone."
       },

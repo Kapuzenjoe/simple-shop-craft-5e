@@ -429,7 +429,7 @@ export default class ShopSheet extends Application5e {
     ].map(o => ({ ...o, selected: o.value === this.selectedActorUuid }));
     context.actor = this.selectedActorUuid ? fromUuidSync(this.selectedActorUuid) : null;
     const playerOverride = context.shop.resolvePlayerOverride(this.selectedActorUuid);
-    const hasCrafterFeat = (game.dnd5e.settings.rulesVersion === "modern")
+    const hasCrafterFeat = (game.settings.get("dnd5e", "rulesVersion") === "modern")
       && !!context.actor?.items.some(i => (i.type === "feat") && (i.system.identifier === "crafter"));
     const hasPassionateTraderFeat = !!context.actor?.items
       .some(i => (i.type === "feat") && (i.system.identifier === "passionate-trader"));
@@ -1424,9 +1424,9 @@ export default class ShopSheet extends Application5e {
 /* -------------------------------------------- */
 
 /**
- * Build a property-attribution source entry for an additive percent term, matching dnd5e's own
- * convention of flipping negative "add" values to type "subtract" with an absolute display value. The `mode` and
- * `negative` fields are for the dnd5e 5.3 template.
+ * Build a property-attribution source entry for an additive percent term. A negative value is given as type
+ * "subtract" with its absolute value, since the dnd5e template only reads `type`. The `mode` and `negative`
+ * fields are for the dnd5e 5.3 template.
  * @param {string} label
  * @param {number} value
  * @returns {{ label: string, value: string, type: string, mode: number, negative: boolean }}
@@ -1488,6 +1488,7 @@ async function groupByType({
     row.weight = resolveWeight(row.item?.system, targetUnit);
     row.stockTracked = row.entry.restockMode !== "unlimited";
     row.stockCurrent = row.stockTracked ? (row.entry.stock.current ?? 0) : null;
+    if ( row.stockTracked ) row.cartQuantity = Math.min(row.cartQuantity, row.stockCurrent);
     row.stockMax = (row.entry.restockMode === "normal")
       ? (row.entry.stock.max ?? (row.item ? Shop.defaultStockMax(row.item, stockDefaults) : null))
       : null;
