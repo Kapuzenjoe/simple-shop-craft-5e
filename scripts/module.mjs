@@ -1,4 +1,5 @@
 import { CraftMessageData } from "./data/craft-message.mjs";
+import { HaggleMessageData } from "./data/haggle-message.mjs";
 import { InProgressCraft } from "./data/in-progress-craft.mjs";
 import { ProgressSessionMessageData } from "./data/progress-session-message.mjs";
 import { PurchaseMessageData } from "./data/purchase-message.mjs";
@@ -11,6 +12,7 @@ Hooks.once("init", () => {
   registerSettings();
   Hooks.on("dnd5e.renderChatMessage", PurchaseMessageData.onRender);
   Hooks.on("dnd5e.renderChatMessage", CraftMessageData.onRender);
+  Hooks.on("dnd5e.renderChatMessage", HaggleMessageData.onRender);
   Hooks.on("dnd5e.renderChatMessage", ProgressSessionMessageData.onRender);
   Hooks.on("dnd5e.postUseActivity", InProgressCraft.onPostUseActivity);
   Hooks.on("dnd5e.preUseActivity", InProgressCraft.onPreUseActivity);
@@ -18,6 +20,8 @@ Hooks.once("init", () => {
   Hooks.on("updateWorldTime", InProgressCraft.onUpdateWorldTime);
   Hooks.on("renderCharacterActorSheet", InProgressCraft.onRenderCharacterActorSheet);
   Hooks.on("updateWorldTime", Shop.onUpdateWorldTime);
+  Hooks.on("updateScene", Shop.onUpdateScene);
+  Hooks.on("deleteScene", Shop.onDeleteScene);
   Hooks.on("updateWorldTime", async (worldTime, dt) => {
     const { default: ShopSheet } = await import("./applications/shops/shop-sheet.mjs");
     ShopSheet.onUpdateWorldTime(worldTime, dt);

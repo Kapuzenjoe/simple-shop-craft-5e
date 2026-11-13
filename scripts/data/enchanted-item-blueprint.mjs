@@ -60,7 +60,7 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
     const effect = enchantItem?.effects.get(this.effectId);
     const spell = this.spellUuid ? await fromUuid(this.spellUuid) : null;
     if ( !baseItem || !effect || (this.spellUuid && !spell) ) return null;
-    const item = EnchantedItemBlueprint.#synthesize(baseItem, enchantItem, effect, spell, this.img);
+    const item = await EnchantedItemBlueprint.#synthesize(baseItem, enchantItem, effect, spell, this.img);
     if ( this.identifier ) item.updateSource({ "system.identifier": this.identifier });
     return item;
   }
@@ -68,15 +68,16 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
   /* -------------------------------------------- */
 
   /**
-   * Resolve the Additional Items of this blueprint's enchantment profile.
+   * Resolve the Additional Items of this blueprint's enchantment.
    * @returns {Promise<Item5e[]>}
    */
   async resolveRiderItems() {
     const enchantItem = await fromUuid(this.enchantItemUuid);
     if ( !enchantItem ) return [];
-    const uuids = EnchantedItemBlueprint.#findProfile(enchantItem, this.effectId)?.profile.riders.item;
-    if ( !uuids?.size ) return [];
-    return (await Promise.all(Array.from(uuids, uuid => fromUuid(uuid)))).filter(item => item);
+    const profile = EnchantedItemBlueprint.#findProfile(enchantItem, this.effectId)?.profile;
+    const rider = enchantItem.effects.get(this.effectId)?.system.rider;
+    const uuids = [...(profile?.riders.item ?? []), ...(rider?.items ?? [])];
+    return (await Promise.all(uuids.map(uuid => fromUuid(uuid)))).filter(item => item);
   }
 
   /* -------------------------------------------- */
@@ -204,7 +205,7 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
 
     const { types, categoryFilters, filters } = candidates;
     const itemType = activity.restrictions.type || activity.item.type;
-    const rules = game.dnd5e.settings.rulesVersion === "modern" ? "2024" : "2014";
+    const rules = game.settings.get("dnd5e", "rulesVersion") === "modern" ? "2024" : "2014";
     const restrictions = [
       wantedSubtypes && { k: "system.type.value", o: "in", v: wantedSubtypes },
       wantedBaseItems && { k: "system.type.baseItem", o: "in", v: wantedBaseItems }
@@ -305,17 +306,17 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
 
   /**
    * Build a non-persisted Item combining a base item with a cloned enchantment effect. The rider activities and
-   * effects of the enchantment profile are added and marked as dependent on that effect. A given icon replaces the
-   * one that the effect would force onto the item.
+   * effects of the enchantment are added and marked as dependent on that effect. A given icon replaces the one that
+   * the effect would force onto the item.
    * @see dnd5e — EnchantmentData#collectRiders()
    * @param {Item5e} baseItem
    * @param {Item5e} enchantItem
    * @param {ActiveEffect5e} effect
    * @param {Item5e|null} spell  Spell bound into the item, if any.
    * @param {string} [img]       Icon to give the item.
-   * @returns {Item5e}
+   * @returns {Promise<Item5e>}
    */
-  static #synthesize(baseItem, enchantItem, effect, spell, img="") {
+  static async #synthesize(baseItem, enchantItem, effect, spell, img="") {
     const itemData = baseItem.toObject();
     delete itemData._id;
     itemData.system.quantity = 1;
@@ -329,7 +330,9 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
     itemData.effects = [...(itemData.effects ?? []), effectData];
 
     const profile = EnchantedItemBlueprint.#findProfile(enchantItem, effect.id)?.profile;
-    for ( const activityId of profile?.riders.activity ?? [] ) {
+    const rider = effect.system.rider;
+    const activityIds = new Set([...(profile?.riders.activity ?? []), ...(rider?.activities ?? [])]);
+    for ( const activityId of activityIds ) {
       const riderActivity = enchantItem.system.activities.get(activityId);
       const activityData = riderActivity?.toObject();
       if ( !activityData ) continue;
@@ -342,10 +345,13 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
         if ( riderEffectData ) itemData.effects.push(setDependentOn(riderEffectData, effectData._id));
       }
     }
-    for ( const riderEffectId of profile?.riders.effect ?? [] ) {
-      const riderEffectData = enchantItem.effects.get(riderEffectId)?.toObject();
-      if ( !riderEffectData ) continue;
-      itemData.effects.push(setDependentOn({ ...riderEffectData, _id: foundry.utils.randomID() }, effectData._id));
+    const riderEffects = Array.from(profile?.riders.effect ?? [], id => enchantItem.effects.get(id));
+    for ( const uuid of rider?.effects ?? [] ) riderEffects.push(await fromUuid(uuid, { relative: enchantItem }));
+    for ( const riderEffect of riderEffects ) {
+      if ( riderEffect?.type !== "base" ) continue;
+      itemData.effects.push(
+        setDependentOn({ ...riderEffect.toObject(), _id: foundry.utils.randomID() }, effectData._id)
+      );
     }
 
     const changeKeys = new Set(effect.system.changes?.map(change => change.key));

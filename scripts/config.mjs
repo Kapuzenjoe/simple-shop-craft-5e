@@ -146,6 +146,15 @@ export const RESTOCK_MODES = {
 };
 
 /**
+ * Ways a shop is activated and deactivated.
+ * @type {Record<string, { label: string }>}
+ */
+export const ACTIVATION_MODES = {
+  manual: { label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.ActivationModeManual" },
+  scene: { label: "SIMPLE_SHOP_CRAFT_5E.ShopEditor.ActivationModeScene" }
+};
+
+/**
  * Nightly lodging tiers and their default price, per PHB 2024 "Food, Drink, and Lodging".
  * @type {Record<string, { label: string, price: { value: number, denomination: string } }>}
  */
@@ -202,6 +211,13 @@ export const CARD_STATUSES = {
   accepted: { label: "SIMPLE_SHOP_CRAFT_5E.Status.Accepted" },
   rejected: { label: "SIMPLE_SHOP_CRAFT_5E.Status.Rejected" }
 };
+
+/**
+ * Percentages the GM can choose for a successful haggling roll, and the one preselected.
+ * @type {number[]}
+ */
+export const HAGGLE_PERCENTS = [5, 10, 15, 20, 25];
+export const HAGGLE_DEFAULT_PERCENT = 10;
 
 /**
  * Unlock behaviors for a recipe.

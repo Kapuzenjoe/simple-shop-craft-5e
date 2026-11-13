@@ -7,6 +7,11 @@
     width: 120px;
   }
 
+  li[data-shop-id] .gold-icon {
+    object-fit: contain;
+    object-position: center;
+  }
+
   .item-settlementCap,
   .item-materialValue {
     min-width: 120px;
@@ -26,7 +31,8 @@
     width: 90px;
   }
 
-  .proficiency-icon {
+  .proficiency-icon,
+  .scene-icon {
     margin-left: 4px;
     color: var(--color-text-tertiary);
     cursor: help;
@@ -107,6 +113,13 @@
     }
   }
 
+  .title .bundle-size {
+    font-size: var(--font-size-10);
+    color: var(--color-text-secondary);
+    font-weight: normal;
+    margin-left: 4px;
+  }
+
   .item.suppressed {
     opacity: .5;
   }
@@ -132,13 +145,22 @@
     color: var(--dnd5e-chat-status-failure, var(--color-level-error));
   }
 
+  &.haggle-tray .percent-options {
+    margin-inline-start: auto;
+  }
+
   .icon-picker-preview {
     flex: none;
     width: 32px;
     height: 32px;
     border: 1px solid var(--dnd5e-color-gold);
     border-radius: 4px;
-    object-fit: cover;
+    object-fit: contain;
+  }
+
+  &.purchase-card .card-header .gold-icon {
+    object-fit: contain;
+    object-position: center;
   }
 
   &.configure-templates-dialog .pill-lg {
@@ -368,10 +390,6 @@
     bottom: 60px;
   }
 
-  .item-discount, .item-price, .item-quantity {
-    .config-button i { font-size: var(--font-size-11); }
-  }
-
   .sheet-header {
     display: flex;
     flex-direction: column;
@@ -403,10 +421,12 @@
     flex: 1;
     display: flex;
     flex-direction: column;
+    background: transparent;
   }
 
   .document-image {
     --dnd5e-document-image-size: 96px;
+    object-fit: contain;
   }
 
   section.currency i.currency {
@@ -466,13 +486,6 @@
     gap: 4px;
   }
 
-  .title .bundle-size {
-    font-size: var(--font-size-10);
-    color: var(--color-text-secondary);
-    font-weight: normal;
-    margin-left: 4px;
-  }
-
   .item-price {
     min-width: 120px;
   }
@@ -526,4 +539,10 @@
   .log-sold {
     color: var(--color-level-error);
   }
+}
+
+.simple-shop-craft-5e.config-sheet {
+  max-block-size: 85vh;
+  body.detached & { max-block-size: unset; }
+  .window-content { overflow-y: auto; }
 }

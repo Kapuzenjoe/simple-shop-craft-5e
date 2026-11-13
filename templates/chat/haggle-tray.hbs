@@ -1,0 +1,33 @@
+<div class="simple-shop-craft-5e card-tray haggle-tray">
+    <label class="roboto-upper">
+        <i class="fa-solid fa-handshake" inert></i>
+        <span>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Haggling" }} &middot; {{ sideLabel }}</span>
+    </label>
+    <div class="collapsible-content">
+        <div class="wrapper">
+            {{#if pending}}
+            <p class="supplement"><strong>{{ localize "SIMPLE_SHOP_CRAFT_5E.HaggleTray.Current" }}</strong> {{ current }}%</p>
+            <section class="icon-row">
+                <i class="fa-fw fa-solid fa-sliders" inert></i>
+                <span>{{ percentLabel }}</span>
+                <div class="percent-options split-button">
+                    {{#each percents}}
+                    <button type="button" class="multiplier-button split-control" value="{{ this }}"
+                            aria-pressed="{{ eq this ../percent }}">{{ this }}%</button>
+                    {{/each}}
+                </div>
+            </section>
+            <button type="button" class="apply-button" data-action="applyHaggle">
+                <i class="fa-light fa-reply-all fa-flip-horizontal" inert></i>
+                <span>{{ localize "DND5E.Apply" }}</span>
+            </button>
+            <button type="button" class="apply-button" data-action="rejectHaggle">
+                <i class="fa-solid fa-xmark" inert></i>
+                <span>{{ localize "SIMPLE_SHOP_CRAFT_5E.Reject" }}</span>
+            </button>
+            {{else}}
+            <p class="supplement">{{ statusLabel }}</p>
+            {{/if}}
+        </div>
+    </div>
+</div>

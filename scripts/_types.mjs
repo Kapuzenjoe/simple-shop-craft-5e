@@ -5,7 +5,8 @@
  *                                             the shop's buyModifier. `null` = no override.
  * @property {number|null} sellModifier        Percent discount (negative) or markup (positive) override, replacing
  *                                             the shop's sellModifier. `null` = no override.
- * @property {Record<string, number>} hagglingLocks  Map of Charisma skill id to the world time
+ * @property {Record<string, number>} hagglingLocks  Map of `<side>-<skill>`, with side `buy` or `sell` and the
+ *                                                    Charisma skill id, to the world time
  *                                                    (`game.time.worldTime`) its Influence check last failed.
  */
 
@@ -13,11 +14,12 @@
 
 /**
  * @typedef ShopItemEntryData
+ * @property {string} _id                Unique id of this entry.
  * @property {string} [identifier]       Fallback `system.identifier` reference, used if there is no `uuid`.
  * @property {string} [uuid]             UUID of the referenced item.
  * @property {string} [img]              Icon shown instead of the referenced item's own, for normal entries.
  * @property {object} stock
- * @property {number|null} stock.max      Maximum stock, or `null` for unlimited.
+ * @property {number|null} stock.max      Maximum stock, or `null` to use the shop's default for the item type.
  * @property {number|null} stock.current  Current stock, or `null` for unlimited.
  * @property {number|null} discount      Percent discount (negative) or markup (positive). `null` inherits the
  *                                       shop's buyModifier.
@@ -28,13 +30,8 @@
  * @property {string} price.denomination      Currency denomination of the override.
  * @property {number|null} bundleSize    Override for how many individual items the listed price buys
  *                                       (e.g. 20 for a bundle of arrows). `null` = quantity of the compendium item.
- * @property {object|null} generated     Recipe for a generated magic item, `null` for normal entries.
- * @property {string} generated.baseItemUuid      UUID of the base item the enchantment is applied to.
- * @property {string} generated.enchantItemUuid   UUID of the item granting the enchantment.
- * @property {string} generated.effectId          Id of the specific enchantment effect applied.
- * @property {string} generated.spellUuid         UUID of the spell bound into an Enspelled item, empty otherwise.
- * @property {object|null} spellScroll   Recipe for a generated spell scroll, `null` for normal entries.
- * @property {string} spellScroll.spellUuid       UUID of the spell the scroll casts.
+ * @property {EnchantedItemBlueprintData|null} generated  Generated magic item blueprint, `null` for normal entries.
+ * @property {SpellScrollBlueprintData|null} spellScroll  Spell scroll blueprint, `null` for normal entries.
  * @property {boolean} isService         Whether this entry is a service (Services tab) instead of a normal item.
  * @property {LodgingBlueprintData|null} lodging  Lodging blueprint, `null` for non-lodging entries.
  * @property {HirelingBlueprintData|null} hireling  Hireling blueprint, `null` for non-hireling entries.
@@ -58,7 +55,10 @@
  *                                          type; an empty set = any subtype.
  * @property {ShopPlayerDiscountData[]} playerDiscounts  Per-actor buy/sell modifier overrides.
  * @property {string} [npc]                  UUID of the NPC actor this shop is assigned to.
+ * @property {string} [npcName]              Name of the owner. Empty uses the name of the NPC actor.
  * @property {string} [location]             Optional free-text location (e.g. "Baldur's Gate").
+ * @property {Set<string>} scenes            UUIDs of the scenes in which this shop is found.
+ * @property {string} activationMode         Whether this shop is activated by hand or with its scenes.
  * @property {object} settlementCap
  * @property {number|null} settlementCap.value        Max. price of the most expensive item this shop sells
  *                                                    (DMG 2024 "Settlements by Size"). `null` = no cap.
@@ -89,6 +89,15 @@
  * @property {number} closeMinute            Minute (0-59) this shop closes each day.
  * @property {string} [description]          Optional shop description.
  * @property {ShopItemEntryData[]} items     Items available in this shop.
+ */
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef ShopOwner
+ * @property {string} name         Name of the owner, or of the linked actor. `—` if neither is set.
+ * @property {Actor5e|null} actor  Linked actor, or `null` if there is none or it can't be resolved.
+ * @property {boolean} broken      Whether an actor is linked but can't be resolved.
  */
 
 /* -------------------------------------------- */
@@ -349,6 +358,7 @@
  * @property {string} img              Image path of the sold item.
  * @property {number} quantity         Quantity sold.
  * @property {number} priceCP          Price per unit, in copper.
+ * @property {boolean} fullPrice       Whether the line is sold at its full price instead of the shop's sell modifier.
  * @property {CurrencyPart[]} subtotal Line subtotal, broken down by denomination.
  */
 
@@ -366,6 +376,16 @@
  * @property {PurchaseSellLine[]} sellLines Items being sold to the shop.
  * @property {CurrencyPart[]} total         Net transaction total, broken down by denomination.
  * @property {number} netCP                 Net total in copper; negative = actor owes, positive = actor is owed.
+ */
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef HaggleMessageCardData
+ * @property {string} status      Status of the pending haggling: "pending", "accepted", or "rejected".
+ * @property {string} shopId      Id of the shop that was haggled with.
+ * @property {string} actorUuid   UUID of the haggling actor.
+ * @property {string} side        Side of the transaction haggled over: "buy" or "sell".
  */
 
 /* -------------------------------------------- */

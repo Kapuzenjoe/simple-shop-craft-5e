@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.2.0
+
+- Added choosing whether to haggle on buying or selling, with a separate cooldown for each.
+- Added a tray under successful haggling rolls that lets the GM choose a discount or bonus and apply it to the player's modifier of the shop.
+- Added an option for selling items at their full price for characters with the Ember "Passionate Trader" feat.
+- Added owners of shops without an actor, with a name and an optional linked actor.
+- Added the portrait of a shop's owner as the default icon of the shop.
+- Added assigning scenes to a shop, so it can be activated and deactivated together with them.
+- Added editing the current stock of an item directly in the shop sheet.
+- Added a delete button to the items of the Buy and Services tabs in Edit mode.
+- Added searching shops in the Shop Manager by location and owner.
+- Changed the default Fixed-Value Loot Types of new shops to include Trade Goods.
+- Changed choosing a shop's icon from clicking it in the shop sheet to the Vendor Settings.
+- Changed opening the Transaction Log of a shop from the Vendor Settings to the shop's menu in the Shop Manager and a button in the title bar of the shop sheet.
+- Changed editing the description of a shop to an edit button in the Description tab, which the GM can use without Edit mode.
+- Changed the location and opening hours of a shop from the Description tab to a subtitle of the shop sheet, and removed the restock days from the tab.
+- Changed creating a new shop to open its Vendor Settings right after the shop is created.
+- Changed a successful haggling roll to lock every Charisma skill of that side of the shop.
+- Changed editing the current money of a shop in the shop sheet to work without Edit mode.
+- Fixed importing a transaction log into the log of all shops removing the shop assignment of every imported transaction.
+- Fixed being able to choose no currency for the price of an item, a recipe material, or the Settlement Cap.
+- Fixed deprecation warnings about item weights in shops with dnd5e 6.1.
+- Fixed generated enchanted items missing the Additional Items, activities, and effects that an enchantment carries itself with dnd5e 6.1.
+- Fixed shop icons that are not square, such as portraits, being cropped.
+- Fixed the shopping cart keeping a larger quantity than the remaining stock of an item after another purchase.
+- Fixed the assistants of a crafting session losing their worked hours when the craft can't be completed because its target item can't be found.
+- Reworked the Vendor Settings:
+  - Added the tabs General, Prices, and Money & Stock.
+  - Added a Vendor Settings button to the title bar of the shop sheet.
+  - Changed editing the owner, price modifiers, and Settlement Cap of a shop from separate dialogs to the Vendor Settings.
+  - Changed editing the location, opening hours, and restock days of a shop from the Description tab to the Vendor Settings.
+- Reworked the settings of a shop item:
+  - Added Item Settings with the price, bundle size, price modifier, restock mode, and Max Stock of an item, which save every change right away.
+  - Added an edit button to the items of the Buy and Services tabs in Edit mode, replacing the buttons in the price, modifier, and stock columns.
+  - Added the price modifier, restock mode, and Max Stock to the settings of lodging and hireling entries.
+  - Changed editing the price, price modifier, and stock of an item from separate dialogs to the Item Settings.
+
 ## 1.1.0
 
 - Added grouping the items in the Sell tab by the custom sections of Tidy 5e Sheets, if Tidy 5e Sheets is active (#32).

@@ -1,5 +1,6 @@
 import {
-  DEFAULT_STOCK_BY_TYPE, MAGIC_EXEMPT_TYPES, MODULE_ID, RESTOCK_MODES, SETTING_KEYS, STOCK_MAGIC_RULES
+  ACTIVATION_MODES, DEFAULT_STOCK_BY_TYPE, MAGIC_EXEMPT_TYPES, MODULE_ID, RESTOCK_MODES, SETTING_KEYS,
+  STOCK_MAGIC_RULES
 } from "../config.mjs";
 import { calendariaDayOfWeek, isCalendariaActive } from "../integrations/calendaria.mjs";
 import {
@@ -20,7 +21,7 @@ const {
 } = foundry.data.fields;
 
 /**
- * @import { ShopPlayerDiscountData, ShopItemEntryData, ShopData } from "../_types.mjs";
+ * @import { ShopPlayerDiscountData, ShopItemEntryData, ShopData, ShopOwner } from "../_types.mjs";
  */
 
 /**
@@ -196,18 +197,21 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
       active: new BooleanField({ initial: false }),
       buyModifier: new NumberField({ required: true, initial: 0, integer: true, min: -100, max: 1000 }),
       sellModifier: new NumberField({ required: true, initial: -50, integer: true, min: -100, max: 1000 }),
-      fixedValueLootTypes: new SetField(new StringField(), { initial: ["gem", "art"] }),
+      fixedValueLootTypes: new SetField(new StringField(), { initial: ["gem", "art", "trade"] }),
       sellTypes: new TypedObjectField(new SetField(new StringField())),
       playerDiscounts: new ArrayField(new EmbeddedDataField(ShopPlayerDiscount)),
       npc: new DocumentUUIDField({ type: "Actor", blank: true }),
+      npcName: new StringField({ blank: true }),
       location: new StringField({ blank: true }),
+      scenes: new SetField(new DocumentUUIDField({ type: "Scene" })),
+      activationMode: new StringField({ initial: "manual", choices: Object.keys(ACTIVATION_MODES), required: true }),
       openHour: new NumberField({ initial: null, nullable: true, integer: true, min: 0, max: 23 }),
       openMinute: new NumberField({ required: true, initial: 0, integer: true, min: 0, max: 59 }),
       closeHour: new NumberField({ initial: null, nullable: true, integer: true, min: 0, max: 23 }),
       closeMinute: new NumberField({ required: true, initial: 0, integer: true, min: 0, max: 59 }),
       settlementCap: new SchemaField({
         value: new NumberField({ initial: null, nullable: true, min: 0 }),
-        denomination: new StringField({ initial: () => CONFIG.DND5E.defaultCurrency }),
+        denomination: new StringField({ required: true, blank: false, initial: () => CONFIG.DND5E.defaultCurrency }),
         appliesToSell: new BooleanField({ initial: true })
       }),
       goldPool: new SchemaField({
@@ -283,6 +287,37 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
   /* -------------------------------------------- */
 
   /**
+   * The owner of this shop, or `null` if it has none.
+   * @type {ShopOwner|null}
+   */
+  get owner() {
+    if ( !this.npc && !this.npcName ) return null;
+    let actor = null;
+    if ( this.npc ) {
+      try {
+        actor = fromUuidSync(this.npc);
+      } catch ( err ) {
+        console.warn(`${MODULE_ID} | Failed to resolve shop NPC ${this.npc}:`, err);
+      }
+    }
+    return { name: this.npcName || actor?.name || "—", actor, broken: Boolean(this.npc) && !actor };
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * The icon shown for this shop: its own icon, or the portrait of the owner's actor if it has none, or the default
+   * icon.
+   * @type {string}
+   */
+  get displayImg() {
+    if ( this.img && (this.img !== Shop.DEFAULT_ICON) ) return this.img;
+    return this.owner?.actor?.img || Shop.DEFAULT_ICON;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
    * Resolve this shop's effective gold pool for buy-back transactions, summed to copper.
    * @returns {number|null}  Copper amount available, or `null` if unlimited (no cap enforced).
    */
@@ -327,28 +362,29 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
   /* -------------------------------------------- */
 
   /**
-   * Whether an actor is currently locked out from Haggling with a specific Charisma skill for this shop,
-   * after failing an Influence check "in the same way" within the last 24 hours.
+   * Whether an actor is currently locked out from Haggling on one side of this shop with a specific Charisma
+   * skill, after failing an Influence check "in the same way" within the last 24 hours.
    * @param {string} [actorUuid]
    * @param {string} skill
+   * @param {"buy"|"sell"} side
    * @returns {boolean}
    */
-  isHagglingLocked(actorUuid, skill) {
+  isHagglingLocked(actorUuid, skill, side) {
     const locks = actorUuid ? this.playerDiscounts.find(pd => pd.actor === actorUuid)?.hagglingLocks : null;
-    const lock = locks?.[skill];
+    const lock = locks?.[`${side}-${skill}`];
     return (lock != null) && ((game.time.worldTime - lock) < secondsPerDay());
   }
 
   /* -------------------------------------------- */
 
   /**
-   * Whether an actor has any currently active Haggling lock for this shop, regardless of skill.
+   * Whether an actor has any currently active Haggling lock for this shop, regardless of side or skill.
    * @param {string} [actorUuid]
    * @returns {boolean}
    */
   hasHagglingLocks(actorUuid) {
     const locks = actorUuid ? this.playerDiscounts.find(pd => pd.actor === actorUuid)?.hagglingLocks : null;
-    return Object.keys(locks ?? {}).some(skill => this.isHagglingLocked(actorUuid, skill));
+    return Object.values(locks ?? {}).some(lock => (game.time.worldTime - lock) < secondsPerDay());
   }
 
   /* -------------------------------------------- */
@@ -673,6 +709,46 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
       ? null
       : Array.from({ length: midnights }, (_, i) => (dayOfWeek - i + weekLength) % weekLength);
     await Shop.handleDayChange(weekdaysPassed);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle Foundry's `updateScene` hook, syncing the shops that follow scenes once the active scene changes.
+   * @param {Scene} scene
+   * @param {object} changed
+   * @returns {Promise<void>}
+   */
+  static async onUpdateScene(scene, changed) {
+    if ( !("active" in changed) || !game.user.isActiveGM ) return;
+    await Shop.syncSceneActivation();
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle Foundry's `deleteScene` hook, syncing the shops that follow scenes after the active scene was deleted.
+   * @returns {Promise<void>}
+   */
+  static async onDeleteScene() {
+    if ( !game.user.isActiveGM ) return;
+    await Shop.syncSceneActivation();
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Activate the shops that follow the active scene and deactivate those that follow other scenes. Shops that
+   * follow scenes but have none assigned stay as they are.
+   * @returns {Promise<void>}
+   */
+  static async syncSceneActivation() {
+    const uuid = game.scenes.active?.uuid;
+    await Shop.updateAll(entries => entries.map(entry => {
+      if ( (entry.activationMode !== "scene") || !entry.scenes.length ) return entry;
+      const active = entry.scenes.includes(uuid);
+      return (entry.active === active) ? entry : { ...entry, active };
+    }));
   }
 }
 

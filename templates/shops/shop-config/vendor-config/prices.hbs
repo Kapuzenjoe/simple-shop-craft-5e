@@ -1,0 +1,10 @@
+<section class="tab {{ tab.cssClass }}" data-tab="{{ tab.id }}" data-group="{{ tab.group }}">
+    <fieldset>
+        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Discount" }}</legend>
+        {{> "modules/simple-shop-craft-5e/templates/shared/fieldlist.hbs" modifierFields}}
+    </fieldset>
+    <fieldset>
+        <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SettlementCap" }}</legend>
+        {{> "modules/simple-shop-craft-5e/templates/shared/fieldlist.hbs" capFields}}
+    </fieldset>
+</section>

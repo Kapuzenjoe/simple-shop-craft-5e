@@ -3,6 +3,7 @@
 ![Static Badge](https://img.shields.io/badge/Foundry-v14-informational)
 ![Static Badge](https://img.shields.io/badge/Dnd5e-v5.3-informational)
 ![Static Badge](https://img.shields.io/badge/Dnd5e-v6.0-informational)
+![Static Badge](https://img.shields.io/badge/Dnd5e-v6.1-informational)
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/peterlankton86911)
 
@@ -33,8 +34,8 @@ recipes here, and players come here to browse the shops and recipes available to
 
 A new shop needs only a name. Pick a Starter Pack to fill its shelves right away with the stock of a
 Blacksmith, Alchemist, Tavern, General Store, Magic Shop, or Blackmarket. Starter Packs take their items
-from the Player's Handbook if it is active, otherwise from the SRD (SRD 5.1 for the 2014 rules). Every new
-shop starts out Inactive and stays hidden from players until the GM opens it for business.
+from the Player's Handbook, or the SRD without it. Every new shop starts out Inactive and stays hidden from
+players until the GM opens it for business.
 
 ---
 
@@ -44,9 +45,11 @@ shop starts out Inactive and stays hidden from players until the GM opens it for
 
 The Shops tab lists every shop with its owner, opening hours, Settlement Cap, and status.
 
-- **Active and Inactive.** Shops sit in separate groups, and players only ever see the Active ones.
-- **Shop actions.** Right-click a shop to toggle it Active, open its Vendor Settings, duplicate it, or
-  delete it.
+- **Active and Inactive.** Shops sit in separate groups, and players only ever see the Active ones. With
+  Activation set to Scene Active in its Vendor Settings, a shop is Active only while one of its scenes is.
+  Toggling it by hand lasts until the active scene changes.
+- **Shop actions.** Right-click a shop to toggle it Active, open its Vendor Settings or Transaction Log,
+  duplicate it, or delete it.
 - **Show to All Players.** Opens the shop on every connected screen at once, for the moment the party steps
   through the door.
 
@@ -61,8 +64,9 @@ The Shops tab lists every shop with its owner, opening hours, Settlement Cap, an
 
 ### Shop Sheet
 
-Each shop opens in its own sheet with four tabs. The header shows the shop's owner, Settlement Cap, Buy and
-Sell modifiers, and the coin in its till.
+Each shop opens in its own sheet with four tabs. Its location and opening hours show under its name. The
+header shows the shop's owner and its Buy and Sell modifiers. The GM also sees the Settlement Cap and the
+shop money there, and finds buttons for the Vendor Settings and the Transaction Log in the title bar.
 
 - **Buy.** The GM adds items from the Compendium Browser, by UUID, or by dragging them in. Fill from Table
   draws stock from a RollTable, configuring drawn Spell Scrolls and enchantment items by hand or at random,
@@ -74,15 +78,14 @@ Sell modifiers, and the coin in its till.
   inventory instead of by item type.
 - **Services.** Holds Lodging and Hirelings, along with any Buy item marked as a Service. A service costs
   coin but hands over no item.
-- **Description.** The shop's location, opening hours, restock days, and a description of the place.
-  Outside its opening hours players can't enter the shop, unless the GM forces it open.
+- **Description.** A description of the place and the days the shop is closed. Outside its opening hours
+  players can't enter the shop, unless the GM forces it open.
 - **Who buys.** Players shop with their own character or with the Party actor.
-- **Checkout.** Purchases and sales gather in a cart. On confirmation the order goes to the GM as a chat
-  card, and items and coin change hands once the GM accepts.
-- **Stacking.** An item of the same type and identifier that the character already owns gains quantity
-  instead of arriving as a copy. Containers never stack, and neither do items that still have the default
-  identifier, which is the item type such as "weapon". The Buy tab shows the GM a warning icon for these
-  items, for copies sharing an identifier, and for duplicate entries.
+- **Checkout.** Purchases and sales gather in a cart and go out as one order.
+- **Stacking.** A bought item gains quantity on an item of the same type and identifier that the character
+  already owns, instead of arriving as a copy. Containers and items with the default identifier, the item
+  type such as "weapon", never stack. The GM sees a warning icon in the Buy tab for items that can't stack
+  and for duplicate entries.
 
 <table>
   <tr>
@@ -105,34 +108,54 @@ Sell modifiers, and the coin in its till.
     </td>
     <td width="50%">
       <strong>Description tab</strong><br>
-      <img src="docs/example_shop_description.png" alt="Description tab with location, opening hours, closed days, and restock days">
+      <img src="docs/example_shop_description.png" alt="Description tab with the closed days and the description of the shop">
     </td>
   </tr>
 </table>
 
 ### Stock & Restock
 
-Vendor Settings hold the shop's name, its money, the item types it buys, and the default stock for new
-items.
+The Vendor Settings have three tabs. General holds the shop's name, owner, icon, location, scenes, and
+opening hours. Prices holds its modifiers and Settlement Cap. Money & Stock holds its money, the item types
+it buys, the default stock for new items, and the Restock Days. Each item has its own Item Settings, which
+the GM opens with the pencil button in Edit mode or from the item's menu.
 
-- **Stock modes.** Each item has Normal Stock, Unlimited Stock, or Exclude from Stock. Excluded items keep
-  their count but never restock, for the one-of-a-kind piece.
+- **Stock modes.** Each item has Normal Stock, Unlimited Stock, or Exclude from Stock, set in its Item
+  Settings. Excluded items keep their count but never restock, for the one-of-a-kind piece.
+- **Current stock.** The GM changes the current stock of an item right in the Stock column, in any mode.
 - **Default stock.** New items start with a max stock set per item type. The Magical Items rule decides
-  which magic items skip that default and start excluded instead. Any item can still set its own stock.
-- **Shop money.** The till has a Current and a Max amount, or is Unlimited. Purchases by players can push
-  Current past Max. With Purchase Only, the shop buys nothing from players.
+  which magic items skip that default and start excluded instead. Any item can still set its own Max Stock
+  in its Item Settings.
+- **Shop money.** The GM sees the shop's current money in the header and can edit it at any time. The
+  Restock Amount in the Vendor Settings is what it returns to on restock, or the shop has Unlimited Money.
+  Purchases by players can push the current money past that amount. With Purchase Only, the shop buys
+  nothing from players.
 - **Accepted Item Types.** Limits which item types, and optionally subtypes, the shop buys from players. The
   Sell tab then lists only matching items. Left empty, the shop buys anything. Not available with Purchase
   Only.
-- **Restock.** Reset Stock & Shop Money refills every Normal item and returns the till to Max. On the chosen
-  Restock Days this happens on its own at the next in-game day change, which also lifts failed haggling
-  locks. This needs a calendar source (see [Settings](#settings)).
+- **Restock.** Reset Stock & Shop Money refills every Normal item and returns the shop money to the Restock
+  Amount. On the chosen Restock Days this happens on its own at the next in-game day change. This needs a
+  calendar source (see [Settings](#settings)).
 
 <table>
   <tr>
-    <td>
-      <strong>Vendor Settings</strong><br>
-      <img src="docs/example_vendor_setting.png" alt="Vendor Settings with shop name, shop money, and default stock per item type" width="320">
+    <td width="50%">
+      <strong>Vendor Settings: General</strong><br>
+      <img src="docs/example_vendor_setting_general.png" alt="General tab of the Vendor Settings with shop name, owner, icon, location, scenes, and opening hours">
+    </td>
+    <td width="50%">
+      <strong>Vendor Settings: Prices</strong><br>
+      <img src="docs/example_vendor_setting_prices.png" alt="Prices tab of the Vendor Settings with Buy and Sell modifiers, Fixed-Value Loot Types, and Settlement Cap">
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <strong>Vendor Settings: Money & Stock</strong><br>
+      <img src="docs/example_vendor_setting_stock.png" alt="Money & Stock tab of the Vendor Settings with restock money, accepted item types, and default stock per item type">
+    </td>
+    <td width="50%">
+      <strong>Item Settings</strong><br>
+      <img src="docs/example_item_setting.png" alt="Item Settings of a Dagger with price, bundle size, price modifier, restock mode, and max stock">
     </td>
   </tr>
 </table>
@@ -141,8 +164,8 @@ items.
 
 Every purchase and sale the GM accepts is written to the log.
 
-- **Opening.** Open a shop's log with the button in its Vendor Settings. The module settings open the log of
-  all shops (see [Settings](#settings)).
+- **Opening.** Open a shop's log with the button in the title bar of its sheet or from its menu in the Shop
+  Manager.
 - **Entries.** Each line shows the time, the character, the items bought and sold, and the net amount, which
   is negative when the shop paid the character. The search field narrows the list.
 - **Sharing.** Export a shop's log to JSON and import it into a shop's log, in this or another world.
@@ -170,12 +193,14 @@ Every price starts from the item's own value and passes through the shop's modif
 shows which modifiers applied.
 
 - **Shop modifiers.** A Buy and a Sell modifier apply to every trade, by default +0% and −50%.
-- **Item overrides.** The GM can give a single item its own price, or its own modifier in place of the
-  shop's.
-- **Fixed-Value items.** Gemstones and art objects keep their full value, bought or sold. The list of loot
-  types is set per shop.
+- **Item overrides.** In its Item Settings, an item can have its own price, or its own modifier in place of
+  the shop's.
+- **Fixed-Value items.** Gemstones, art objects, and trade goods keep their full value, bought or sold. The
+  list of loot types is set per shop.
 - **Crafter.** With the 2024 rules, a character with the Crafter feat pays 20% less for nonmagical items,
   but not for services.
+- **Passionate Trader.** A character with the Passionate Trader feat of the Ember module can mark items in
+  the Sell tab to sell them at their full price.
 - **Settlement Cap.** A village, town, or city only deals in items up to 20, 2,000, or 200,000 GP, or up to a
   custom cap. Pricier items stay hidden from players, and the cap can apply to selling as well.
 
@@ -194,12 +219,16 @@ The GM can grant single players their own deal, and players can try to haggle th
 
 - **Player discounts.** Drop an actor into the Players dialog and give it its own Buy and Sell modifier. It
   adds to the shop's modifier.
-- **Haggling.** The player rolls a Charisma skill against a DC equal to the shopkeeper's Intelligence score,
-  minimum 15. A Friendly shopkeeper grants Advantage, a Hostile one Disadvantage.
-- **Result.** The roll sets no discount on its own. The GM decides what a success is worth and enters it as
-  a player discount.
-- **Cooldown.** After a failed roll, that skill can't be tried again at this shop for 24 hours. The lock lifts
-  at the next in-game day change, or the GM resets it in the Players dialog.
+- **Haggling.** The player picks Buy or Sell as the transaction, then rolls a Charisma skill against a DC
+  equal to the shopkeeper's Intelligence score, minimum 15. A Friendly shopkeeper grants Advantage, a
+  Hostile one Disadvantage.
+- **Result.** On a success, a tray appears under the roll for the GM only. It offers a discount (Buy) or a
+  bonus (Sell) of 5, 10, 15, 20, or 25 percent, with 10 preselected. Apply sets the player's modifier for
+  that side at this shop and replaces the one it had, Reject leaves it alone. The modifier stays until the
+  GM changes it in the Players dialog.
+- **Cooldown.** A failed roll locks that skill on that side of the shop, a success locks every Charisma skill
+  on that side. The lock lifts 24 hours of in-game time after the roll, or the GM resets it in the Players
+  dialog.
 
 <table>
   <tr>
@@ -207,6 +236,14 @@ The GM can grant single players their own deal, and players can try to haggle th
       <strong>Haggle dialog</strong><br>
       <img src="docs/example_haggle_dialog.png" alt="Haggle dialog with a skill and NPC attitude selection">
     </td>
+    <td width="50%">
+      <strong>Haggle result</strong><br>
+      <img src="docs/example_haggle_chat.png" alt="Tray under a successful haggle roll with a choice of 5 to 25 percent and Apply and Reject buttons">
+    </td>
+  </tr>
+</table>
+<table>
+  <tr>
     <td width="50%">
       <strong>Player discounts</strong><br>
       <img src="docs/example_players_discount.png" alt="Per-player buy and sell discount overrides">
@@ -229,9 +266,7 @@ Generate Item rolls up new stock for a shop. The GM reviews every result before 
 - **Spell Scrolls.** Each scroll carries a real spell, filtered by school, class, level, or rituals.
 - **Enspelled Items.** Enspelled Staffs, Weapons, and Armor come bound to a random spell of the level their
   rarity allows.
-- **Weighting.** Sets how often enchanted items come up: per Combination, Variant, or Template.
-- **Pool.** Shows how many entries each rarity holds, and how many the Settlement Cap or the shop's current
-  stock leave out.
+- **Weighting and pool.** Tune how often enchanted items come up, and see how many entries each rarity holds.
 - **Results.** Up to ten items per roll. Reroll or remove single results, then add the rest to the shop.
 
 <table>
@@ -274,10 +309,10 @@ Recipe Editor, where clicking the name of a target item or material opens it.
   is configured like an item added to a shop, with its profile and base item. The Additional Items of the
   enchantment come with the finished item.
 - **Default recipes.** With the modern rules, Import Default Recipes creates a recipe for each item of the
-  Player's Handbook, or the SRD 5.2 without it, that a chosen tool can craft. Items that already have a recipe
-  are skipped, and the recipes unlock for every character proficient with the tool.
-- **Missing items.** A recipe whose target item can't be found, for example because its compendium is
-  inactive, is greyed out with a warning for the GM and hidden from players.
+  Player's Handbook, or the SRD 5.2 without it, that a chosen tool can craft, skipping items that already
+  have one.
+- **Missing items.** A recipe whose target item can't be found is greyed out with a warning for the GM and
+  hidden from players.
 - **Sharing.** Export recipes to JSON and import them into another world.
 
 <table>
@@ -342,16 +377,16 @@ downtime.
 
 Three menus and two settings in the module settings hold world-wide options.
 
-- **Configure Defaults.** The Buy and Sell modifiers, shop money, Magical Items rule, and default stock per
-  item type that every new shop starts with.
+- **Configure Defaults.** The Buy and Sell modifiers, Restock Amount, Magical Items rule, and default stock
+  per item type that every new shop starts with.
 - **Configure Homebrew.** Max Hours per Workday for crafting, 8 by default, Crafting Assistants on or off,
-  Maximum Assistants (one by default, no limit when empty), and the Calendar Mode.
+  Maximum Assistants, and the Calendar Mode.
 - **Calendar Mode.** Restock days, haggling cooldowns, and crafting sessions can follow Foundry's world
   calendar. Calendar Mode turns on by itself when a world clearly keeps its calendar in use: Calendaria or
   Ember is active, or dnd5e's Daily Recovery Mode is set to Calendar Recovery. Set it to Always On or Always
   Off to decide by hand.
 - **Transaction Log.** Opens the log of all shops. Log Transactions turns logging on or off, and Maximum Log
-  Entries sets how many transactions the log keeps, 1,000 by default and between 100 and 5,000.
+  Entries sets how many transactions the log keeps, 1,000 by default.
 
 ---
 

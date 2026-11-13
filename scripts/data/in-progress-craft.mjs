@@ -285,13 +285,13 @@ export class InProgressCraft extends foundry.abstract.DataModel {
    * @param {Item5e} item                 The in-progress craft item.
    * @param {number} hours                Hours worked by the crafter. Each assistant adds the same hours of progress.
    * @param {Actor5e[]} [assistants=[]]   Actors assisting the crafter.
-   * @returns {Promise<void>}
+   * @returns {Promise<boolean>}          Whether the progress was credited.
    */
   async creditProgress(item, hours, assistants=[]) {
     const progress = roundToMinute(this.progress + (hours * (1 + assistants.length)));
     if ( (progress >= this.totalHours) && !(await this.#resolveTarget()) ) {
       await this.#saveProgress(item);
-      return;
+      return false;
     }
     this.updateSource({ progress });
 
@@ -318,17 +318,19 @@ export class InProgressCraft extends foundry.abstract.DataModel {
 
     if ( this.progress >= this.totalHours ) {
       await this.complete(item);
-      return;
+      return true;
     }
 
     await this.#saveProgress(item);
+    return true;
   }
 
   /* -------------------------------------------- */
 
   /**
    * Resolve this craft's currently pending calendar-mode session: credit the full planned hours once
-   * naturally elapsed, or only the hours actually elapsed so far if ended early.
+   * naturally elapsed, or only the hours actually elapsed so far if ended early. Assistants get the hours back
+   * that were not credited.
    * @param {Item5e} item
    * @param {object} [options={}]
    * @param {boolean} [options.early=false]  End the session now instead of waiting out its planned duration.
@@ -341,11 +343,11 @@ export class InProgressCraft extends foundry.abstract.DataModel {
     try {
       const elapsedHours = Math.max(0, (game.time.worldTime - this.pendingStart) / 3600);
       const hours = early ? Math.min(this.pendingHours, elapsedHours) : this.pendingHours;
-      const unusedHours = this.pendingHours - hours;
+      let unusedHours = this.pendingHours - hours;
       const assistants = this.pendingAssistants.map(uuid => fromUuidSync(uuid)).filter(Boolean);
       const messageId = this.pendingMessageId;
       this.updateSource({ pendingStart: null, pendingHours: null, pendingMessageId: "", pendingAssistants: [] });
-      await this.creditProgress(item, hours, assistants);
+      if ( !(await this.creditProgress(item, hours, assistants)) ) unusedHours += hours;
       if ( unusedHours > 0 ) {
         await Promise.all(assistants.map(assistant => {
           const workedToday = assistant.getFlag(MODULE_ID, "hoursWorkedToday") ?? 0;

@@ -76,7 +76,9 @@
                         <img class="gold-icon" src="{{ this.img }}" alt="{{ this.name }}">
                         <div class="name-stacked">
                             <span class="title">{{ this.name }}</span>
-                            <span class="subtitle">&times;{{ this.quantity }}</span>
+                            <span class="subtitle">&times;{{ this.quantity }}
+                                {{~#if this.fullPrice}} &middot; <i class="fa-solid fa-sack-dollar warning" inert></i>
+                                {{ localize "SIMPLE_SHOP_CRAFT_5E.PassionateTrader" }}{{/if}}</span>
                         </div>
                         {{> "modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs" parts=this.subtotal }}
                     </li>

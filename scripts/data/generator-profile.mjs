@@ -157,7 +157,7 @@ export default class GeneratorProfile extends foundry.abstract.DataModel {
   async buildPool({ settlementCap, existingKeys=new Set() }={}) {
     const { magic, rarities } = this;
     const capCP = settlementCap?.value != null ? toCopper(settlementCap.value, settlementCap.denomination) : null;
-    const rules = game.dnd5e.settings.rulesVersion === "modern" ? "2024" : "2014";
+    const rules = game.settings.get("dnd5e", "rulesVersion") === "modern" ? "2024" : "2014";
     const summary = { included: {}, capped: {}, owned: {} };
     const pool = [];
     const found = [];
@@ -345,7 +345,7 @@ export default class GeneratorProfile extends foundry.abstract.DataModel {
    * @returns {Promise<object[]>}
    */
   static async #fetchSpells(filters) {
-    const rules = game.dnd5e.settings.rulesVersion === "modern" ? "2024" : "2014";
+    const rules = game.settings.get("dnd5e", "rulesVersion") === "modern" ? "2024" : "2014";
     const results = await game.dnd5e.applications.CompendiumBrowser.fetch(Item, {
       types: new Set(["spell"]), filters, indexFields: new Set(["system.source", "system.identifier"])
     });

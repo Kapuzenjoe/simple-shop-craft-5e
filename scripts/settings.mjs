@@ -191,17 +191,26 @@ export function registerSettings() {
 /* -------------------------------------------- */
 
 /**
- * Re-render any open shop management and transaction log applications after settings change elsewhere.
+ * Re-render any open shop management, transaction log, shop config, and recipe applications after settings
+ * change.
  * @returns {Promise<void>}
  */
 async function refreshShopApplications() {
   const { default: ShopManager } = await import("./applications/shop-manager.mjs");
   const { default: ShopSheet } = await import("./applications/shops/shop-sheet.mjs");
+  const { default: BaseShopConfig } = await import("./applications/shops/shop-config/base-shop-config.mjs");
+  const { default: RecipeSheet } = await import("./applications/craft/recipe-sheet.mjs");
+  const { default: CraftStartDialog } = await import("./applications/craft/craft-start-dialog.mjs");
   foundry.applications.instances.forEach(app => {
     if ( app instanceof ShopManager ) app.render();
+    if ( (app instanceof BaseShopConfig) && app.onUpdate ) app.render();
     if ( app instanceof TransactionLog ) app.render();
     if ( app instanceof ShopSheet ) {
       if ( app.shop ) app.render();
+      else app.close();
+    }
+    if ( (app instanceof RecipeSheet) || (app instanceof CraftStartDialog) ) {
+      if ( app.recipe ) app.render();
       else app.close();
     }
   });
