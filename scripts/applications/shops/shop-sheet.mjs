@@ -712,10 +712,34 @@ export default class ShopSheet extends Application5e {
     await super._onRender(context, options);
 
     this._renderModeToggle();
+    this.#fitOwnerName();
 
     const canShowActions = context.editable && this.isEditMode;
     this.element.querySelectorAll(".window-content-actions").forEach(actions => actions.hidden = !canShowActions);
     if ( this.#cartApp?.rendered ) this.#cartApp.render();
+  }
+
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  _onPosition(position) {
+    super._onPosition(position);
+    if ( "width" in position ) this.#fitOwnerName();
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Scale the font size of the owner name down until it fits into its two lines.
+   * @see dnd5e — BaseApplication5e#scaleTitle()
+   */
+  #fitOwnerName() {
+    const name = this.element.querySelector(".owner .value");
+    if ( !name?.clientHeight ) return;
+    for ( let percent = 100; percent >= 60; percent -= 5 ) {
+      name.style.setProperty("--font-size-scale", percent / 100);
+      if ( name.scrollHeight <= name.clientHeight ) break;
+    }
   }
 
   /* -------------------------------------------- */
