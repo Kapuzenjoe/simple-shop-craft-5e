@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.1
+
+- Fixed the owner name in the shop sheet breaking in the middle of a word (#36).
+- Fixed the description of a shop staying small regardless of the size of the window (#36).
+
 ## 1.2.0
 
 - Added choosing whether to haggle on buying or selling, with a separate cooldown for each.
