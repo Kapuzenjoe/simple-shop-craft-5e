@@ -10,7 +10,7 @@
                 <div class="shop-summary-info card">
                     <div class="info">
                         {{#if isGM}}
-                        <div>
+                        <div class="settlement-cap">
                             <span class="label">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.SettlementCap" }}</span>
                             {{#if settlementCapDisplay}}
                             <span class="value">
@@ -21,9 +21,9 @@
                             {{/if}}
                         </div>
                         {{/if}}
-                        <div>
+                        <div class="owner">
                             <span class="label">{{ localize "SIMPLE_SHOP_CRAFT_5E.Owner" }}</span>
-                            <span class="value">
+                            <span class="value" data-tooltip="{{ shop.owner.name }}">
                                 {{#with shop.owner as |owner|}}
                                 {{#if owner.actor}}
                                 <a class="content-link" draggable="true" data-link
