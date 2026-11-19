@@ -1,12 +1,8 @@
 <section class="tab active craft-start-content">
 
 <fieldset>
-    <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Player" }}</legend>
-    <select name="selectedActor" class="uninput always-interactive">
-        {{#each actorOptions}}
-        <option value="{{ this.value }}" {{#if this.selected}}selected{{/if}}>{{ this.label }}</option>
-        {{/each}}
-    </select>
+    <legend>{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.ActingAs" }}</legend>
+    <p>{{ actorName }}</p>
 </fieldset>
 
 {{#if noActor}}

@@ -125,12 +125,12 @@
   }
 
   i.success {
-    color: var(--dnd5e-chat-status-success, var(--color-level-success));
+    color: var(--dnd5e-chat-status-success);
   }
 
   i.failure,
   i.error {
-    color: var(--dnd5e-chat-status-failure, var(--color-level-error));
+    color: var(--dnd5e-chat-status-failure);
   }
 
   i.warning {
@@ -142,7 +142,7 @@
   }
 
   .hint.error {
-    color: var(--dnd5e-chat-status-failure, var(--color-level-error));
+    color: var(--dnd5e-chat-status-failure);
   }
 
   &.haggle-tray .percent-options {
@@ -301,6 +301,37 @@
     &.is-dragover {
       border-color: var(--dnd5e-color-gold);
       box-shadow: 0 0 6px var(--dnd5e-color-gold);
+    }
+  }
+
+  .recipes-filters {
+    .player-select {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      width: 300px;
+      margin-left: auto;
+      font-size: var(--font-size-13);
+      font-weight: normal;
+
+      select {
+        flex: 1;
+        min-width: 0;
+      }
+    }
+
+    .tool-chip {
+      font-family: var(--dnd5e-font-roboto);
+      font-weight: bold;
+      line-height: normal;
+      padding: .25rem .5rem;
+      text-transform: uppercase;
+      cursor: pointer;
+      box-shadow: none;
+
+      &:hover {
+        border-color: var(--dnd5e-color-gold);
+      }
     }
   }
 

@@ -214,6 +214,12 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
         denomination: new StringField({ required: true, blank: false, initial: () => CONFIG.DND5E.defaultCurrency }),
         appliesToSell: new BooleanField({ initial: true })
       }),
+      haggle: new SchemaField({
+        skills: new SetField(new StringField(), {
+          initial: () => Object.entries(CONFIG.DND5E.skills).filter(([, s]) => s.ability === "cha").map(([key]) => key)
+        }),
+        dc: new NumberField({ initial: null, nullable: true, integer: true, min: 1 })
+      }),
       goldPool: new SchemaField({
         max: new ObjectField({ initial: {} }),
         current: new ObjectField({ initial: {} }),
@@ -357,6 +363,16 @@ export class Shop extends SettingCollectionMixin(foundry.abstract.DataModel, SET
     const exempt = isMagic
       && ((magicRule === "all") || ((magicRule === "gear") && MAGIC_EXEMPT_TYPES.has(item.type)));
     return exempt ? null : (byType[item.type] ?? null);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Skills allowed for Haggling in this shop, without keys missing from the current skill configuration.
+   * @type {string[]}
+   */
+  get haggleSkills() {
+    return Array.from(this.haggle.skills).filter(key => key in CONFIG.DND5E.skills);
   }
 
   /* -------------------------------------------- */

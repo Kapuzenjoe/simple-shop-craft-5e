@@ -1,10 +1,10 @@
-import { CRAFTING_TOOLS } from "../config.mjs";
+import { ANY_VALUE, CRAFTING_TOOLS } from "../config.mjs";
 import { Recipe } from "../data/recipe-data.mjs";
 import { Shop, ShopItemEntry } from "../data/shop-data.mjs";
 import {
   applyItemSort, applyListControls, applyLoadingTooltip, breakdownCopper, buildItemTableSections,
-  confirmDeleteShop, finalizeGroups, formatDuration, promptImportFiles, recipeCraftCost, resolveTotalHours,
-  selectableActors, spotlightShop, toCopper
+  confirmDeleteShop, defaultActor, finalizeGroups, formatDuration, promptImportFiles, recipeCraftCost,
+  resolveTotalHours, selectableActors, spotlightShop, toCopper
 } from "../utils.mjs";
 import CraftStartDialog from "./craft/craft-start-dialog.mjs";
 import RecipeSheet from "./craft/recipe-sheet.mjs";
@@ -74,7 +74,10 @@ export default class ShopManager extends Application5e {
 
   /** @override */
   static PARTS = {
-    tabs: { template: "templates/generic/tab-navigation.hbs" },
+    tabs: {
+      template: "modules/simple-shop-craft-5e/templates/shared/tabs.hbs",
+      templates: ["templates/generic/tab-navigation.hbs"]
+    },
     shops: {
       template: "modules/simple-shop-craft-5e/templates/shop-manager/shops.hbs",
       templates: ["modules/simple-shop-craft-5e/templates/shared/item-avatar-name.hbs"]
@@ -135,6 +138,15 @@ export default class ShopManager extends Application5e {
   /* -------------------------------------------- */
 
   /**
+   * Keys of the tools the recipes list is limited to, with `"none"` for recipes without a tool. Empty means the
+   * list is not limited.
+   * @type {Set<string>}
+   */
+  #toolFilter = new Set();
+
+  /* -------------------------------------------- */
+
+  /**
    * Current sort mode for the recipes list, a key of {@link RECIPE_SORT_MODES}.
    * @type {"name"|"materialValue"}
    */
@@ -147,6 +159,24 @@ export default class ShopManager extends Application5e {
    * @type {"type"|"tool"}
    */
   #recipeGroup = "type";
+
+  /* -------------------------------------------- */
+
+  /**
+   * UUID of the character the recipes list is shown for. Empty string means no character, which shows every
+   * recipe and is only available to the GM.
+   * @type {string}
+   */
+  #actorUuid = "";
+
+  /* -------------------------------------------- */
+
+  /**
+   * Target items and crafting costs of the recipes, kept until the recipes change. The selected character and
+   * tools do not affect them.
+   * @type {{ recipes: Recipe[], entries: Map<Recipe, { item: object|null, cost: object|null }> }|null}
+   */
+  #resolvedRecipes = null;
 
   /* -------------------------------------------- */
   /*  Rendering                                   */
@@ -196,14 +226,27 @@ export default class ShopManager extends Application5e {
       sections
     };
     const recipes = Recipe.getAll();
-    const actors = selectableActors();
-    const visibleRecipes = context.isGM
-      ? recipes
-      : recipes.filter(r => (r.unlockMode === "all") || actors.some(actor => r.canCraft(actor)));
-    const targetResolved = await ShopItemEntry.resolveMany(visibleRecipes.map(r => r.targetItem));
-    const craftCosts = await Promise.all(
-      targetResolved.map(({ item }, index) => recipeCraftCost(visibleRecipes[index], item))
-    );
+    const { actor, actors } = this._resolveActor();
+    context.actorOptions = [
+      ...(context.isGM ? [{ value: "", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.AllRecipes") }] : []),
+      ...actors.map(a => ({ value: a.uuid, label: a.name }))
+    ].map(o => ({ ...o, selected: o.value === this.#actorUuid }));
+    const visibleRecipes = (actor || !context.isGM) ? recipes.filter(r => r.canCraft(actor)) : recipes;
+    let cached = this.#resolvedRecipes;
+    if ( cached?.recipes !== recipes ) {
+      cached = { recipes, entries: new Map() };
+      this.#resolvedRecipes = cached;
+    }
+    const missing = visibleRecipes.filter(recipe => !cached.entries.has(recipe));
+    if ( missing.length ) {
+      const resolved = await ShopItemEntry.resolveMany(missing.map(r => r.targetItem));
+      const costs = await Promise.all(resolved.map(({ item }, index) => recipeCraftCost(missing[index], item)));
+      missing.forEach((recipe, index) => {
+        cached.entries.set(recipe, { item: resolved[index].item, cost: costs[index] });
+      });
+    }
+    const targetResolved = visibleRecipes.map(recipe => cached.entries.get(recipe));
+    const craftCosts = targetResolved.map(({ cost }) => cost);
     const toolLabel = key => game.dnd5e.documents.Trait.keyLabel(key, { trait: "tool" });
     const skillLabel = key => _loc(CONFIG.DND5E.skills[key]?.label ?? key);
     const unlockedDisplay = recipe => {
@@ -227,6 +270,7 @@ export default class ShopManager extends Application5e {
           toolProfTooltip: Array.from(recipe.toolProficiencies).map(toolLabel).filter(Boolean).join("\n"),
           skillProfTooltip: Array.from(recipe.skillProficiencies).map(skillLabel).filter(Boolean).join("\n"),
           type: item?.type ?? "unknown",
+          tools: recipe.toolProficiencies.size ? Array.from(recipe.toolProficiencies) : ["none"],
           targetMissing: recipe.isTargetMissing(item),
           bundleSize: (recipe.targetQuantity > 1) ? recipe.targetQuantity : null,
           materialValueCP,
@@ -235,30 +279,53 @@ export default class ShopManager extends Application5e {
         };
       })
       .toSorted((a, b) => a.displayName.localeCompare(b.displayName));
-    const recipeGroups = new Map();
+    let total = 0;
+    const toolCounts = new Map();
     for ( const row of recipeRows ) {
+      if ( row.targetMissing && !context.isGM ) continue;
+      total++;
+      for ( const key of row.tools ) toolCounts.set(key, (toolCounts.get(key) ?? 0) + 1);
+    }
+    this.#toolFilter = new Set(Array.from(this.#toolFilter).filter(key => toolCounts.has(key)));
+    const toolName = key => (key === "none") ? _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.NoTool") : toolLabel(key);
+    const toolOrder = (a, b) => {
+      if ( (a === "none") !== (b === "none") ) return (a === "none") ? 1 : -1;
+      return toolName(a).localeCompare(toolName(b));
+    };
+    context.toolChips = [
+      {
+        value: ANY_VALUE, label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.GenerateItemAny"),
+        count: total, active: !this.#toolFilter.size
+      },
+      ...Array.from(toolCounts.keys()).sort(toolOrder).map(key => ({
+        value: key, label: toolName(key), count: toolCounts.get(key), active: this.#toolFilter.has(key)
+      }))
+    ];
+    const listedRows = this.#toolFilter.size
+      ? recipeRows.filter(row => row.tools.some(key => this.#toolFilter.has(key)))
+      : recipeRows;
+    const recipeGroups = new Map();
+    for ( const row of listedRows ) {
       if ( !recipeGroups.has(row.type) ) recipeGroups.set(row.type, []);
       recipeGroups.get(row.type).push(row);
     }
     const typeGroups = finalizeGroups(recipeGroups);
     context.recipeTypes = typeGroups.map(({ type, label }) => ({ type, label }));
+    if ( this.#recipeTypeFilter && !typeGroups.some(({ type }) => type === this.#recipeTypeFilter) ) {
+      this.#recipeTypeFilter = "";
+    }
     let groups = typeGroups;
     if ( this.#recipeGroup === "tool" ) {
       const toolGroups = new Map();
-      for ( const row of recipeRows ) {
-        const keys = Array.from(row.recipe.toolProficiencies);
-        for ( const key of keys.length ? keys : ["none"] ) {
+      for ( const row of listedRows ) {
+        for ( const key of row.tools ) {
+          if ( this.#toolFilter.size && !this.#toolFilter.has(key) ) continue;
           if ( !toolGroups.has(key) ) toolGroups.set(key, []);
           toolGroups.get(key).push(row);
         }
       }
-      groups = Array.from(toolGroups, ([type, items]) => ({
-        type, items,
-        label: (type === "none") ? _loc("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.NoTool") : toolLabel(type)
-      })).sort((a, b) => {
-        if ( (a.type === "none") !== (b.type === "none") ) return (a.type === "none") ? 1 : -1;
-        return a.label.localeCompare(b.label);
-      });
+      groups = Array.from(toolGroups, ([type, items]) => ({ type, items, label: toolName(type) }))
+        .sort((a, b) => toolOrder(a.type, b.type));
     }
     context.recipeTable = buildItemTableSections({
       groups,
@@ -281,6 +348,21 @@ export default class ShopManager extends Application5e {
     context = await super._preparePartContext(partId, context, options);
     context.tab = context.tabs?.[partId];
     return context;
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Resolve the character the recipes are shown for, falling back to the default if the chosen one can no longer
+   * be selected.
+   * @returns {{ actor: Actor5e|null, actors: Actor5e[] }}  The character and all selectable characters.
+   * @protected
+   */
+  _resolveActor() {
+    const actors = selectableActors();
+    const actor = actors.find(a => a.uuid === this.#actorUuid) ?? defaultActor(actors);
+    this.#actorUuid = actor?.uuid ?? "";
+    return { actor, actors };
   }
 
   /* -------------------------------------------- */
@@ -321,6 +403,18 @@ export default class ShopManager extends Application5e {
     }
 
     if ( partId === "recipes" ) {
+      htmlElement.querySelector('select[name="actor"]')?.addEventListener("change", event => {
+        this.#actorUuid = event.target.value;
+        this.render({ parts: ["recipes"] });
+      });
+      htmlElement.querySelector(".tool-chips")?.addEventListener("click", event => {
+        // "Any" is exclusive: it clears the selection, and deselecting the last tool restores it
+        const { tool } = event.target.closest("[data-tool]")?.dataset ?? {};
+        if ( !tool ) return;
+        if ( tool === ANY_VALUE ) this.#toolFilter = new Set();
+        else if ( !this.#toolFilter.delete(tool) ) this.#toolFilter.add(tool);
+        this.render({ parts: ["recipes"] });
+      });
       htmlElement.querySelectorAll(".item-tooltip[data-uuid]").forEach(el => applyLoadingTooltip(el));
       const content = applyListControls(htmlElement, {
         sortModes: RECIPE_SORT_MODES, sort: this.#recipeSort, setSort: v => this.#recipeSort = v,
@@ -486,12 +580,16 @@ export default class ShopManager extends Application5e {
   static #startCraft(event, target) {
     const recipe = Recipe.get(target.dataset.recipeId);
     if ( !recipe ) return;
-    const unlocked = (recipe.unlockMode === "all") || selectableActors().some(actor => recipe.canCraft(actor));
-    if ( !game.user.isGM && !unlocked ) {
+    const { actor } = this._resolveActor();
+    if ( !actor ) {
+      ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.NoActorSelectedHint", { localize: true });
+      return;
+    }
+    if ( !game.user.isGM && !recipe.canCraft(actor) ) {
       ui.notifications.warn("SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.Locked", { localize: true });
       return;
     }
-    new CraftStartDialog({ recipeId: recipe._id }).render({ force: true });
+    new CraftStartDialog({ recipeId: recipe._id, actorUuid: actor.uuid }).render({ force: true });
   }
 
   /* -------------------------------------------- */

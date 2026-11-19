@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.3.0
+
+- Added tool chips to the Craft tab for filtering the recipes by tool.
+- Added choosing the skills allowed for haggling and a fixed haggling DC per shop in the Vendor Settings.
+- Changed choosing the acting character for crafting from the Start Craft dialog to the Craft tab.
+- Changed the minimum supported dnd5e version from 5.3 to 6.1.
+- Changed the crafting cost of nonmagical items to follow dnd5e, which rounds the gold cost down.
+
+## 1.2.1
+
+- Fixed the owner name in the shop sheet breaking in the middle of a word (#36).
+- Fixed the description of a shop staying small regardless of the size of the window (#36).
+
 ## 1.2.0
 
 - Added choosing whether to haggle on buying or selling, with a separate cooldown for each.

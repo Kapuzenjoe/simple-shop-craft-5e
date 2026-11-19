@@ -28,6 +28,16 @@
           "label": "Fixed-Value Loot Types",
           "hint": "Items of these loot types are bought and sold at their listed price, ignoring all price modifiers."
         },
+        "haggle": {
+          "skills": {
+            "label": "Allowed Skills",
+            "hint": "Skills players can use to haggle in this shop. Leave empty to disable haggling."
+          },
+          "dc": {
+            "label": "Haggle DC",
+            "hint": "Leave empty to use the higher of 15 and the Intelligence score of the owner."
+          }
+        },
         "goldPool": {
           "unlimited": { "label": "Unlimited" },
           "sellDisabled": { "label": "Purchase Only" }
@@ -140,6 +150,7 @@
         "Unlocked": "Unlocked",
         "UnlockedAll": "All",
         "SearchRecipes": "Search Recipes",
+        "AllRecipes": "— All Recipes —",
         "MaterialValue": "Material Value",
         "SortByMaterialValue": "Sort by Material Value",
         "GroupByTool": "Group by Tool Proficiency",
@@ -351,6 +362,7 @@
       "HagglingRoll": "Roll",
       "HagglingLocked": "Locked",
       "HagglingSomeLocked": "Skills used in a recent failed attempt are on cooldown for 24 hours.",
+      "HagglingNoSkills": "No skills are allowed for haggling in this shop.",
       "HagglingUnlock": "Reset Haggling Lock",
       "EditPlayers": "Edit Player Discounts",
       "Players": {
@@ -505,7 +517,7 @@
       "MissingActor": "The haggling character could no longer be found — haggling not applied."
     },
     "CraftStart": {
-      "NoActor": "Select a character above to continue.",
+      "NoActor": "The acting character is no longer available.",
       "Spell": "Spell",
       "ChooseSpell": "Choose Spell",
       "RemoveSpell": "Remove Spell",
@@ -587,7 +599,7 @@
       "Rejected": "Rejected"
     },
     "GoldFilled": "From Gold",
-    "NoActorSelectedHint": "No character selected — pick one under \"Acting As\" first.",
+    "NoActorSelectedHint": "No character selected — pick one under \"Player\" first.",
     "Custom": "Custom"
   }
 }

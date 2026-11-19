@@ -362,8 +362,7 @@ export class EnchantedItemBlueprint extends foundry.abstract.DataModel {
     }
     const enchantRarity = itemRarity(enchantItem);
     if ( !changeKeys.has("system.rarity") && !changeKeys.has("system.rarities") && enchantRarity ) {
-      if ( baseItem.system.schema.has("rarities") ) itemData.system.rarities = [enchantRarity];
-      else itemData.system.rarity = enchantRarity;
+      itemData.system.rarities = [enchantRarity];
     }
 
     itemData.system.identifier = EnchantedItemBlueprint.resolveIdentifier(baseItem, enchantItem, effect, spell);

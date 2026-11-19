@@ -90,38 +90,8 @@ export function resolveTotalHours(recipe, craftCost, targetItem) {
 /* -------------------------------------------- */
 
 /**
- * Resolve an item's crafting cost — `CONFIG.DND5E.crafting.exceptions`/`.scrolls` for Potion of Healing
- * and Spell Scrolls, a copper-precise mundane-item calculation for non-magical items, otherwise
- * `item.system.getCraftCost()`.
- * @see dnd5e — ItemDataModel#getCraftCost()
- * @param {Item5e} item
- * @returns {Promise<{ days: number, gold: number }>}
- */
-async function effectiveCraftCost(item) {
-  const { scrolls, exceptions } = CONFIG.DND5E.crafting;
-  if ( exceptions[item.system.identifier] ) return exceptions[item.system.identifier];
-  if ( item.system.type?.value === "scroll" ) {
-    const level = item.system.activities?.find(a => a.type === "cast")?.spell?.level;
-    if ( (level != null) && scrolls[level] ) return scrolls[level];
-  }
-  if ( !item.system.properties?.has("mgc") || !item.system.rarity ) {
-    const { mundane } = CONFIG.DND5E.crafting;
-    const priceCP = item.system.price?.value
-      ? toCopper(item.system.price.value, item.system.price.denomination) : 0;
-    const copperPerGP = toCopper(1, "gp");
-    return {
-      days: Math.ceil((priceCP / copperPerGP) * mundane.days),
-      gold: Math.floor(priceCP * mundane.gold) / copperPerGP
-    };
-  }
-  return item.system.getCraftCost();
-}
-
-/* -------------------------------------------- */
-
-/**
  * Resolve a recipe's crafting cost: `CONFIG.DND5E.crafting.scrolls[level]` for a spell-scroll recipe,
- * otherwise `effectiveCraftCost()` on the resolved target item.
+ * otherwise `getCraftCost()` of the resolved target item.
  * @param {Recipe} recipe
  * @param {Item5e|null} targetItem  The recipe's resolved target item, if any.
  * @returns {Promise<{ days: number, gold: number }|null>}
@@ -131,7 +101,7 @@ export async function recipeCraftCost(recipe, targetItem) {
   if ( !targetItem ) return null;
   try {
     const fullItem = targetItem.uuid ? await fromUuid(targetItem.uuid) : targetItem;
-    return fullItem?.system?.getCraftCost ? await effectiveCraftCost(fullItem) : null;
+    return fullItem?.system?.getCraftCost ? await fullItem.system.getCraftCost() : null;
   } catch ( err ) {
     console.warn(`${MODULE_ID} | Failed to resolve craft cost for ${targetItem.uuid}:`, err);
     return null;
@@ -241,20 +211,6 @@ export function canAffordCP(actor, amountCP) {
 /* -------------------------------------------- */
 
 /**
- * Denominations currently available for shop pricing, in system-configured order.
- * @param {object} [options]
- * @param {boolean} [options.abbreviated]  Use short symbols (e.g. "gp") instead of full names (e.g. "Gold").
- * @returns {{ value: string, label: string }[]}
- */
-function getCurrencyOptions({ abbreviated=false }={}) {
-  return Object.entries(CONFIG.DND5E.currencies).map(([value, cfg]) => ({
-    value, label: abbreviated ? cfg.abbreviation : cfg.label
-  }));
-}
-
-/* -------------------------------------------- */
-
-/**
  * Build a single-line Value + Currency split-group fieldlist entry.
  * @param {object} options
  * @param {string} options.label
@@ -276,7 +232,9 @@ export function currencyValueField({
       { field: field.fields.value, name: valueName, value, placeholder, label },
       {
         field: field.fields.denomination, name: denominationName, value: denomination || CONFIG.DND5E.defaultCurrency,
-        label: _loc("DND5E.Currency"), options: getCurrencyOptions({ abbreviated: true }), blank: false
+        label: _loc("DND5E.Currency"), blank: false,
+        options: Object.entries(CONFIG.DND5E.currencies)
+          .map(([value, { abbreviation }]) => ({ value, label: abbreviation }))
       }
     ]
   };
@@ -295,9 +253,7 @@ export function goldPoolCurrencies() {
 /* -------------------------------------------- */
 
 /**
- * Convert a value in a given denomination to a whole number of copper pieces, rounded down after removing
- * floating-point error. A value above zero never rounds down below 1 cp.
- * Uses the system's `roundCurrency` if it is available.
+ * Convert a value in a given denomination to a whole number of copper pieces. 
  * @param {number} value
  * @param {string} [denomination="gp"]
  * @returns {number}
@@ -305,7 +261,7 @@ export function goldPoolCurrencies() {
 export function toCopper(value, denomination="gp") {
   const cpPerUnit = CONFIG.DND5E.currencies.cp.conversion / (CONFIG.DND5E.currencies[denomination]?.conversion ?? 1);
   const copper = Number((value * cpPerUnit).toFixed(6));
-  const rounded = Math.floor(game.dnd5e.utils.roundCurrency?.(copper, "cp") ?? copper);
+  const rounded = Math.floor(game.dnd5e.utils.roundCurrency(copper, "cp"));
   return ((copper > 0) && !rounded) ? 1 : rounded;
 }
 
@@ -376,6 +332,20 @@ export function selectableActors({ includeParty=false }={}) {
   const partySelectable = party && (isGM
     || (game.user.character && party.system.playerCharacters.includes(game.user.character) && party.isOwner));
   return { characters, party: partySelectable ? party : null };
+}
+
+/* -------------------------------------------- */
+
+/**
+ * The actor acting by default: the character assigned to the current user if it is selectable, otherwise the
+ * first selectable character by name. A GM acts as no actor by default.
+ * @param {Actor5e[]} actors  Actors selectable by the current user, as returned by {@link selectableActors}.
+ * @returns {Actor5e|null}
+ */
+export function defaultActor(actors) {
+  if ( game.user.isGM ) return null;
+  return actors.find(a => a === game.user.character)
+    ?? actors.toSorted((a, b) => a.name.localeCompare(b.name))[0] ?? null;
 }
 
 /* -------------------------------------------- */
@@ -738,7 +708,7 @@ export async function resolveBundleSizes(items) {
 /**
  * Bulk version of `fromUuid` that performs only a single fetch per compendium.
  * Documents already cached by their compendium are not fetched again. Uses the system's version for the remaining
- * ones if it is available. Documents outside a compendium are not retrieved.
+ * ones. Documents outside a compendium are not retrieved.
  * @param {string[]} uuids                    UUIDs of documents to retrieve.
  * @returns {Promise<Map<string, Document>>}  Documents mapped to the provided UUID.
  */
@@ -756,16 +726,7 @@ export async function bulkFromUuid(uuids) {
   }
   if ( !missing.length ) return documents;
 
-  let fetched;
-  if ( game.dnd5e.utils.bulkFromUuid ) {
-    fetched = await game.dnd5e.utils.bulkFromUuid(missing.map(({ source }) => source));
-  } else {
-    const fetches = Array.from(Map.groupBy(missing, ({ collection }) => collection), ([collection, group]) => {
-      return collection.getDocuments({ _id__in: group.map(({ id }) => id) });
-    });
-    const sources = new Map(missing.map(({ source, uuid }) => [uuid, source]));
-    fetched = new Map((await Promise.all(fetches)).flat().map(document => [sources.get(document.uuid), document]));
-  }
+  const fetched = await game.dnd5e.utils.bulkFromUuid(missing.map(({ source }) => source));
   for ( const [source, document] of fetched ) documents.set(source, document);
   return documents;
 }
@@ -1033,7 +994,7 @@ function applyItemFilters(rgx, typeFilter, content) {
 export function applyItemSort(sortType, content) {
   for ( const list of content.querySelectorAll(".item-list") ) {
     const rows = Array.from(list.children);
-    if ( sortType === "name" ) rows.sort((a, b) => a.dataset.name.localeCompare(b.dataset.name));
+    if ( sortType === "name" ) rows.sort((a, b) => a.dataset.name.localeCompare(b.dataset.name, game.i18n.lang));
     else rows.sort((a, b) => Number(a.dataset[sortType]) - Number(b.dataset[sortType]));
     rows.forEach(row => list.append(row));
   }
@@ -1127,20 +1088,6 @@ export function applyDropArea(element, onDrop) {
 /* -------------------------------------------- */
 
 /**
- * Build the markup for a loading tooltip section, displayed as a spinner while a document's rich
- * tooltip content is fetched.
- * @see dnd5e — utils#loadingTooltip()
- * @param {string} uuid  UUID of the document whose rich tooltip should be displayed.
- * @returns {string}
- */
-function loadingTooltip(uuid) {
-  if ( game.dnd5e.utils.loadingTooltip ) return game.dnd5e.utils.loadingTooltip({ uuid });
-  return `<section class="loading" data-uuid="${uuid}"><i class="fas fa-spinner fa-spin-pulse" inert></i></section>`;
-}
-
-/* -------------------------------------------- */
-
-/**
  * Wire an element's loading-tooltip dataset attributes, keyed by its `data-uuid`. No-op if the element
  * has no `data-uuid`.
  * @param {HTMLElement} el
@@ -1148,10 +1095,8 @@ function loadingTooltip(uuid) {
 export function applyLoadingTooltip(el) {
   const uuid = el.dataset.uuid;
   if ( !uuid ) return;
-  el.dataset.tooltipHtml = loadingTooltip(uuid);
-  el.dataset.tooltipClass = game.dnd5e.utils.loadingTooltip
-    ? "dnd5e2 dnd5e-tooltip item-tooltip"
-    : "dnd5e2 dnd5e-tooltip item-tooltip themed theme-light";
+  el.dataset.tooltipHtml = game.dnd5e.utils.loadingTooltip({ uuid });
+  el.dataset.tooltipClass = "dnd5e2 dnd5e-tooltip item-tooltip document-tooltip";
   el.dataset.tooltipDirection ??= "LEFT";
 }
 
@@ -1190,6 +1135,6 @@ export async function applyRichTooltip(el, data) {
  * @returns {number}
  */
 export function secondsPerDay() {
-  const days = game.time.calendar?.days ?? {};
-  return (days.hoursPerDay ?? 24) * (days.minutesPerHour ?? 60) * (days.secondsPerMinute ?? 60);
+  const { hoursPerDay, minutesPerHour, secondsPerMinute } = game.time.calendar.days;
+  return hoursPerDay * minutesPerHour * secondsPerMinute;
 }

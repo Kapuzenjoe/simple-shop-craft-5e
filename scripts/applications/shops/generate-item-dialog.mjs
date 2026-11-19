@@ -55,7 +55,7 @@ export default class GenerateItemDialog extends Dialog5e {
   /** @override */
   static PARTS = {
     tabs: {
-      template: "systems/dnd5e/templates/shared/horizontal-tabs.hbs",
+      template: "modules/simple-shop-craft-5e/templates/shared/tabs.hbs",
       templates: ["templates/generic/tab-navigation.hbs"]
     },
     filters: { template: "modules/simple-shop-craft-5e/templates/shops/generate-item-dialog/filters.hbs" },

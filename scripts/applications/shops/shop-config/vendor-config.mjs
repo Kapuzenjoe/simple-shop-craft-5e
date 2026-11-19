@@ -35,7 +35,8 @@ export default class VendorConfig extends BaseShopConfig {
   /** @override */
   static PARTS = {
     tabs: {
-      template: "templates/generic/tab-navigation.hbs"
+      template: "modules/simple-shop-craft-5e/templates/shared/tabs.hbs",
+      templates: ["templates/generic/tab-navigation.hbs"]
     },
     general: {
       template: "modules/simple-shop-craft-5e/templates/shops/shop-config/vendor-config/general.hbs"
@@ -183,6 +184,18 @@ export default class VendorConfig extends BaseShopConfig {
       }
     ];
 
+    context.haggleFields = [
+      {
+        field: Shop.schema.fields.haggle.fields.skills, name: "haggle.skills", value: this.shop.haggleSkills,
+        options: Object.entries(CONFIG.DND5E.skills).map(([value, { label }]) => ({ value, label }))
+      },
+      {
+        field: Shop.schema.fields.haggle.fields.dc, name: "haggle.dc", value: this.shop.haggle.dc,
+        input: (field, config) => foundry.applications.fields.createNumberInput(config),
+        placeholder: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.StatusOverrideAuto")
+      }
+    ];
+
     context.moneyFields = [
       {
         field: Shop.schema.fields.goldPool.fields.sellDisabled, name: "sellDisabled", value: goldPool.sellDisabled,
@@ -304,6 +317,10 @@ export default class VendorConfig extends BaseShopConfig {
         value: capValue,
         denomination: customCap ? (data.settlementCapDenomination ?? settlementCap.denomination) : "gp",
         appliesToSell: !!data.appliesToSell
+      },
+      haggle: {
+        skills: data.haggle?.skills ?? [],
+        dc: (data.haggle?.dc == null) ? null : Math.max(1, Math.round(data.haggle.dc))
       },
       goldPool: { ...currentGoldPool, max, unlimited, sellDisabled },
       stockDefaults: { byType, magicRule: data.magicRule ?? "gear" },

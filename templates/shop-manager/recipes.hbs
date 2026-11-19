@@ -1,4 +1,29 @@
 <section class="tab {{ tab.cssClass }}" data-tab="recipes" data-group="{{ tab.group }}">
+    <div class="pills-group recipes-filters">
+        <h3 class="icon">
+            <i class="fas fa-hammer" inert></i>
+            <span class="roboto-upper">{{ localize 'TYPES.Item.toolPl' }}</span>
+            <label class="player-select" data-tooltip="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.Player' }}">
+                <i class="fa-solid fa-user" inert></i>
+                <span class="roboto-upper">{{ localize "SIMPLE_SHOP_CRAFT_5E.ShopEditor.Player" }}</span>
+                <select name="actor" class="always-interactive"
+                        aria-label="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopEditor.Player' }}">
+                    {{#each actorOptions}}
+                    <option value="{{ this.value }}" {{#if this.selected}}selected{{/if}}>{{ this.label }}</option>
+                    {{/each}}
+                </select>
+            </label>
+        </h3>
+        <div class="pills tool-chips" role="group" aria-label="{{ localize 'TYPES.Item.toolPl' }}">
+            {{#each toolChips}}
+            <button type="button" class="pill tool-chip always-interactive {{#if this.active}}green{{/if}}"
+                    data-tool="{{ this.value }}" aria-pressed="{{ this.active }}">
+                {{ this.label }} ({{ this.count }})
+            </button>
+            {{/each}}
+        </div>
+    </div>
+    <hr>
     <search>
         <input type="search" class="item-search always-interactive"
                placeholder="{{ localize 'SIMPLE_SHOP_CRAFT_5E.ShopManager.Recipes.SearchRecipes' }}">

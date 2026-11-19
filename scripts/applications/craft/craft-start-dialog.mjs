@@ -4,7 +4,7 @@ import { ShopItemEntry } from "../../data/shop-data.mjs";
 import {
   applyDropArea, applyLoadingTooltip, breakdownCopper, buildItemTableSections, canAffordCP, matchIdentifier,
   maxHoursPerWorkday, openItemSheet, recipeCraftCost, resolveBundleSize, resolveBundleSizes, resolveEntries,
-  resolveTotalHours, resolveUnitPrice, selectableActors, subtypeOptions, toCopper
+  resolveTotalHours, resolveUnitPrice, subtypeOptions, toCopper
 } from "../../utils.mjs";
 
 const { Dialog5e } = game.dnd5e.applications.api;
@@ -14,10 +14,10 @@ const { Dialog5e } = game.dnd5e.applications.api;
  * requirements, with optional gold fill-in, ending in a GM-confirmation chat card.
  */
 export default class CraftStartDialog extends Dialog5e {
-  constructor({ recipeId, ...options }={}) {
+  constructor({ recipeId, actorUuid, ...options }={}) {
     super(options);
     this.recipeId = recipeId;
-    this.selectedActorUuid = game.user.character?.type === "character" ? game.user.character.uuid : "";
+    this.selectedActorUuid = actorUuid ?? "";
   }
 
   /* -------------------------------------------- */
@@ -65,7 +65,7 @@ export default class CraftStartDialog extends Dialog5e {
   /* -------------------------------------------- */
 
   /**
-   * UUID of the selected crafting actor, or "" if none chosen.
+   * UUID of the crafting actor, passed in when the dialog is opened.
    * @type {string}
    */
   selectedActorUuid;
@@ -145,7 +145,7 @@ export default class CraftStartDialog extends Dialog5e {
   /* -------------------------------------------- */
 
   /**
-   * The currently selected crafting actor.
+   * The crafting actor.
    * @type {Actor5e|null}
    */
   get actor() {
@@ -188,10 +188,7 @@ export default class CraftStartDialog extends Dialog5e {
     context = await super._prepareContentContext(context, options);
     const state = context.state;
 
-    context.actorOptions = [
-      { value: "", label: _loc("SIMPLE_SHOP_CRAFT_5E.ShopEditor.NoActorSelected") },
-      ...selectableActors().map(a => ({ value: a.uuid, label: a.name }))
-    ].map(o => ({ ...o, selected: o.value === this.selectedActorUuid }));
+    context.actorName = state.actor?.name ?? "";
     context.recipe = state.recipe;
     context.targetItem = state.targetItem;
     context.displayName = this.#targetItemName;
@@ -282,17 +279,7 @@ export default class CraftStartDialog extends Dialog5e {
   /** @inheritDoc */
   _onChangeForm(formConfig, event) {
     super._onChangeForm(formConfig, event);
-    if ( event.target.name === "selectedActor" ) {
-      this.selectedActorUuid = event.target.value;
-      this.#freeformIds.clear();
-      this.#workshopClaimed = false;
-      this.#fillWithGold = false;
-      this.#materialQuantities.clear();
-      this.#chosenSpellUuid = null;
-      this.#scrollDC = null;
-      this.#scrollBonus = null;
-    }
-    else if ( event.target.name === "count" ) this.#count = Math.max(1, Math.floor(Number(event.target.value)) || 1);
+    if ( event.target.name === "count" ) this.#count = Math.max(1, Math.floor(Number(event.target.value)) || 1);
     else if ( event.target.name === "workshopClaimed" ) this.#workshopClaimed = event.target.checked;
     else if ( event.target.name === "fillWithGold" ) this.#fillWithGold = event.target.checked;
     else if ( event.target.name === "spellUuid" ) this.#chosenSpellUuid = event.target.value || null;

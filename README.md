@@ -1,8 +1,6 @@
 <img src="docs/banner.png" alt="Simple Shop & Craft 5e — Buy, Sell & Services · Random Item Generator · Haggling & Player Discounts · Recipe-Based Downtime Crafting" width="100%">
 
 ![Static Badge](https://img.shields.io/badge/Foundry-v14-informational)
-![Static Badge](https://img.shields.io/badge/Dnd5e-v5.3-informational)
-![Static Badge](https://img.shields.io/badge/Dnd5e-v6.0-informational)
 ![Static Badge](https://img.shields.io/badge/Dnd5e-v6.1-informational)
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/peterlankton86911)
@@ -219,16 +217,17 @@ The GM can grant single players their own deal, and players can try to haggle th
 
 - **Player discounts.** Drop an actor into the Players dialog and give it its own Buy and Sell modifier. It
   adds to the shop's modifier.
-- **Haggling.** The player picks Buy or Sell as the transaction, then rolls a Charisma skill against a DC
-  equal to the shopkeeper's Intelligence score, minimum 15. A Friendly shopkeeper grants Advantage, a
-  Hostile one Disadvantage.
+- **Haggling.** The player picks Buy or Sell as the transaction, then rolls one of the skills the shop allows,
+  by default the Charisma skills, against a DC equal to the shopkeeper's Intelligence score, minimum 15. The
+  allowed skills and a fixed DC are set per shop in the Prices tab of the Vendor Settings. A Friendly
+  shopkeeper grants Advantage, a Hostile one Disadvantage.
 - **Result.** On a success, a tray appears under the roll for the GM only. It offers a discount (Buy) or a
   bonus (Sell) of 5, 10, 15, 20, or 25 percent, with 10 preselected. Apply sets the player's modifier for
   that side at this shop and replaces the one it had, Reject leaves it alone. The modifier stays until the
   GM changes it in the Players dialog.
-- **Cooldown.** A failed roll locks that skill on that side of the shop, a success locks every Charisma skill
-  on that side. The lock lifts 24 hours of in-game time after the roll, or the GM resets it in the Players
-  dialog.
+- **Cooldown.** A failed roll locks that skill on that side of the shop, a success locks every skill the shop
+  allows on that side. The lock lifts 24 hours of in-game time after the roll, or the GM resets it in the
+  Players dialog.
 
 <table>
   <tr>
@@ -285,9 +284,10 @@ Generate Item rolls up new stock for a shop. The GM reviews every result before 
 ### Recipes
 
 The Craft tab lists every recipe with its material value, duration, and required proficiencies, grouped by
-the type of item it makes. The group button above the list switches to grouping by tool proficiency, with
-recipes that need no tool under No Tool. Click a recipe to start crafting it. The GM writes recipes in the
-Recipe Editor, where clicking the name of a target item or material opens it.
+the type of item it makes. Pick the character under Player and filter by tool with the Tools chips. The
+group button above the list switches to grouping by tool proficiency, with recipes that need no tool under
+No Tool. Click a recipe to start crafting it. The GM writes recipes in the Recipe Editor, where clicking the
+name of a target item or material opens it.
 
 - **Target item.** The item a recipe makes and how many per craft. Cost and duration follow the item's
   crafting value, or the GM sets a custom duration. A recipe can also skip the crafting value and rely on its
@@ -333,9 +333,9 @@ Recipe Editor, where clicking the name of a target item or material opens it.
 A player starts a craft from the Craft tab. Once the GM approves, the work goes on through the character's
 downtime.
 
-- **Start Craft.** Choose the character. The Requirements list every tool and skill the recipe asks for and
-  what is still missing. Then add owned materials, and pay any value still missing in gold. For a Spell
-  Scroll, pick the spell and set its save DC and attack bonus, which default to the crafter's own.
+- **Start Craft.** The Requirements list every tool and skill the recipe asks for and what is still
+  missing. Then add owned materials, and pay any value still missing in gold. For a Spell Scroll, pick the
+  spell and set its save DC and attack bonus, which default to the crafter's own.
 - **Quantity.** Craft the recipe several times in a row. Materials and cost multiply, and each run takes its
   own crafting time. Quantity isn't offered for containers.
 - **Approval.** The order goes to the GM as a chat card. On acceptance, materials and gold are spent and an

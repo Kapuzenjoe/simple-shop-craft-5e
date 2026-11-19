@@ -65,6 +65,10 @@
  * @property {string} settlementCap.denomination      Currency denomination of the cap.
  * @property {boolean} settlementCap.appliesToSell     Whether the cap also blocks selling items to this shop
  *                                                    above the cap, not just buying them. Default `true`.
+ * @property {object} haggle
+ * @property {Set<string>} haggle.skills               Skills allowed for Haggling. Empty = Haggling is disabled.
+ * @property {number|null} haggle.dc                   Fixed DC of the Haggling check. `null` = the higher of 15 and
+ *                                                    the Intelligence score of the owner.
  * @property {object} goldPool
  * @property {Record<string, number>} goldPool.max      Maximum gold pool, per denomination.
  * @property {Record<string, number>} goldPool.current  Current gold pool, per denomination.

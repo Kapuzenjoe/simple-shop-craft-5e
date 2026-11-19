@@ -161,7 +161,7 @@ export default class ShopSheet extends Application5e {
       templates: ["modules/simple-shop-craft-5e/templates/shared/currency-parts.hbs"]
     },
     tabs: {
-      template: "systems/dnd5e/templates/shared/horizontal-tabs.hbs",
+      template: "modules/simple-shop-craft-5e/templates/shared/tabs.hbs",
       templates: ["templates/generic/tab-navigation.hbs"]
     },
     buy: {
@@ -1449,14 +1449,13 @@ export default class ShopSheet extends Application5e {
 
 /**
  * Build a property-attribution source entry for an additive percent term. A negative value is given as type
- * "subtract" with its absolute value, since the dnd5e template only reads `type`. The `mode` and `negative`
- * fields are for the dnd5e 5.3 template.
- * @param {string} label
- * @param {number} value
- * @returns {{ label: string, value: string, type: string, mode: number, negative: boolean }}
+ * "subtract" with its absolute value.
+ * @param {string} label  Label of the term.
+ * @param {number} value  Percent that the term adds or subtracts.
+ * @returns {{ label: string, value: string, type: string }}
  */
 function additiveSource(label, value) {
-  return { label, value: `${Math.abs(value)}%`, type: (value < 0) ? "subtract" : "add", mode: 2, negative: value < 0 };
+  return { label, value: `${Math.abs(value)}%`, type: (value < 0) ? "subtract" : "add" };
 }
 
 /* -------------------------------------------- */
@@ -1698,8 +1697,6 @@ function resolveWeight(itemSystem, targetUnit) {
   if ( !itemSystem?.weight ) return undefined;
   const { convertWeight } = game.dnd5e.utils;
   const from = itemSystem.weight.units || targetUnit;
-  const value = foundry.utils.isNewerVersion("6.1.0", game.system.version)
-    ? convertWeight(itemSystem.weight.value, from, targetUnit)
-    : convertWeight(itemSystem.weight.value, from, { to: targetUnit, legacy: false }).value;
+  const { value } = convertWeight(itemSystem.weight.value, from, { to: targetUnit, legacy: false });
   return { value, unit: targetUnit };
 }
